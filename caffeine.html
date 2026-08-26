@@ -50,7 +50,31 @@ body::after {
 }
 @keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
 
-.page { max-width: 1100px; margin: 0 auto; }
+/* ===== Fond atmosphérique "Torréfaction" (ambre café + particules) ===== */
+.atmo-wash {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(60% 50% at 50% 20%, rgba(201,163,107,0.16) 0%, rgba(201,163,107,0.06) 35%, transparent 65%),
+    radial-gradient(50% 40% at 80% 85%, rgba(107,66,38,0.14) 0%, transparent 60%),
+    radial-gradient(120% 80% at 50% 100%, rgba(20,14,8,0.5) 0%, rgba(4,6,10,0.95) 75%);
+  background-repeat: no-repeat; background-size: 100% 100%;
+}
+.atmo-particles { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.atmo-particles span {
+  position: absolute; width: 1.5px; height: 1.5px; border-radius: 50%;
+  background: rgba(230,200,150,0.7);
+  animation: atmo-drift linear infinite;
+  box-shadow: 0 0 6px rgba(201,163,107,0.5);
+}
+@keyframes atmo-drift {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.5; }
+  100% { transform: translate3d(var(--dx, 12px), var(--dy, -100vh), 0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .atmo-particles span { animation: none; } }
+
+.page { max-width: 1100px; margin: 0 auto; position: relative; z-index: 5; }
 .dash-title {
   margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
   background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
@@ -196,6 +220,10 @@ body::after {
 </style>
 </head>
 <body>
+<div id="atmo-backdrop" aria-hidden="true">
+  <div class="atmo-wash"></div>
+  <div class="atmo-particles" id="atmoParticles"></div>
+</div>
 <div class="page">
 
   <h1 class="dash-title">Caféine</h1>
@@ -667,6 +695,31 @@ body::after {
     window.initCloudSync({ appKey:'caffeine', syncedKeys:[LOGS_KEY,CUSTOM_KEY],
       onApplied:function(){ logs=loadJSON(LOGS_KEY,[]); custom=loadJSON(CUSTOM_KEY,[]); renderResults($('search').value); renderAll(); } });
   }
+})();
+</script>
+<script id="atmo-backdrop-js">
+(function () {
+  function spawnParticles() {
+    var root = document.getElementById('atmoParticles');
+    if (!root) return;
+    root.innerHTML = '';
+    var N = window.innerWidth < 640 ? 12 : 20;
+    for (var i = 0; i < N; i++) {
+      var s = document.createElement('span');
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.top = (55 + Math.random() * 45) + '%';
+      var size = 1.1 + Math.random() * 1.2;
+      s.style.width = s.style.height = size + 'px';
+      var dur = 24 + Math.random() * 30;
+      s.style.animationDuration = dur + 's';
+      s.style.animationDelay = (-Math.random() * dur) + 's';
+      s.style.setProperty('--dx', (Math.random() * 28 - 14) + 'px');
+      s.style.setProperty('--dy', -(55 + Math.random() * 45) + 'vh');
+      root.appendChild(s);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', spawnParticles);
+  else spawnParticles();
 })();
 </script>
 </body>
