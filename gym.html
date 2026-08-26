@@ -80,15 +80,15 @@ const CONFIG = {
   // First-run defaults. Once a user logs anything, they edit through
   // the in-app + / gear buttons; this block stays as the seed.
   defaultExercises: [
-    { name: "Développé couché",     gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 60, primaryMuscles: ["chest"], secondaryMuscles: ["front_delts","triceps"] },
-    { name: "Développé militaire",  gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 35, primaryMuscles: ["front_delts","side_delts"], secondaryMuscles: ["triceps"] },
-    { name: "Extension triceps à la poulie", gym: "comm", day: "push", repMin: 8, repMax: 12, step: 2.5, startWeight: 25, primaryMuscles: ["triceps"], secondaryMuscles: [] },
-    { name: "Tractions",        gym: "both", day: "pull", repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true, primaryMuscles: ["lats"], secondaryMuscles: ["biceps"] },
-    { name: "Rowing barre",     gym: "comm", day: "pull", repMin: 6, repMax: 10, step: 2.5, startWeight: 50, primaryMuscles: ["lats"], secondaryMuscles: ["biceps","rear_delts"] },
-    { name: "Curl biceps",      gym: "comm", day: "pull", repMin: 8, repMax: 12, step: 1.25,startWeight: 15, primaryMuscles: ["biceps"], secondaryMuscles: ["forearms"] },
-    { name: "Squat arrière",      gym: "comm", day: "legs", repMin: 5, repMax: 8,  step: 5,   startWeight: 80, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] },
-    { name: "Soulevé de terre roumain", gym: "comm", day: "legs", repMin: 6, repMax: 10, step: 5, startWeight: 60, primaryMuscles: ["hamstrings"], secondaryMuscles: ["glutes","lower_back"] },
-    { name: "Presse à cuisses",       gym: "comm", day: "legs", repMin: 8, repMax: 12, step: 5,   startWeight: 100, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] }
+    { name: "Développé couché",     gym: "comm", days: ["push"], repMin: 5, repMax: 8,  step: 2.5, startWeight: 60, primaryMuscles: ["chest"], secondaryMuscles: ["front_delts","triceps"] },
+    { name: "Développé militaire",  gym: "comm", days: ["push"], repMin: 5, repMax: 8,  step: 2.5, startWeight: 35, primaryMuscles: ["front_delts","side_delts"], secondaryMuscles: ["triceps"] },
+    { name: "Extension triceps à la poulie", gym: "comm", days: ["push"], repMin: 8, repMax: 12, step: 2.5, startWeight: 25, primaryMuscles: ["triceps"], secondaryMuscles: [] },
+    { name: "Tractions",        gym: "both", days: ["pull"], repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true, primaryMuscles: ["lats"], secondaryMuscles: ["biceps"] },
+    { name: "Rowing barre",     gym: "comm", days: ["pull"], repMin: 6, repMax: 10, step: 2.5, startWeight: 50, primaryMuscles: ["lats"], secondaryMuscles: ["biceps","rear_delts"] },
+    { name: "Curl biceps",      gym: "comm", days: ["pull"], repMin: 8, repMax: 12, step: 1.25,startWeight: 15, primaryMuscles: ["biceps"], secondaryMuscles: ["forearms"] },
+    { name: "Squat arrière",      gym: "comm", days: ["legs"], repMin: 5, repMax: 8,  step: 5,   startWeight: 80, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] },
+    { name: "Soulevé de terre roumain", gym: "comm", days: ["legs"], repMin: 6, repMax: 10, step: 5, startWeight: 60, primaryMuscles: ["hamstrings"], secondaryMuscles: ["glutes","lower_back"] },
+    { name: "Presse à cuisses",       gym: "comm", days: ["legs"], repMin: 8, repMax: 12, step: 5,   startWeight: 100, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] }
   ]
 };
 
@@ -1373,6 +1373,80 @@ img, video, canvas, svg { max-width: 100%; }
   text-align: center; font-variant-numeric: tabular-nums; width: 100%; box-sizing: border-box;
   -moz-appearance: textfield;
 }
+
+/* ===== Séance du jour — entry card + picker + guided overlay ===== */
+.sesh-card { background: linear-gradient(180deg, rgba(110,231,183,0.06), var(--bg-card)); border-color: rgba(110,231,183,0.14); }
+.sesh-eyebrow {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 6px;
+}
+.sesh-headline { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 14px; }
+.sesh-progress { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden; margin-bottom: 14px; }
+.sesh-progress-bar { height: 100%; background: var(--good); border-radius: 3px; transition: width 0.3s ease; }
+.sesh-card .po-btn-secondary { width: 100%; margin-top: 8px; }
+
+.sesh-dots { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 16px; }
+.sesh-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.14);
+  cursor: pointer; transition: background 0.15s, transform 0.15s;
+}
+.sesh-dot.done { background: rgba(110,231,183,0.55); }
+.sesh-dot.active { background: var(--good); transform: scale(1.3); }
+
+.sesh-carousel { touch-action: pan-y; }
+.sesh-card-eyebrow {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 6px; text-align: center;
+}
+.sesh-card-title { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 14px; text-align: center; }
+.sesh-carousel .po-last-set { justify-content: center; }
+.sesh-series-picker {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  margin: 18px 0 14px;
+}
+.sesh-series-stepper { display: flex; align-items: center; gap: 12px; }
+.sesh-series-count { font-size: 20px; font-weight: 700; min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
+.sesh-sets { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.sesh-set-row {
+  display: grid; grid-template-columns: 20px 1fr 1fr auto; gap: 8px; align-items: center;
+  background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px;
+}
+.sesh-set-num { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); font-weight: 700; }
+.sesh-set-row input[type="number"] {
+  padding: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.28);
+  color: var(--text-1); border-radius: 10px; font-family: inherit; font-size: 15px;
+  text-align: center; font-variant-numeric: tabular-nums; width: 100%; box-sizing: border-box;
+  -moz-appearance: textfield;
+}
+.sesh-fail {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2);
+  white-space: nowrap; cursor: pointer;
+}
+.sesh-fail input { accent-color: var(--bad); }
+.sesh-skip {
+  display: block; margin: 0 auto; background: transparent; border: none;
+  color: var(--text-3); text-decoration: underline; font-size: 12px; cursor: pointer;
+  padding: 6px;
+}
+.sesh-nav { display: flex; justify-content: space-between; margin-top: 4px; }
+.sesh-finish-top { flex-shrink: 0; padding: 8px 14px; font-size: 12px; }
+
+@media (max-width: 480px) {
+  .sesh-set-row { grid-template-columns: 16px 1fr 1fr auto; gap: 6px; padding: 9px 10px; }
+  .sesh-fail { font-size: 10px; }
+  .sesh-card-title { font-size: 20px; }
+}
+
+/* ===== Desktop: stop stretching everything into one long mobile-style
+   column — use the extra width with a two-column layout. ===== */
+@media (min-width: 900px) {
+  .po-shell { max-width: min(1080px, 100vw); }
+  #mainCard { display: flex; flex-wrap: wrap; column-gap: 28px; align-items: flex-start; }
+  #mainCard > .po-filters, #mainCard > #secTodayWorkout { flex: 1 1 100%; }
+  #colLeft, #colRight { flex: 1 1 0; min-width: 0; }
+  .sesh-set-row { grid-template-columns: 24px 1fr 1fr auto; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1389,6 +1463,13 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="po-day-sep">·</span>
     <span class="po-day-split" id="dayPillSplit">—</span>
   </button>
+
+  <!-- Séance du jour — the main way to log now. Starting one timestamps
+       it and walks you through its exercises one at a time; it stays
+       "active" (resumable) across closing the tab until you finish it. -->
+  <div class="card sesh-card">
+    <div id="seshCardInner"></div>
+  </div>
 
   <!-- WEIGHT + PROGRESS PHOTOS -->
   <div class="wt-section">
@@ -1563,7 +1644,7 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="mainCard">
     <!-- Filters -->
     <div class="po-filters">
       <div class="po-seg-row">
@@ -1576,9 +1657,10 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
-    <!-- Exercise -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Exercice</div>
+    <div id="colLeft">
+    <!-- Exercise stats browser -->
+    <div class="po-sub-section" id="secStatsPicker">
+      <div class="po-sub-title">Consulter un exercice</div>
       <div class="po-scan-zone" id="scanZone">
         <input type="file" id="scanFile" accept="image/*" style="display:none">
         <div id="scanZoneEmpty">
@@ -1602,52 +1684,21 @@ img, video, canvas, svg { max-width: 100%; }
         </button>
       </div>
       <div class="po-no-ex" id="noExMsg" style="display:none">Aucun exercice ici pour l'instant. Touchez <strong>+</strong> pour en ajouter un.</div>
-    </div>
-
-    <!-- Log a set -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Enregistrer la meilleure série du jour</div>
-      <div class="po-bw-banner" id="bwBanner">Poids du corps — enregistre uniquement les répétitions</div>
       <div class="po-last-set" id="lastSet">
         <span class="po-last-label">Dernière fois</span>
         <span class="po-last-value" id="lastSetValue"></span>
         <span class="po-last-meta" id="lastSetMeta"></span>
       </div>
-      <div class="po-log-grid" id="logGrid">
-        <div class="po-field" id="weightField">
-          <label id="weightLabel">Poids (kg)</label>
-          <div class="po-weight-row">
-            <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
-            <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
-            <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
-          </div>
-        </div>
-        <div class="po-field">
-          <label>Répétitions</label>
-          <div class="po-reps-row" id="repsRow" data-value="8">
-            <button type="button" class="po-reps-pill" data-v="4">4</button>
-            <button type="button" class="po-reps-pill" data-v="5">5</button>
-            <button type="button" class="po-reps-pill" data-v="6">6</button>
-            <button type="button" class="po-reps-pill" data-v="7">7</button>
-            <button type="button" class="po-reps-pill active" data-v="8">8</button>
-            <button type="button" class="po-reps-pill" data-v="9">9</button>
-            <button type="button" class="po-reps-pill" data-v="10">10</button>
-            <button type="button" class="po-reps-pill" data-v="11">11</button>
-            <button type="button" class="po-reps-pill" data-v="12">12</button>
-          </div>
-        </div>
-      </div>
-      <button class="po-btn-primary" id="logBtn">Enregistrer la série</button>
     </div>
 
     <!-- Prescription -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secPrescription">
       <div class="po-sub-title">Prochaine séance</div>
       <div id="rxWrap"></div>
     </div>
 
     <!-- Stats -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secStats">
       <div class="po-sub-title">Statistiques</div>
       <div class="po-stats-row">
         <div class="po-stat-box">
@@ -1666,7 +1717,7 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
 
     <!-- Trend -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secTrend">
       <div class="po-sub-title">Tendance (10 dernières séances)</div>
       <div class="po-spark-wrap">
         <svg class="po-spark-svg" id="sparkline" viewBox="0 0 300 60" preserveAspectRatio="none">
@@ -1682,16 +1733,18 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
 
     <!-- History -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secHistory">
       <div class="po-sub-title">Historique</div>
       <div id="historyCard">
         <div class="po-empty">Aucun enregistrement pour l'instant.</div>
       </div>
     </div>
+    </div><!-- /colLeft -->
 
+    <div id="colRight">
     <!-- Régularité — 12-week heatmap + flame streak for the current
          exercise, derived from state.logs on every render (no cache). -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secRegularity">
       <div class="po-sub-title">Régularité</div>
       <div class="po-heat-row" id="exHeatRow"></div>
       <div class="wt-streak hidden" id="exFlameStreak">🔥<span id="exFlameStreakNum"></span></div>
@@ -1700,16 +1753,17 @@ img, video, canvas, svg { max-width: 100%; }
     <!-- Reminders — exercises whose most recent logged set is older than
          their own reminderDays (default 10), most-overdue first. Purely
          derived from state.exercises + state.logs on every render. -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secReminders">
       <div class="po-sub-title">Rappels</div>
       <div id="remindersList"><div class="po-empty">Rien en retard.</div></div>
     </div>
+    </div><!-- /colRight -->
 
     <!-- Today's Workout — every set logged today, grouped by exercise.
          "Mark done" stamps the day so the past-workouts list shows it
          as a completed session. The volume here also feeds the
          composition estimate at the top of the page. -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="secTodayWorkout">
       <div class="po-sub-title">Séance du jour</div>
       <div class="po-tw" id="poTw">
         <div class="po-tw-head">
@@ -1750,8 +1804,8 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-modal-seg" id="exGymSeg"></div>
     </div>
     <div class="po-field">
-      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Jour</label>
-      <div class="po-modal-seg" id="exDaySeg"></div>
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Jours</label>
+      <div class="po-muscle-grid" id="exDaysGrid"></div>
     </div>
     <label class="po-bw-toggle">
       <input type="checkbox" id="exBw">
@@ -1816,6 +1870,39 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="scanDiscardBtn">Ignorer</button>
       <button class="po-btn-primary" id="scanApplyBtn">Appliquer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Séance du jour: pick which day's exercises to load before starting. -->
+<div class="po-modal-bg" id="seshPickerBg">
+  <div class="po-modal">
+    <h3>Quel jour ?</h3>
+    <div class="po-modal-seg" id="seshDaySeg"></div>
+    <div class="po-modal-actions">
+      <button class="po-btn-secondary" id="seshPickerCancel">Annuler</button>
+      <button class="po-btn-primary" id="seshPickerStart">Commencer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Séance du jour: guided one-exercise-at-a-time logging. Swipe (touch)
+     or use the arrows to move between exercises; every field auto-saves
+     on change so closing this (or the whole tab) never loses progress. -->
+<div class="wt-overlay" id="sessionOverlay" aria-hidden="true">
+  <div class="wt-overlay-inner">
+    <div class="wt-overlay-h">
+      <button class="wt-back" id="seshClose" aria-label="Fermer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="wt-overlay-title">Séance</div>
+      <button class="po-btn-secondary sesh-finish-top" id="seshOverlayFinish">Terminer</button>
+    </div>
+    <div class="sesh-dots" id="seshDots"></div>
+    <div class="sesh-carousel" id="seshCarousel"></div>
+    <div class="sesh-nav">
+      <button class="po-btn-icon" id="seshPrevBtn" aria-label="Exercice précédent">‹</button>
+      <button class="po-btn-icon" id="seshNextBtn" aria-label="Exercice suivant">›</button>
     </div>
   </div>
 </div>
@@ -1984,8 +2071,17 @@ img, video, canvas, svg { max-width: 100%; }
       if (!Array.isArray(e.primaryMuscles)) e.primaryMuscles = [];
       if (!Array.isArray(e.secondaryMuscles)) e.secondaryMuscles = [];
       if (typeof e.reminderDays !== 'number' || !(e.reminderDays > 0)) e.reminderDays = 10;
+      // Exercises used to belong to exactly one day (e.g. "push"); now they
+      // can belong to several (e.g. both "push" and "upper body").
+      if (!Array.isArray(e.days)) e.days = e.day ? [e.day] : [];
+      delete e.day;
     });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
+    // Guided "Séance du jour" sessions — small registry (start time, day,
+    // which exercises), separate from the heavy per-set logs. Only one can
+    // be active/resumable at a time.
+    if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
+    if (s.activeSessionId && !s.sessions[s.activeSessionId]) s.activeSessionId = null;
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Split rotation lives in state so the user can edit it via the pill modal.
@@ -2032,7 +2128,7 @@ img, video, canvas, svg { max-width: 100%; }
   function roundToStep(v, s) { return Math.round(v / s) * s; }
   function getFiltered() {
     return state.exercises.filter(e =>
-      (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
+      (e.gym === state.filterGym || e.gym === 'both') && (e.days || []).includes(state.filterDay));
   }
   function getCurrentEx() {
     const f = getFiltered();
@@ -2100,14 +2196,13 @@ img, video, canvas, svg { max-width: 100%; }
     const f = getFiltered();
     const noMsg = $('noExMsg');
     const editBtn = $('editExBtn');
-    const logBtn = $('logBtn');
     if (!f.length) {
       sel.innerHTML = '<option>—</option>';
-      sel.disabled = true; editBtn.disabled = true; logBtn.disabled = true;
+      sel.disabled = true; editBtn.disabled = true;
       noMsg.style.display = 'block'; state.currentEx = null;
       return;
     }
-    sel.disabled = false; editBtn.disabled = false; logBtn.disabled = false;
+    sel.disabled = false; editBtn.disabled = false;
     noMsg.style.display = 'none';
     if (!f.find(e => e.id === state.currentEx)) state.currentEx = f[0].id;
     sel.innerHTML = f.map(e => {
@@ -2118,22 +2213,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function renderForm() {
     const ex = getCurrentEx();
-    const banner = $('bwBanner');
-    const wField = $('weightField');
-    const oneRmLbl = $('oneRmLabel');
-    const grid = $('logGrid');
-    $('weightLabel').textContent = 'Poids (' + unit() + ')';
-    if (ex && ex.bw) {
-      banner.classList.add('show');
-      wField.style.display = 'none';
-      grid.classList.add('po-bw-mode');
-      oneRmLbl.textContent = 'Meilleures répétitions';
-    } else {
-      banner.classList.remove('show');
-      wField.style.display = '';
-      grid.classList.remove('po-bw-mode');
-      oneRmLbl.textContent = '1RM est.';
-    }
+    $('oneRmLabel').textContent = (ex && ex.bw) ? 'Meilleures répétitions' : '1RM est.';
   }
   function renderLastSet() {
     const wrap = $('lastSet');
@@ -2292,39 +2372,6 @@ img, video, canvas, svg { max-width: 100%; }
     const splitEl = $('dayPillSplit');
     splitEl.textContent = splitLabel(split.name);
     splitEl.classList.toggle('is-rest', isRestName(split.name));
-  }
-
-  // Build the rep buttons based on the current exercise's repMin/repMax.
-  // Always spans repMin → repMax + 2 (a small buffer for over-performing
-  // sets that trigger the upgrade signal), capped at 16 buttons total so
-  // wide ranges don't break the mobile layout.
-  function renderRepsRow() {
-    const row = document.getElementById('repsRow');
-    if (!row) return;
-    const ex = getCurrentEx();
-    let repMin, repMax;
-    if (ex) {
-      repMin = Math.max(1, parseInt(ex.repMin, 10) || 1);
-      repMax = Math.max(repMin, parseInt(ex.repMax, 10) || repMin);
-    } else {
-      repMin = 4; repMax = 12;
-    }
-    const upper = Math.max(repMax + 2, repMin + 5);
-    const end = Math.min(upper, repMin + 15);
-
-    // Preserve the previously-selected rep if it still fits in the new
-    // range; otherwise default to the target (repMax).
-    const prev = parseInt(row.dataset.value, 10);
-    const active = (prev >= repMin && prev <= end) ? prev : repMax;
-
-    let html = '';
-    for (let i = repMin; i <= end; i++) {
-      html += '<button type="button" class="po-reps-pill' +
-        (i === active ? ' active' : '') +
-        '" data-v="' + i + '">' + i + '</button>';
-    }
-    row.innerHTML = html;
-    row.dataset.value = String(active);
   }
 
   // ============================================================
@@ -2577,19 +2624,12 @@ img, video, canvas, svg { max-width: 100%; }
   function renderAll() {
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
-    renderRepsRow();
     renderRx(); renderStats(); renderSparkline(); renderHistory();
     renderRegularity();
     renderReminders();
     renderTodaysWorkout();
     renderPastWorkouts();
-    // Pre-fill weight input with last logged weight (or starting weight)
-    const ex = getCurrentEx();
-    if (ex && !ex.bw) {
-      const logs = getLogs();
-      const w = logs.length ? logs[logs.length - 1].weight : (ex.startWeight || 0);
-      $('weightInput').value = w;
-    }
+    renderSessionCard();
   }
 
   // ============================================================
@@ -2798,52 +2838,13 @@ img, video, canvas, svg { max-width: 100%; }
   $('exSelect').addEventListener('change', e => {
     state.currentEx = e.target.value; saveState(); renderAll();
   });
-  $('weightDownBtn').addEventListener('click', () => {
-    const ex = getCurrentEx(); if (!ex || ex.bw) return;
-    const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = Math.max(0, w - (ex.step || 2.5));
-  });
-  $('weightUpBtn').addEventListener('click', () => {
-    const ex = getCurrentEx(); if (!ex || ex.bw) return;
-    const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = w + (ex.step || 2.5);
-  });
-  // Delegated click handler — reps row is regenerated per exercise via
-  // renderRepsRow(), so we listen on the container rather than the
-  // individual buttons.
-  $('repsRow').addEventListener('click', (e) => {
-    const p = e.target.closest('.po-reps-pill');
-    if (!p) return;
-    $('repsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
-    p.classList.add('active');
-    $('repsRow').dataset.value = p.dataset.v;
-  });
-  $('logBtn').addEventListener('click', () => {
-    const ex = getCurrentEx();
-    if (!ex) return;
-    const reps = parseInt($('repsRow').dataset.value, 10) || 0;
-    if (reps <= 0) { alert('Choisissez un nombre de répétitions.'); return; }
-    const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
-    if (!ex.bw && w <= 0) { alert('Entrez un poids.'); return; }
-    const arr = state.logs[ex.id] || [];
-    arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
-    state.logs[ex.id] = arr;
-    saveState(); renderAll();
-    // Strength changed → composition estimate may shift
-    if (typeof wtRender === 'function') wtRender();
-    // Tiny pulse on the button so the user feels the save
-    const btn = $('logBtn');
-    btn.style.transition = 'transform 0.15s';
-    btn.style.transform = 'scale(0.96)';
-    setTimeout(() => { btn.style.transform = ''; }, 160);
-  });
 
   // ============================================================
   // EXERCISE MODAL (add / edit)
   // ============================================================
   let editingExId = null;
-  let modalGym = null, modalDay = null;
-  let modalPrimary = [], modalSecondary = [];
+  let modalGym = null;
+  let modalPrimary = [], modalSecondary = [], modalDays = [];
   function renderMuscleGrid(containerId, selectedArr) {
     const el = $(containerId);
     el.innerHTML = MUSCLE_GROUPS.map(m =>
@@ -2862,9 +2863,6 @@ img, video, canvas, svg { max-width: 100%; }
     $('exGymSeg').innerHTML = state.gyms.map(g =>
       '<button data-gym="' + g.id + '" class="' + (modalGym === g.id ? 'active' : '') + '">' + escape(g.name) + '</button>'
     ).join('') + '<button data-gym="both" class="' + (modalGym === 'both' ? 'active' : '') + '">Les deux</button>';
-    $('exDaySeg').innerHTML = state.days.map(d =>
-      '<button data-day="' + d.id + '" class="' + (modalDay === d.id ? 'active' : '') + '">' + escape(d.name) + '</button>'
-    ).join('');
     $('exGymSeg').querySelectorAll('button').forEach(b => {
       b.addEventListener('click', () => {
         modalGym = b.dataset.gym;
@@ -2872,11 +2870,18 @@ img, video, canvas, svg { max-width: 100%; }
         b.classList.add('active');
       });
     });
-    $('exDaySeg').querySelectorAll('button').forEach(b => {
+  }
+  function renderDaysGrid() {
+    const el = $('exDaysGrid');
+    el.innerHTML = state.days.map(d =>
+      '<button type="button" class="po-muscle-chip' + (modalDays.includes(d.id) ? ' active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>'
+    ).join('');
+    el.querySelectorAll('.po-muscle-chip').forEach(b => {
       b.addEventListener('click', () => {
-        modalDay = b.dataset.day;
-        $('exDaySeg').querySelectorAll('button').forEach(x => x.classList.remove('active'));
-        b.classList.add('active');
+        const id = b.dataset.day;
+        const i = modalDays.indexOf(id);
+        if (i === -1) modalDays.push(id); else modalDays.splice(i, 1);
+        b.classList.toggle('active');
       });
     });
   }
@@ -2887,7 +2892,7 @@ img, video, canvas, svg { max-width: 100%; }
     if (mode === 'edit') {
       $('exName').value = ex.name;
       modalGym = ex.gym;
-      modalDay = ex.day;
+      modalDays = (ex.days || []).slice();
       $('exBw').checked = !!ex.bw;
       $('exStartWeight').value = ex.startWeight || 0;
       $('exRepMin').value = ex.repMin;
@@ -2899,7 +2904,7 @@ img, video, canvas, svg { max-width: 100%; }
     } else {
       $('exName').value = '';
       modalGym = state.filterGym;
-      modalDay = state.filterDay;
+      modalDays = [state.filterDay];
       $('exBw').checked = false;
       $('exStartWeight').value = 20;
       $('exRepMin').value = 6;
@@ -2910,6 +2915,7 @@ img, video, canvas, svg { max-width: 100%; }
       $('exReminderDays').value = 10;
     }
     renderModalSegs();
+    renderDaysGrid();
     renderMuscleGrid('exPrimaryMuscles', modalPrimary);
     renderMuscleGrid('exSecondaryMuscles', modalSecondary);
     toggleBwFields();
@@ -2932,12 +2938,12 @@ img, video, canvas, svg { max-width: 100%; }
     const name = $('exName').value.trim();
     if (!name) { alert('Le nom est requis.'); return; }
     if (!modalGym) { alert('Choisissez une salle.'); return; }
-    if (!modalDay) { alert('Choisissez un jour.'); return; }
+    if (!modalDays.length) { alert('Choisissez au moins un jour.'); return; }
     const isBw = $('exBw').checked;
     const repMin = parseInt($('exRepMin').value, 10) || 6;
     const repMax = parseInt($('exRepMax').value, 10) || 8;
     const data = {
-      name, gym: modalGym, day: modalDay,
+      name, gym: modalGym, days: modalDays.slice(),
       bw: isBw,
       startWeight: isBw ? 0 : (parseFloat($('exStartWeight').value) || 0),
       repMin, repMax,
@@ -2954,7 +2960,7 @@ img, video, canvas, svg { max-width: 100%; }
       state.exercises.push(ex);
       state.currentEx = ex.id;
       state.filterGym = (modalGym === 'both') ? state.filterGym : modalGym;
-      state.filterDay = modalDay;
+      if (!modalDays.includes(state.filterDay)) state.filterDay = modalDays[0];
     }
     saveState();
     $('exModalBg').classList.remove('show');
@@ -4060,7 +4066,7 @@ img, video, canvas, svg { max-width: 100%; }
     let ex = state.exercises.find(e => e.name.trim().toLowerCase() === name.toLowerCase());
     if (!ex) {
       ex = {
-        id: uid(), name: name, gym: state.filterGym, day: state.filterDay,
+        id: uid(), name: name, gym: state.filterGym, days: [state.filterDay],
         bw: false, startWeight: (scanDraftSets[0] && scanDraftSets[0].weight) || 0,
         repMin: 6, repMax: 8, step: 2.5,
         primaryMuscles: [], secondaryMuscles: [], reminderDays: 10
@@ -4080,6 +4086,278 @@ img, video, canvas, svg { max-width: 100%; }
     scanReset();
     renderAll();
   });
+
+  // ============================================================
+  // SÉANCE DU JOUR — guided, resumable session logging. Replaces the old
+  // "pick one exercise, log one set" flow. A session is a small metadata
+  // record { id, startedAt, dayId, exIds, cursor, finishedAt } stored in
+  // state.sessions; the actual sets it logs go straight into state.logs
+  // (same shape the rest of the app already reads), tagged with
+  // sessionId + setIndex so this screen can find/update its own rows.
+  // Only one session can be active/resumable at a time — closing the tab
+  // or the overlay just leaves it active, so re-opening the app picks
+  // straight back up via the "Reprendre" card.
+  // ============================================================
+  function uidSession() { return 'sess_' + Date.now() + '_' + Math.floor(Math.random() * 9999); }
+  function getActiveSession() { return state.activeSessionId ? state.sessions[state.activeSessionId] : null; }
+  function sessionExercises(s) { return (s.exIds || []).map(id => state.exercises.find(e => e.id === id)).filter(Boolean); }
+  function sessionLoggedCount(s, exId) { return (state.logs[exId] || []).filter(l => l.sessionId === s.id).length; }
+  function sessionDoneCount(s) { return sessionExercises(s).filter(ex => sessionLoggedCount(s, ex.id) > 0).length; }
+  function startSession(dayId) {
+    // Not gym-filtered — a session is "what I do this day", regardless of
+    // which gym happens to be selected in the stats browser above.
+    const exIds = state.exercises
+      .filter(e => (e.days || []).includes(dayId))
+      .map(e => e.id);
+    const id = uidSession();
+    state.sessions[id] = { id, startedAt: new Date().toISOString(), dayId, exIds, cursor: 0, finishedAt: null };
+    state.activeSessionId = id;
+    saveState();
+    return state.sessions[id];
+  }
+  function finishActiveSession() {
+    const s = getActiveSession();
+    if (!s) return;
+    s.finishedAt = new Date().toISOString();
+    state.activeSessionId = null;
+    saveState();
+  }
+
+  function renderSessionCard() {
+    const wrap = $('seshCardInner');
+    if (!wrap) return;
+    const s = getActiveSession();
+    if (!s) {
+      wrap.innerHTML =
+        '<div class="sesh-eyebrow">SÉANCE</div>'
+        + '<div class="sesh-headline">Prêt à vous entraîner ?</div>'
+        + '<button type="button" class="po-btn-primary" id="seshStartBtn">Démarrer une séance</button>';
+      $('seshStartBtn').addEventListener('click', openSessionPicker);
+      return;
+    }
+    const done = sessionDoneCount(s);
+    const total = sessionExercises(s).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    wrap.innerHTML =
+      '<div class="sesh-eyebrow">SÉANCE EN COURS · ' + escape(dayName(s.dayId)) + '</div>'
+      + '<div class="sesh-headline">' + done + ' / ' + total + ' exercices</div>'
+      + '<div class="sesh-progress"><div class="sesh-progress-bar" style="width:' + pct + '%"></div></div>'
+      + '<button type="button" class="po-btn-primary" id="seshResumeBtn">Reprendre la séance</button>'
+      + '<button type="button" class="po-btn-secondary" id="seshFinishCardBtn">Terminer la séance</button>';
+    $('seshResumeBtn').addEventListener('click', () => openSessionOverlay());
+    $('seshFinishCardBtn').addEventListener('click', () => {
+      if (!confirm('Terminer la séance maintenant ?')) return;
+      finishActiveSession();
+      renderSessionCard();
+      renderAll();
+    });
+  }
+
+  // ----- Day picker (before starting a session) -----
+  let seshPickedDay = null;
+  function openSessionPicker() {
+    const active = getActiveSession();
+    if (active) { openSessionOverlay(); return; }
+    const split = todaySplit();
+    const matched = (!isRestName(split.name) && split.name)
+      ? state.days.find(d => d.name.toLowerCase() === split.name.toLowerCase())
+      : null;
+    seshPickedDay = matched ? matched.id : state.filterDay;
+    renderSeshDaySeg();
+    $('seshPickerBg').classList.add('show');
+  }
+  function renderSeshDaySeg() {
+    $('seshDaySeg').innerHTML = state.days.map(d =>
+      '<button type="button" data-day="' + d.id + '" class="' + (seshPickedDay === d.id ? 'active' : '') + '">' + escape(d.name) + '</button>'
+    ).join('');
+    $('seshDaySeg').querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => { seshPickedDay = b.dataset.day; renderSeshDaySeg(); });
+    });
+  }
+  $('seshPickerCancel').addEventListener('click', () => $('seshPickerBg').classList.remove('show'));
+  $('seshPickerStart').addEventListener('click', () => {
+    if (!seshPickedDay) return;
+    startSession(seshPickedDay);
+    $('seshPickerBg').classList.remove('show');
+    renderSessionCard();
+    openSessionOverlay();
+  });
+
+  // ----- Guided overlay: one exercise at a time -----
+  let seshCursor = 0;
+  let seshSeriesCount = 3;
+
+  function seshSetRowHtml(ex, k, set) {
+    return '<div class="sesh-set-row" data-k="' + k + '">'
+      + '<span class="sesh-set-num">' + (k + 1) + '</span>'
+      + (ex.bw ? '' : '<input type="number" class="sesh-w" step="0.5" inputmode="decimal" placeholder="' + unit() + '" value="' + (set.weight || '') + '">')
+      + '<input type="number" class="sesh-r" inputmode="numeric" placeholder="reps" value="' + (set.reps || '') + '">'
+      + '<label class="sesh-fail"><input type="checkbox" class="sesh-f"' + (set.failure ? ' checked' : '') + '> Échec ?</label>'
+      + '</div>';
+  }
+  function seshSetsHtml(s, ex, setCount) {
+    const bySetIndex = {};
+    (state.logs[ex.id] || []).filter(l => l.sessionId === s.id).forEach(l => { bySetIndex[l.setIndex] = l; });
+    let rows = '';
+    for (let k = 0; k < setCount; k++) rows += seshSetRowHtml(ex, k, bySetIndex[k] || {});
+    return rows;
+  }
+  function seshCardHtml(s, ex, i, total, setCount) {
+    const logs = state.logs[ex.id] || [];
+    const last = logs.filter(l => l.sessionId !== s.id);
+    const lastLog = last.length ? last[last.length - 1] : null;
+    const lastStr = lastLog ? (ex.bw ? (lastLog.reps + ' répétitions') : (lastLog.weight + unit() + ' × ' + lastLog.reps)) : null;
+    return '<div class="sesh-card">'
+      + '<div class="sesh-card-eyebrow">EXERCICE ' + (i + 1) + ' / ' + total + '</div>'
+      + '<div class="sesh-card-title">' + escape(ex.name) + '</div>'
+      + (lastStr ? '<div class="po-last-set show"><span class="po-last-label">Dernière fois</span><span class="po-last-value">' + lastStr + '</span></div>' : '')
+      + '<div class="sesh-series-picker">'
+      +   '<span class="po-seg-label">Séries</span>'
+      +   '<div class="sesh-series-stepper">'
+      +     '<button type="button" class="po-w-btn" id="seshSeriesDown">−</button>'
+      +     '<span class="sesh-series-count" id="seshSeriesCount">' + setCount + '</span>'
+      +     '<button type="button" class="po-w-btn" id="seshSeriesUp">+</button>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="sesh-sets" id="seshSetsWrap">' + seshSetsHtml(s, ex, setCount) + '</div>'
+      + '<button type="button" class="sesh-skip" id="seshSkipBtn">Passer cet exercice</button>'
+      + '</div>';
+  }
+  function seshUpsertRow(s, ex, k) {
+    const row = document.querySelector('#seshSetsWrap .sesh-set-row[data-k="' + k + '"]');
+    if (!row) return;
+    const wInput = row.querySelector('.sesh-w');
+    const rInput = row.querySelector('.sesh-r');
+    const fInput = row.querySelector('.sesh-f');
+    const reps = parseInt(rInput.value, 10) || 0;
+    const arr = state.logs[ex.id] || [];
+    let entry = arr.find(l => l.sessionId === s.id && l.setIndex === k);
+    if (reps <= 0) {
+      // Empty row — drop any previously-saved entry for this slot.
+      if (entry) { state.logs[ex.id] = arr.filter(l => l !== entry); saveState(); renderSeshDots(); renderSessionCard(); }
+      return;
+    }
+    const weight = ex.bw ? 0 : (parseFloat(wInput && wInput.value) || 0);
+    if (!entry) {
+      entry = { sessionId: s.id, setIndex: k, date: new Date().toISOString() };
+      arr.push(entry);
+      state.logs[ex.id] = arr;
+    }
+    entry.weight = weight;
+    entry.reps = reps;
+    entry.failure = !!(fInput && fInput.checked);
+    saveState();
+    renderSeshDots();
+    renderSessionCard();
+    if (typeof wtRender === 'function') wtRender();
+  }
+  function wireSeshSetRows(s, ex) {
+    document.querySelectorAll('#seshSetsWrap .sesh-set-row').forEach(row => {
+      const k = parseInt(row.dataset.k, 10);
+      row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => seshUpsertRow(s, ex, k)));
+    });
+  }
+  function seshRerenderSetsOnly(s, ex) {
+    $('seshSetsWrap').innerHTML = seshSetsHtml(s, ex, seshSeriesCount);
+    $('seshSeriesCount').textContent = seshSeriesCount;
+    wireSeshSetRows(s, ex);
+  }
+  function renderSeshDots() {
+    const s = getActiveSession();
+    if (!s) return;
+    const exs = sessionExercises(s);
+    $('seshDots').innerHTML = exs.map((ex, i) => {
+      const done = sessionLoggedCount(s, ex.id) > 0;
+      return '<span class="sesh-dot' + (i === seshCursor ? ' active' : '') + (done ? ' done' : '') + '" data-i="' + i + '" title="' + escape(ex.name) + '"></span>';
+    }).join('');
+    $('seshDots').querySelectorAll('.sesh-dot').forEach(d => {
+      d.addEventListener('click', () => goToSeshIndex(parseInt(d.dataset.i, 10)));
+    });
+  }
+  function renderSeshCardOnly() {
+    const s = getActiveSession();
+    if (!s) return;
+    const exs = sessionExercises(s);
+    if (!exs.length) {
+      $('seshCarousel').innerHTML = '<div class="po-rx-empty">Aucun exercice pour ce jour. Ajoutez-en un via « Consulter un exercice » puis touchez « ' + escape(dayName(s.dayId)) + ' » dans ses jours.</div>';
+      $('seshDots').innerHTML = '';
+      $('seshPrevBtn').disabled = true;
+      $('seshNextBtn').disabled = true;
+      return;
+    }
+    const ex = exs[seshCursor];
+    if (!ex) return;
+    const mySets = (state.logs[ex.id] || []).filter(l => l.sessionId === s.id);
+    seshSeriesCount = mySets.length || 3;
+    $('seshCarousel').innerHTML = seshCardHtml(s, ex, seshCursor, exs.length, seshSeriesCount);
+    wireSeshSetRows(s, ex);
+    $('seshSeriesUp').addEventListener('click', () => {
+      seshSeriesCount = Math.min(12, seshSeriesCount + 1);
+      seshRerenderSetsOnly(s, ex);
+    });
+    $('seshSeriesDown').addEventListener('click', () => {
+      if (seshSeriesCount <= 1) return;
+      const newCount = seshSeriesCount - 1;
+      const arr = state.logs[ex.id] || [];
+      state.logs[ex.id] = arr.filter(l => !(l.sessionId === s.id && l.setIndex === newCount));
+      saveState();
+      seshSeriesCount = newCount;
+      seshRerenderSetsOnly(s, ex);
+      renderSeshDots();
+      renderSessionCard();
+    });
+    $('seshSkipBtn').addEventListener('click', () => goToSeshIndex(seshCursor + 1));
+    renderSeshDots();
+    $('seshPrevBtn').disabled = seshCursor === 0;
+    $('seshNextBtn').disabled = seshCursor === exs.length - 1;
+  }
+  function goToSeshIndex(i) {
+    const s = getActiveSession();
+    if (!s) return;
+    const exs = sessionExercises(s);
+    if (!exs.length) return;
+    seshCursor = Math.max(0, Math.min(exs.length - 1, i));
+    s.cursor = seshCursor;
+    saveState();
+    renderSeshCardOnly();
+  }
+  function openSessionOverlay() {
+    const s = getActiveSession();
+    if (!s) return;
+    const exs = sessionExercises(s);
+    seshCursor = Math.min(s.cursor || 0, Math.max(0, exs.length - 1));
+    renderSeshCardOnly();
+    $('sessionOverlay').classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSessionOverlay() {
+    $('sessionOverlay').classList.remove('is-open');
+    document.body.style.overflow = '';
+    renderSessionCard();
+    renderAll();
+  }
+  $('seshClose').addEventListener('click', closeSessionOverlay);
+  $('seshOverlayFinish').addEventListener('click', () => {
+    if (!confirm('Terminer la séance maintenant ?')) return;
+    finishActiveSession();
+    closeSessionOverlay();
+  });
+  $('seshPrevBtn').addEventListener('click', () => goToSeshIndex(seshCursor - 1));
+  $('seshNextBtn').addEventListener('click', () => goToSeshIndex(seshCursor + 1));
+  // Swipe support — the carousel div's content is swapped per exercise
+  // rather than scrolled, so this just reads the horizontal drag distance.
+  (function wireSeshSwipe() {
+    let startX = null;
+    const el = $('seshCarousel');
+    el.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      if (startX == null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      startX = null;
+      if (Math.abs(dx) < 40) return;
+      if (dx < 0) goToSeshIndex(seshCursor + 1); else goToSeshIndex(seshCursor - 1);
+    }, { passive: true });
+  })();
 
   // ============================================================
   // BOOT
