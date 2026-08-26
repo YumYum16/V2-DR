@@ -326,6 +326,11 @@ img, video, canvas, svg { max-width: 100%; }
 .po-ex-card-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
 .po-ex-card-edit.po-btn-icon { width: 34px; height: 34px; flex-shrink: 0; }
 .po-ex-card .po-last-set { margin-bottom: 10px; }
+.po-ex-perf-row { margin-bottom: 8px; }
+.po-ex-perf-score {
+  font-size: 11.5px; color: var(--text-2); margin-bottom: 14px;
+}
+.po-ex-perf-score strong { color: var(--good); }
 .po-ex-card-thumb {
   width: 38px; height: 38px; border-radius: 9px; object-fit: cover;
   flex-shrink: 0; margin-right: 10px;
@@ -1630,6 +1635,64 @@ img, video, canvas, svg { max-width: 100%; }
 
   const EX_EDIT_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
 
+  // ============================================================
+  // PERFORMANCE HISTORY per exercise — heaviest weight logged, how many
+  // sets have hit that weight, how often the exercise gets trained, and
+  // (for a handful of well-studied compound lifts only) a rough 0-10
+  // capacity estimate against common bodyweight-ratio strength standards,
+  // adjusted for age. Derived from state.logs on every render, same as
+  // everything else in this app — no separate cache.
+  // ============================================================
+  function readWaterProfile() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('po_water_v1'));
+      return (raw && raw.profile) || {};
+    } catch (e) { return {}; }
+  }
+  function currentBodyweightKg() {
+    const last = wtEntries[wtEntries.length - 1];
+    if (last) return unit() === 'lb' ? last.weight / 2.20462 : last.weight;
+    const prof = readWaterProfile();
+    return prof.weightKg || null;
+  }
+  // Approximate 1RM/bodyweight ratios at novice/intermediate/advanced —
+  // commonly-cited ballpark figures, not a precise scientific standard.
+  // Only these well-studied compound lifts get a score; everything else
+  // just doesn't have enough consensus data to compare against.
+  const STRENGTH_STANDARDS = [
+    { match: /d[ée]velopp[ée].*couch[ée]|\bbench/i, novice: 0.5, intermediate: 1.0, advanced: 1.5 },
+    { match: /squat/i, novice: 0.75, intermediate: 1.5, advanced: 2.0 },
+    { match: /soulev[ée].*terre|deadlift/i, novice: 1.0, intermediate: 1.75, advanced: 2.25 },
+    { match: /d[ée]velopp[ée].*militaire|overhead|\bohp\b/i, novice: 0.35, intermediate: 0.6, advanced: 0.9 }
+  ];
+  function capacityScoreFor(ex, maxWeight) {
+    if (!maxWeight) return null;
+    const std = STRENGTH_STANDARDS.find(s => s.match.test(ex.name));
+    if (!std) return null;
+    const bw = currentBodyweightKg();
+    if (!bw) return null;
+    const prof = readWaterProfile();
+    const age = prof.age || 30;
+    const sexFactor = /^f/i.test(prof.sex || '') ? 0.75 : 1;
+    const ageBoost = 1 + Math.max(0, Math.min(age - 30, 30)) * 0.005; // up to +15% by 60
+    const ratio = (maxWeight / bw) / (sexFactor * ageBoost);
+    let score;
+    if (ratio <= std.novice) score = (ratio / std.novice) * 3;
+    else if (ratio <= std.intermediate) score = 3 + ((ratio - std.novice) / (std.intermediate - std.novice)) * 4;
+    else score = 7 + ((ratio - std.intermediate) / (std.advanced - std.intermediate)) * 3;
+    return Math.round(Math.max(0, Math.min(10, score)) * 10) / 10;
+  }
+  function exercisePerfStats(ex) {
+    const logs = getLogsFor(ex.id);
+    if (!logs.length) return null;
+    const maxWeight = Math.max.apply(null, logs.map(l => l.weight || 0));
+    const setsAtMax = logs.filter(l => (l.weight || 0) === maxWeight).length;
+    const cutoff = Date.now() - 30 * 86400000;
+    const recentDays = new Set(logs.filter(l => new Date(l.date).getTime() >= cutoff).map(l => l.date.slice(0, 10)));
+    const score = capacityScoreFor(ex, maxWeight);
+    return { maxWeight, setsAtMax, recentSessions: recentDays.size, score };
+  }
+
   // One card per exercise in the current Salle, each with its own inline
   // weight/reps log form — no separate "pick an exercise first" step.
   // Exercises no longer carry a rep-range/step/start-weight of their own
@@ -1647,6 +1710,14 @@ img, video, canvas, svg { max-width: 100%; }
     const lastStr = last ? (last.weight + unit() + ' × ' + last.reps) : null;
     const wVal = last ? last.weight : '';
     const badge = ex.fixedWeight ? 'Poulie' : 'Poids libre';
+    const perf = exercisePerfStats(ex);
+    const perfHtml = !perf ? '' :
+      '<div class="po-stats-row po-ex-perf-row">'
+      + '<div class="po-stat-box"><div class="po-stat-label">Record</div><div class="po-stat-val">' + perf.maxWeight + '<span class="po-unit">' + unit() + '</span></div></div>'
+      + '<div class="po-stat-box"><div class="po-stat-label">Séries au record</div><div class="po-stat-val">' + perf.setsAtMax + '</div></div>'
+      + '<div class="po-stat-box"><div class="po-stat-label">Régularité</div><div class="po-stat-val">' + perf.recentSessions + '<span class="po-unit">/30j</span></div></div>'
+      + '</div>'
+      + (perf.score != null ? '<div class="po-ex-perf-score">Capacité estimée (âge/poids) : <strong>' + perf.score + '/10</strong></div>' : '');
     return '<div class="po-ex-card" data-ex-id="' + ex.id + '" data-active-reps="' + active + '">'
       + '<div class="po-ex-card-head">'
       +   '<div class="po-ex-card-name-wrap">'
@@ -1656,6 +1727,7 @@ img, video, canvas, svg { max-width: 100%; }
       +   '<button type="button" class="po-btn-icon po-ex-card-edit" data-action="edit" title="Modifier / supprimer" aria-label="Modifier">' + EX_EDIT_ICON + '</button>'
       + '</div>'
       + (lastStr ? '<div class="po-last-set show"><span class="po-last-label">Dernière fois</span><span class="po-last-value">' + lastStr + '</span></div>' : '')
+      + perfHtml
       + '<div class="po-log-grid">'
       +   '<div class="po-field"><label>Poids (' + unit() + ')</label><div class="po-weight-row">'
       +     '<button class="po-w-btn" type="button" data-action="wdown">−</button>'
