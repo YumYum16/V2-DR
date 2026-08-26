@@ -369,12 +369,14 @@ img, video, canvas, svg { max-width: 100%; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
 }
 .po-log-grid.po-bw-mode { grid-template-columns: 1fr; }
-.po-field { display: flex; flex-direction: column; gap: 8px; }
+.po-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .po-field > label {
   font-size: 10.5px; color: var(--text-3); font-weight: 700;
   letter-spacing: 0.14em; text-transform: uppercase;
 }
 .po-field input[type="number"], .po-field input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
   padding: 14px 12px;
   border: 1px solid var(--border);
   background: rgba(0,0,0,0.28);
@@ -383,6 +385,9 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 22px; font-weight: 700; text-align: center;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
+}
+.po-field-hint {
+  font-size: 11px; color: var(--text-3); line-height: 1.4; margin-top: -2px;
 }
 .po-field input[type="number"]::-webkit-outer-spin-button,
 .po-field input[type="number"]::-webkit-inner-spin-button {
@@ -1623,6 +1628,7 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="po-field" id="exStepField">
       <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Incrément</label>
       <input type="number" id="exStep" step="0.5" value="2.5">
+      <div class="po-field-hint">Le poids ajouté automatiquement à la barre quand vous dépassez les répétitions max — ex. 2.5 kg de plus la prochaine séance.</div>
     </div>
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="exModalCancel">Annuler</button>
