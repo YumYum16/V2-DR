@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Avatar Lab · Nova</title>
+<title>Laboratoire Avatar · Nova</title>
 <!-- ============================================================
  * AVATAR LAB — local playground for the Nova avatar.
  * Pick colors, try 5 designs, preview idle / thinking / happy,
@@ -155,17 +155,17 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
 <body data-state="idle">
   <div class="shell">
     <header>
-      <h1>Avatar Lab</h1><span class="role">Nova design playground</span>
+      <h1>Laboratoire Avatar</h1><span class="role">Terrain de jeu de design Nova</span>
     </header>
-    <p class="sub">Tweak the colors, watch all five designs react. Toggle the state to preview thinking & happy. Hit <b>Use in Nova</b> to copy that design's CSS.</p>
+    <p class="sub">Ajustez les couleurs, observez les cinq designs réagir. Changez l'état pour prévisualiser réflexion et content. Cliquez sur <b>Utiliser dans Nova</b> pour copier le CSS de ce design.</p>
 
     <div class="controls">
       <div class="ctl">
-        <label>Colors</label>
+        <label>Couleurs</label>
         <div class="swatches">
-          <div class="swatch"><input id="c1" type="color" value="#6EE7B7"><span>light</span></div>
-          <div class="swatch"><input id="c2" type="color" value="#67E8F9"><span>glow</span></div>
-          <div class="swatch"><input id="c3" type="color" value="#1f8f66"><span>deep</span></div>
+          <div class="swatch"><input id="c1" type="color" value="#6EE7B7"><span>clair</span></div>
+          <div class="swatch"><input id="c2" type="color" value="#67E8F9"><span>lueur</span></div>
+          <div class="swatch"><input id="c3" type="color" value="#1f8f66"><span>profond</span></div>
         </div>
       </div>
 
@@ -175,16 +175,16 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
       </div>
 
       <div class="ctl">
-        <label>State</label>
+        <label>État</label>
         <div class="seg" id="stateSeg">
-          <button data-state="idle" class="on">Idle</button>
-          <button data-state="think">Thinking</button>
-          <button data-state="happy">Happy</button>
+          <button data-state="idle" class="on">Inactif</button>
+          <button data-state="think">Réflexion</button>
+          <button data-state="happy">Content</button>
         </div>
       </div>
 
       <div class="ctl">
-        <label>Size</label>
+        <label>Taille</label>
         <div class="sizebar"><input id="size" type="range" min="44" max="120" value="64"><span id="sizeVal" style="font-size:12px;color:var(--muted);font-family:ui-monospace,monospace">64px</span></div>
       </div>
     </div>
@@ -192,7 +192,7 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
     <div class="grid" id="grid"></div>
   </div>
 
-  <div class="toast" id="toast">Copied!</div>
+  <div class="toast" id="toast">Copié !</div>
 
 <script>
 (function(){
@@ -200,11 +200,11 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
   const body = document.body;
 
   const DESIGNS = [
-    { id:'orb',     name:'Orb',     desc:'Glossy sphere with eyes — the original Nova.', html:'' },
-    { id:'reactor', name:'Reactor', desc:'Spinning energy rings around a bright core.',   html:'<i></i>' },
-    { id:'blob',    name:'Blob',    desc:'Soft morphing droplet, playful and alive.',     html:'' },
-    { id:'bot',     name:'Bot',     desc:'Friendly robot head with a blinking face.',     html:'<div class="face"><b></b><b></b></div>' },
-    { id:'plasma',  name:'Plasma',  desc:'Glassy orb of swirling conic plasma.',          html:'' },
+    { id:'orb',     name:'Orbe',     desc:'Sphère brillante avec des yeux — le Nova original.', html:'' },
+    { id:'reactor', name:'Réacteur', desc:'Anneaux d\'énergie tournants autour d\'un noyau lumineux.',   html:'<i></i>' },
+    { id:'blob',    name:'Goutte',   desc:'Goutte souple et changeante, ludique et vivante.',     html:'' },
+    { id:'bot',     name:'Robot',    desc:'Tête de robot sympathique avec un visage clignotant.',     html:'<div class="face"><b></b><b></b></div>' },
+    { id:'plasma',  name:'Plasma',   desc:'Orbe vitreux de plasma conique tourbillonnant.',          html:'' },
   ];
 
   const PALETTES = [
@@ -227,7 +227,7 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
       '<div class="stage"><div class="av av--'+d.id+'">'+d.html+'</div></div>' +
       '<div class="name">'+d.name+'</div>' +
       '<div class="desc">'+d.desc+'</div>' +
-      '<button class="use" data-id="'+d.id+'">Use in Nova</button>';
+      '<button class="use" data-id="'+d.id+'">Utiliser dans Nova</button>';
     grid.appendChild(card);
   });
 
@@ -235,7 +235,7 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
   const presets = document.getElementById('presets');
   PALETTES.forEach(p => {
     const b = document.createElement('button');
-    b.className = 'preset'; b.title = 'Apply palette';
+    b.className = 'preset'; b.title = 'Appliquer la palette';
     b.innerHTML = '<i style="background:'+p.c1+'"></i><i style="background:'+p.c2+'"></i><i style="background:'+p.c3+'"></i>';
     b.addEventListener('click', () => applyPalette(p));
     presets.appendChild(b);
@@ -275,8 +275,8 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
       if (t.includes('.av--'+id)) { rules.push(t); continue; }
       if (t.startsWith('@keyframes')) { rules.push(t); continue; }
     }
-    return `/* Nova avatar · "${id}" design — paste into your stylesheet */\n${vars}\n\n` + rules.join('\n') +
-      `\n\n<!-- markup -->\n<div class="av av--${id}" data-state="idle">${DESIGNS.find(d=>d.id===id).html}</div>`;
+    return `/* Avatar Nova · design "${id}" — à coller dans votre feuille de style */\n${vars}\n\n` + rules.join('\n') +
+      `\n\n<!-- balisage -->\n<div class="av av--${id}" data-state="idle">${DESIGNS.find(d=>d.id===id).html}</div>`;
   }
 
   grid.addEventListener('click', async e => {
@@ -285,9 +285,9 @@ header .role { font-family: ui-monospace, monospace; font-size: 10px; letter-spa
     try { await navigator.clipboard.writeText(css); } catch(_){
       const ta = document.createElement('textarea'); ta.value = css; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
     }
-    btn.classList.add('copied'); btn.textContent = '✓ Copied CSS';
-    setTimeout(()=>{ btn.classList.remove('copied'); btn.textContent = 'Use in Nova'; }, 1500);
-    showToast(btn.dataset.id + ' CSS copied');
+    btn.classList.add('copied'); btn.textContent = '✓ CSS copié';
+    setTimeout(()=>{ btn.classList.remove('copied'); btn.textContent = 'Utiliser dans Nova'; }, 1500);
+    showToast('CSS ' + btn.dataset.id + ' copié');
   });
 })();
 </script>

@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
-<title>Caffeine · Dashboard</title>
+<title>Caféine · Tableau de bord</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
@@ -185,11 +185,11 @@ body::after {
 <body>
 <div class="page">
 
-  <h1 class="dash-title">Caffeine</h1>
+  <h1 class="dash-title">Caféine</h1>
 
   <!-- ENERGY CURVE -->
   <div class="section">
-    <div class="section-title">Your Day</div>
+    <div class="section-title">Votre journée</div>
     <div class="gm-card">
       <div class="energy-head">
         <div class="ring">
@@ -200,15 +200,15 @@ body::after {
           <div class="ring-num" id="ringNum">—</div>
         </div>
         <div class="energy-label">
-          <span class="energy-state" id="energyState">Energy</span>
-          <span class="energy-when" id="energyWhen">Right now</span>
-          <span class="energy-hint"><span class="dot"></span>Hover / drag the curve</span>
+          <span class="energy-state" id="energyState">Énergie</span>
+          <span class="energy-when" id="energyWhen">En ce moment</span>
+          <span class="energy-hint"><span class="dot"></span>Survolez / glissez la courbe</span>
         </div>
-        <div class="energy-desc">Your predicted energy, hour by hour — built from your caffeine, your body clock, and how long you've been awake.</div>
+        <div class="energy-desc">Votre énergie prévue, heure par heure — calculée à partir de votre caféine, de votre horloge biologique et de votre temps d'éveil.</div>
         <div class="seg-toggle" id="modeToggle">
-          <button data-m="line" class="on">LINE</button>
-          <button data-m="bars">BARS</button>
-          <button data-m="stack">STACK</button>
+          <button data-m="line" class="on">LIGNE</button>
+          <button data-m="bars">BARRES</button>
+          <button data-m="stack">EMPILÉ</button>
         </div>
       </div>
 
@@ -216,25 +216,25 @@ body::after {
         <svg id="energyChart" viewBox="0 0 600 230" preserveAspectRatio="none"></svg>
       </div>
       <div class="axis">
-        <span>12A</span><span>3A</span><span>6A</span><span>9A</span><span>12P</span><span>3P</span><span>6P</span><span>9P</span><span>12A</span>
+        <span>00h</span><span>03h</span><span>06h</span><span>09h</span><span>12h</span><span>15h</span><span>18h</span><span>21h</span><span>00h</span>
       </div>
 
       <div class="plan-band" id="planBand">
-        <div class="plan-item"><span class="k">Peak focus</span><span class="v green" id="peakVal">—</span></div>
-        <div class="plan-item"><span class="k">Predicted crash</span><span class="v amber" id="crashVal">—</span></div>
-        <div class="plan-item"><span class="k">Last coffee by</span><span class="v" id="cutoffVal" style="color:#7DD3FC">—</span></div>
+        <div class="plan-item"><span class="k">Pic de concentration</span><span class="v green" id="peakVal">—</span></div>
+        <div class="plan-item"><span class="k">Baisse prévue</span><span class="v amber" id="crashVal">—</span></div>
+        <div class="plan-item"><span class="k">Dernier café avant</span><span class="v" id="cutoffVal" style="color:#7DD3FC">—</span></div>
       </div>
     </div>
   </div>
 
   <!-- SMART TIMING + TIPS -->
   <div class="section">
-    <div class="section-title">Smart Timing</div>
+    <div class="section-title">Minutage intelligent</div>
     <div class="gm-card">
       <div class="tile-grid">
-        <div class="mini peak"><div class="k">Most productive</div><div class="v" id="mPeak">—</div><div class="s" id="mPeakSub"></div></div>
-        <div class="mini crash"><div class="k">You'll crash</div><div class="v" id="mCrash">—</div><div class="s" id="mCrashSub"></div></div>
-        <div class="mini cutoff"><div class="k">Coffee cutoff</div><div class="v" id="mCutoff">—</div><div class="s" id="mCutoffSub"></div></div>
+        <div class="mini peak"><div class="k">Plus productif</div><div class="v" id="mPeak">—</div><div class="s" id="mPeakSub"></div></div>
+        <div class="mini crash"><div class="k">Coup de barre</div><div class="v" id="mCrash">—</div><div class="s" id="mCrashSub"></div></div>
+        <div class="mini cutoff"><div class="k">Limite café</div><div class="v" id="mCutoff">—</div><div class="s" id="mCutoffSub"></div></div>
       </div>
       <ul class="tips" id="tips"></ul>
     </div>
@@ -242,7 +242,7 @@ body::after {
 
   <!-- DAILY INTAKE BAR -->
   <div class="section">
-    <div class="section-title">Today</div>
+    <div class="section-title">Aujourd'hui</div>
     <div class="gm-card">
       <div class="daily-top">
         <span class="daily-num" id="dailyNum">0</span>
@@ -251,28 +251,28 @@ body::after {
         <span class="daily-active" id="dailyActive"></span>
       </div>
       <div class="bar-track"><div class="bar-fill" id="dailyFill" style="width:0%"></div></div>
-      <div class="daily-msg good" id="dailyMsg">You haven't logged anything today.</div>
+      <div class="daily-msg good" id="dailyMsg">Vous n'avez rien enregistré aujourd'hui.</div>
       <div class="daily-note" id="dailyNote"></div>
     </div>
   </div>
 
   <!-- LOG A DRINK -->
   <div class="section">
-    <div class="section-title">Log a Drink</div>
+    <div class="section-title">Ajouter une boisson</div>
     <div class="gm-card">
-      <input class="gm-input" id="search" type="text" placeholder="Search a drink… (coffee, monster, matcha…)" autocomplete="off">
+      <input class="gm-input" id="search" type="text" placeholder="Rechercher une boisson… (café, monster, matcha…)" autocomplete="off">
       <ul class="results" id="results"></ul>
       <div class="custom-row">
-        <input class="gm-input" id="customName" type="text" placeholder="Custom drink name" autocomplete="off">
+        <input class="gm-input" id="customName" type="text" placeholder="Nom de la boisson personnalisée" autocomplete="off">
         <input class="gm-input mg-input" id="customMg" type="number" min="0" placeholder="mg" autocomplete="off">
-        <button class="gm-add" id="customAdd" type="button">Add</button>
+        <button class="gm-add" id="customAdd" type="button">Ajouter</button>
       </div>
     </div>
   </div>
 
   <!-- TODAY'S LOG -->
   <div class="section">
-    <div class="section-title">Logged Today</div>
+    <div class="section-title">Enregistré aujourd'hui</div>
     <div class="gm-card">
       <ul class="log-list" id="logList"></ul>
     </div>
@@ -292,37 +292,37 @@ body::after {
 
   /* ============ Beverage database ============ */
   const DB = [
-    {n:'Brewed coffee (8 oz)',mg:95,c:'Coffee',e:'☕'},{n:'Brewed coffee (12 oz)',mg:140,c:'Coffee',e:'☕'},
-    {n:'Brewed coffee (16 oz)',mg:190,c:'Coffee',e:'☕'},{n:'Large drip coffee (20 oz)',mg:240,c:'Coffee',e:'☕'},
-    {n:'Cold brew (16 oz)',mg:205,c:'Coffee',e:'🧊'},{n:'Nitro cold brew (16 oz)',mg:280,c:'Coffee',e:'🧊'},
-    {n:'Instant coffee (8 oz)',mg:62,c:'Coffee',e:'☕'},{n:'Decaf coffee (8 oz)',mg:3,c:'Coffee',e:'☕'},
-    {n:'Espresso (1 shot)',mg:64,c:'Espresso',e:'☕'},{n:'Double espresso (2 shots)',mg:128,c:'Espresso',e:'☕'},
-    {n:'Latte (1 shot)',mg:64,c:'Espresso',e:'☕'},{n:'Latte, large (2 shots)',mg:128,c:'Espresso',e:'☕'},
-    {n:'Cappuccino (1 shot)',mg:64,c:'Espresso',e:'☕'},{n:'Americano (2 shots)',mg:128,c:'Espresso',e:'☕'},
-    {n:'Flat white (2 shots)',mg:130,c:'Espresso',e:'☕'},{n:'Mocha (2 shots)',mg:128,c:'Espresso',e:'☕'},
-    {n:'Macchiato (1 shot)',mg:64,c:'Espresso',e:'☕'},{n:'Starbucks grande Pike',mg:310,c:'Coffee',e:'☕'},
-    {n:'Starbucks grande Blonde',mg:360,c:'Coffee',e:'☕'},{n:'Dunkin medium coffee',mg:210,c:'Coffee',e:'☕'},
-    {n:'Black tea (8 oz)',mg:47,c:'Tea',e:'🍵'},{n:'Green tea (8 oz)',mg:28,c:'Tea',e:'🍵'},
-    {n:'Matcha (1 tsp)',mg:70,c:'Tea',e:'🍵'},{n:'Oolong tea (8 oz)',mg:38,c:'Tea',e:'🍵'},
-    {n:'White tea (8 oz)',mg:30,c:'Tea',e:'🍵'},{n:'Chai latte (8 oz)',mg:50,c:'Tea',e:'🍵'},
-    {n:'Yerba mate (8 oz)',mg:85,c:'Tea',e:'🍵'},{n:'Iced tea (16 oz)',mg:47,c:'Tea',e:'🧊'},
-    {n:'Herbal / rooibos tea',mg:0,c:'Tea',e:'🍵'},
-    {n:'Red Bull (8.4 oz)',mg:80,c:'Energy',e:'⚡'},{n:'Red Bull (12 oz)',mg:114,c:'Energy',e:'⚡'},
-    {n:'Monster (16 oz)',mg:160,c:'Energy',e:'⚡'},{n:'Monster Ultra (16 oz)',mg:150,c:'Energy',e:'⚡'},
-    {n:'Rockstar (16 oz)',mg:160,c:'Energy',e:'⚡'},{n:'Bang (16 oz)',mg:300,c:'Energy',e:'⚡'},
-    {n:'Reign (16 oz)',mg:300,c:'Energy',e:'⚡'},{n:'Celsius (12 oz)',mg:200,c:'Energy',e:'⚡'},
-    {n:'Celsius Essentials (16 oz)',mg:270,c:'Energy',e:'⚡'},{n:'Alani Nu (12 oz)',mg:200,c:'Energy',e:'⚡'},
-    {n:'Prime Energy (12 oz)',mg:200,c:'Energy',e:'⚡'},{n:'C4 Energy (16 oz)',mg:200,c:'Energy',e:'⚡'},
-    {n:'Ghost Energy (16 oz)',mg:200,c:'Energy',e:'⚡'},{n:'NOS (16 oz)',mg:160,c:'Energy',e:'⚡'},
-    {n:'5-Hour Energy',mg:200,c:'Energy',e:'⚡'},{n:'5-Hour Energy Extra',mg:230,c:'Energy',e:'⚡'},
-    {n:'Coca-Cola (12 oz)',mg:34,c:'Soda',e:'🥤'},{n:'Diet Coke (12 oz)',mg:46,c:'Soda',e:'🥤'},
-    {n:'Coke Zero (12 oz)',mg:34,c:'Soda',e:'🥤'},{n:'Pepsi (12 oz)',mg:38,c:'Soda',e:'🥤'},
+    {n:'Café filtre (8 oz)',mg:95,c:'Café',e:'☕'},{n:'Café filtre (12 oz)',mg:140,c:'Café',e:'☕'},
+    {n:'Café filtre (16 oz)',mg:190,c:'Café',e:'☕'},{n:'Grand café filtre (20 oz)',mg:240,c:'Café',e:'☕'},
+    {n:'Cold brew (16 oz)',mg:205,c:'Café',e:'🧊'},{n:'Nitro cold brew (16 oz)',mg:280,c:'Café',e:'🧊'},
+    {n:'Café instantané (8 oz)',mg:62,c:'Café',e:'☕'},{n:'Café décaféiné (8 oz)',mg:3,c:'Café',e:'☕'},
+    {n:'Espresso (1 dose)',mg:64,c:'Espresso',e:'☕'},{n:'Double espresso (2 doses)',mg:128,c:'Espresso',e:'☕'},
+    {n:'Latte (1 dose)',mg:64,c:'Espresso',e:'☕'},{n:'Latte, grand (2 doses)',mg:128,c:'Espresso',e:'☕'},
+    {n:'Cappuccino (1 dose)',mg:64,c:'Espresso',e:'☕'},{n:'Americano (2 doses)',mg:128,c:'Espresso',e:'☕'},
+    {n:'Flat white (2 doses)',mg:130,c:'Espresso',e:'☕'},{n:'Mocha (2 doses)',mg:128,c:'Espresso',e:'☕'},
+    {n:'Macchiato (1 dose)',mg:64,c:'Espresso',e:'☕'},{n:'Starbucks grande Pike',mg:310,c:'Café',e:'☕'},
+    {n:'Starbucks grande Blonde',mg:360,c:'Café',e:'☕'},{n:'Dunkin café moyen',mg:210,c:'Café',e:'☕'},
+    {n:'Thé noir (8 oz)',mg:47,c:'Thé',e:'🍵'},{n:'Thé vert (8 oz)',mg:28,c:'Thé',e:'🍵'},
+    {n:'Matcha (1 c. à café)',mg:70,c:'Thé',e:'🍵'},{n:'Thé oolong (8 oz)',mg:38,c:'Thé',e:'🍵'},
+    {n:'Thé blanc (8 oz)',mg:30,c:'Thé',e:'🍵'},{n:'Chaï latte (8 oz)',mg:50,c:'Thé',e:'🍵'},
+    {n:'Yerba maté (8 oz)',mg:85,c:'Thé',e:'🍵'},{n:'Thé glacé (16 oz)',mg:47,c:'Thé',e:'🧊'},
+    {n:'Tisane / rooibos',mg:0,c:'Thé',e:'🍵'},
+    {n:'Red Bull (8.4 oz)',mg:80,c:'Énergisant',e:'⚡'},{n:'Red Bull (12 oz)',mg:114,c:'Énergisant',e:'⚡'},
+    {n:'Monster (16 oz)',mg:160,c:'Énergisant',e:'⚡'},{n:'Monster Ultra (16 oz)',mg:150,c:'Énergisant',e:'⚡'},
+    {n:'Rockstar (16 oz)',mg:160,c:'Énergisant',e:'⚡'},{n:'Bang (16 oz)',mg:300,c:'Énergisant',e:'⚡'},
+    {n:'Reign (16 oz)',mg:300,c:'Énergisant',e:'⚡'},{n:'Celsius (12 oz)',mg:200,c:'Énergisant',e:'⚡'},
+    {n:'Celsius Essentials (16 oz)',mg:270,c:'Énergisant',e:'⚡'},{n:'Alani Nu (12 oz)',mg:200,c:'Énergisant',e:'⚡'},
+    {n:'Prime Energy (12 oz)',mg:200,c:'Énergisant',e:'⚡'},{n:'C4 Energy (16 oz)',mg:200,c:'Énergisant',e:'⚡'},
+    {n:'Ghost Energy (16 oz)',mg:200,c:'Énergisant',e:'⚡'},{n:'NOS (16 oz)',mg:160,c:'Énergisant',e:'⚡'},
+    {n:'5-Hour Energy',mg:200,c:'Énergisant',e:'⚡'},{n:'5-Hour Energy Extra',mg:230,c:'Énergisant',e:'⚡'},
+    {n:'Coca-Cola (12 oz)',mg:34,c:'Soda',e:'🥤'},{n:'Coca-Cola light (12 oz)',mg:46,c:'Soda',e:'🥤'},
+    {n:'Coca-Cola Zero (12 oz)',mg:34,c:'Soda',e:'🥤'},{n:'Pepsi (12 oz)',mg:38,c:'Soda',e:'🥤'},
     {n:'Pepsi Zero (12 oz)',mg:69,c:'Soda',e:'🥤'},{n:'Mountain Dew (12 oz)',mg:54,c:'Soda',e:'🥤'},
     {n:'Mtn Dew Kickstart',mg:90,c:'Soda',e:'🥤'},{n:'Dr Pepper (12 oz)',mg:41,c:'Soda',e:'🥤'},
     {n:'Barq\'s Root Beer (12 oz)',mg:22,c:'Soda',e:'🥤'},
-    {n:'Pre-workout (1 scoop)',mg:200,c:'Supplement',e:'💊'},{n:'Caffeine pill (200 mg)',mg:200,c:'Supplement',e:'💊'},
-    {n:'Caffeine pill (100 mg)',mg:100,c:'Supplement',e:'💊'},
-    {n:'Dark chocolate (1 oz)',mg:24,c:'Other',e:'🍫'},{n:'Milk chocolate (1 oz)',mg:6,c:'Other',e:'🍫'},{n:'Hot chocolate (8 oz)',mg:5,c:'Other',e:'🍫'},
+    {n:'Pré-entraînement (1 dose)',mg:200,c:'Complément',e:'💊'},{n:'Comprimé de caféine (200 mg)',mg:200,c:'Complément',e:'💊'},
+    {n:'Comprimé de caféine (100 mg)',mg:100,c:'Complément',e:'💊'},
+    {n:'Chocolat noir (1 oz)',mg:24,c:'Autre',e:'🍫'},{n:'Chocolat au lait (1 oz)',mg:6,c:'Autre',e:'🍫'},{n:'Chocolat chaud (8 oz)',mg:5,c:'Autre',e:'🍫'},
   ];
 
   /* ============ Storage ============ */
@@ -354,8 +354,7 @@ body::after {
     h = ((h % 24) + 24) % 24;
     let hr = Math.floor(h), m = Math.round((h-hr)*60);
     if (m === 60) { m = 0; hr = (hr+1)%24; }
-    const ap = hr >= 12 ? 'PM' : 'AM'; let h12 = hr % 12; if (h12===0) h12=12;
-    return h12 + ':' + String(m).padStart(2,'0') + ' ' + ap;
+    return String(hr).padStart(2,'0') + 'h' + String(m).padStart(2,'0');
   }
   function fmtTime(ts) { const d=new Date(ts); return fmtClock(d.getHours()+d.getMinutes()/60); }
 
@@ -384,7 +383,7 @@ body::after {
     if (withCaf !== false) e += caffeineBoostAt(t);
     return clamp(e, 0, 100);
   }
-  function stateWord(v){ if(v>=80)return'Peak'; if(v>=62)return'High'; if(v>=44)return'Steady'; if(v>=28)return'Dip'; return'Low'; }
+  function stateWord(v){ if(v>=80)return'Pic'; if(v>=62)return'Élevée'; if(v>=44)return'Stable'; if(v>=28)return'Baisse'; return'Faible'; }
   function energyColor(v){ if(v>=62)return'#6BE3A4'; if(v>=40)return'#F2C063'; return '#FF8A8A'; }
 
   /* ============ WHOOP (optional) ============ */
@@ -456,7 +455,7 @@ body::after {
     $('ringNum').textContent = v;
     $('energyState').textContent = stateWord(v);
     $('energyState').style.color = energyColor(v);
-    $('energyWhen').textContent = scrubT!=null ? ('at ' + fmtClock(t)) : 'Right now';
+    $('energyWhen').textContent = scrubT!=null ? ('à ' + fmtClock(t)) : 'En ce moment';
   }
 
   function renderChart(){
@@ -522,27 +521,27 @@ body::after {
     const a=analysis();
     // band
     $('peakVal').textContent = a.peakT!=null ? (fmtClock(a.pStart)+'–'+fmtClock(a.pEnd)) : '—';
-    $('crashVal').textContent = a.crashSignificant ? ('~'+fmtClock(a.crashT)) : 'none soon';
+    $('crashVal').textContent = a.crashSignificant ? ('~'+fmtClock(a.crashT)) : 'aucune prévue';
     $('cutoffVal').textContent = fmtClock(a.cutoff);
     // tiles
     $('mPeak').textContent = a.peakT!=null ? fmtClock(a.peakT) : '—';
-    $('mPeakSub').textContent = a.peakT!=null ? ('Energy ~'+a.peakV+'/100 · window '+fmtClock(a.pStart)+'–'+fmtClock(a.pEnd)) : 'Log a drink to see your curve.';
-    if(a.crashSignificant){ $('mCrash').textContent = fmtClock(a.crashT); $('mCrashSub').textContent = 'Drops toward ~'+a.crashTo+'/100 — plan lighter work then.'; }
-    else { $('mCrash').textContent = 'No crash'; $('mCrashSub').textContent = 'No steep drop predicted in the next several hours.'; }
+    $('mPeakSub').textContent = a.peakT!=null ? ('Énergie ~'+a.peakV+'/100 · créneau '+fmtClock(a.pStart)+'–'+fmtClock(a.pEnd)) : 'Enregistrez une boisson pour voir votre courbe.';
+    if(a.crashSignificant){ $('mCrash').textContent = fmtClock(a.crashT); $('mCrashSub').textContent = 'Descend vers ~'+a.crashTo+'/100 — prévoyez une tâche plus légère à ce moment-là.'; }
+    else { $('mCrash').textContent = 'Pas de baisse'; $('mCrashSub').textContent = 'Aucune chute marquée prévue dans les prochaines heures.'; }
     $('mCutoff').textContent = fmtClock(a.cutoff);
-    $('mCutoffSub').textContent = 'Last coffee to keep <30 mg by your '+fmtClock(bedHour)+' bedtime.';
+    $('mCutoffSub').textContent = 'Dernier café pour rester sous 30 mg à votre coucher de '+fmtClock(bedHour)+'.';
 
     // tips
     const tips=[];
-    tips.push(['☀️','Front-load it. Caffeine works best 30–90 min after waking — aim your first cup near '+fmtClock(wakeHour+0.5)+'.']);
+    tips.push(['☀️','Ne tardez pas. La caféine agit mieux 30 à 90 min après le réveil — visez votre première tasse vers '+fmtClock(wakeHour+0.5)+'.']);
     const bedTs=hToTs(bedHour < nowHour() ? bedHour+24 : bedHour);
     const atBed=Math.round(totalActiveAt(bedTs));
-    if(a.cutoff < a.now) tips.push(['🌙','It\'s past your coffee cutoff ('+fmtClock(a.cutoff)+'). More caffeine now will likely cost you sleep tonight.']);
-    else tips.push(['🌙','You can still have coffee until ~'+fmtClock(a.cutoff)+' without wrecking your '+fmtClock(bedHour)+' bedtime.']);
-    if(atBed>=50) tips.push(['⚠️','~'+atBed+' mg will still be active at bedtime — that\'s enough to delay deep sleep. Ease off.']);
-    if(a.crashSignificant) tips.push(['🚶','Beat the '+fmtClock(a.crashT)+' dip with 10 min of daylight + water instead of another coffee — you\'ll avoid stacking a late crash.']);
-    tips.push(['💧','Drink a glass of water per caffeinated drink — dehydration mimics and worsens the crash.']);
-    if(recovery!=null && recovery<34) tips.push(['🔋','WHOOP recovery is '+recovery+'% — low. Caffeine masks fatigue but won\'t repay sleep debt; keep today under '+dailyLimit()+' mg.']);
+    if(a.cutoff < a.now) tips.push(['🌙','Vous avez dépassé votre heure limite pour le café ('+fmtClock(a.cutoff)+'). Prendre plus de caféine maintenant risque de nuire à votre sommeil ce soir.']);
+    else tips.push(['🌙','Vous pouvez encore prendre un café jusqu\'à ~'+fmtClock(a.cutoff)+' sans compromettre votre coucher de '+fmtClock(bedHour)+'.']);
+    if(atBed>=50) tips.push(['⚠️','~'+atBed+' mg seront encore actifs au coucher — de quoi retarder le sommeil profond. Levez le pied.']);
+    if(a.crashSignificant) tips.push(['🚶','Contrez la baisse de '+fmtClock(a.crashT)+' avec 10 min de lumière du jour et de l\'eau plutôt qu\'un autre café — vous éviterez un coup de barre tardif.']);
+    tips.push(['💧','Buvez un verre d\'eau pour chaque boisson caféinée — la déshydratation imite et aggrave le coup de barre.']);
+    if(recovery!=null && recovery<34) tips.push(['🔋','La récupération WHOOP est de '+recovery+'% — faible. La caféine masque la fatigue mais ne compense pas la dette de sommeil ; restez sous '+dailyLimit()+' mg aujourd\'hui.']);
     const ul=$('tips'); ul.innerHTML='';
     tips.forEach(([ic,txt])=>{ const li=document.createElement('li'); li.className='tip'; li.innerHTML='<span class="ic">'+ic+'</span><span>'+txt+'</span>'; ul.appendChild(li); });
   }
@@ -551,32 +550,32 @@ body::after {
     const total=dailyTotal(), limit=dailyLimit(), target=moderateTarget();
     $('dailyNum').textContent=total; $('dailyLimit').textContent=limit;
     const activeNow=Math.round(totalActiveAt(Date.now()));
-    $('dailyActive').textContent = activeNow>0 ? (activeNow+' mg active now') : '';
+    $('dailyActive').textContent = activeNow>0 ? (activeNow+' mg actifs maintenant') : '';
     const pct=Math.min(100,(total/limit)*100); const fill=$('dailyFill'); fill.style.width=pct+'%';
     let color='linear-gradient(90deg,#6BE3A4,#A7F3D0)';
     if(total>=limit) color='linear-gradient(90deg,#FF6B6B,#F2807A)'; else if(total>=target) color='linear-gradient(90deg,#F2C063,#F2A65A)';
     fill.style.background=color;
     const msg=$('dailyMsg'); msg.className='daily-msg';
-    if(total===0){ msg.classList.add('good'); msg.textContent="You haven't logged anything today."; }
-    else if(total>=limit){ msg.classList.add('bad'); msg.textContent="⚠️ That's over your limit for today — ease off the caffeine."; }
-    else if(total>=target){ msg.classList.add('warn'); msg.textContent="Getting up there. "+(limit-total)+" mg until your ceiling."; }
-    else { msg.classList.add('good'); msg.textContent="You're in a good range — "+(target-total)+" mg under your target."; }
+    if(total===0){ msg.classList.add('good'); msg.textContent="Vous n'avez rien enregistré aujourd'hui."; }
+    else if(total>=limit){ msg.classList.add('bad'); msg.textContent="⚠️ Vous avez dépassé votre limite pour aujourd'hui — levez le pied sur la caféine."; }
+    else if(total>=target){ msg.classList.add('warn'); msg.textContent="Ça grimpe. "+(limit-total)+" mg avant votre plafond."; }
+    else { msg.classList.add('good'); msg.textContent="Vous êtes dans une bonne fourchette — "+(target-total)+" mg sous votre objectif."; }
     const parts=[];
-    if(bodyKg) parts.push('Target ~'+target+' mg (3 mg/kg for '+Math.round(bodyKg)+' kg). Ceiling '+limit+' mg.');
-    else parts.push('Using the 400 mg/day ceiling — add your weight in Settings for a personalized target.');
-    if(recovery!=null) parts.push('WHOOP recovery '+recovery+'%'+(recovery<34?' — limit pulled back to '+limit+' mg.':'.'));
+    if(bodyKg) parts.push('Objectif ~'+target+' mg (3 mg/kg pour '+Math.round(bodyKg)+' kg). Plafond '+limit+' mg.');
+    else parts.push('Plafond de 400 mg/jour utilisé — ajoutez votre poids dans Paramètres pour un objectif personnalisé.');
+    if(recovery!=null) parts.push('Récupération WHOOP '+recovery+'%'+(recovery<34?' — limite réduite à '+limit+' mg.':'.'));
     $('dailyNote').innerHTML=parts.join('<br>');
   }
 
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function renderLog(){
     const list=$('logList'); const tl=todaysLogs().slice().sort((a,b)=>b.ts-a.ts); list.innerHTML='';
-    if(tl.length===0){ const li=document.createElement('li'); li.className='empty-state'; li.textContent='No drinks logged today — search one above to start tracking.'; list.appendChild(li); return; }
+    if(tl.length===0){ const li=document.createElement('li'); li.className='empty-state'; li.textContent="Aucune boisson enregistrée aujourd'hui — recherchez-en une ci-dessus pour commencer le suivi."; list.appendChild(li); return; }
     tl.forEach(l=>{
       const m=milestones(l); const li=document.createElement('li'); li.className='log-row';
       li.innerHTML='<span class="log-emoji">'+(l.e||'☕')+'</span><div class="log-main"><div class="log-name">'+escapeHtml(l.n)+'<b>'+l.mg+' mg</b></div>'
-        +'<div class="log-meta">Peaks '+fmtTime(m.peak)+'<span class="sep">•</span>Half gone '+fmtTime(m.half)+'<span class="sep">•</span>Cleared '+fmtTime(m.cleared)+'</div></div>'
-        +'<span class="log-time">'+fmtTime(l.ts)+'</span><button class="log-del" type="button" aria-label="Delete">×</button>';
+        +'<div class="log-meta">Pic '+fmtTime(m.peak)+'<span class="sep">•</span>Moitié éliminée '+fmtTime(m.half)+'<span class="sep">•</span>Éliminée '+fmtTime(m.cleared)+'</div></div>'
+        +'<span class="log-time">'+fmtTime(l.ts)+'</span><button class="log-del" type="button" aria-label="Supprimer">×</button>';
       li.querySelector('.log-del').addEventListener('click',()=>{ logs=logs.filter(x=>x.id!==l.id); saveJSON(LOGS_KEY,logs); renderAll(); });
       list.appendChild(li);
     });
@@ -586,19 +585,19 @@ body::after {
 
   /* ============ Logging / search / custom ============ */
   function logDrink(item){ logs.push({id:'c'+Date.now()+Math.floor(Math.random()*1000), n:item.n, mg:Math.round(item.mg), e:item.e||'☕', ts:Date.now()}); saveJSON(LOGS_KEY,logs); renderAll(); }
-  function allDrinks(){ return DB.concat(custom.map(c=>({n:c.n,mg:c.mg,c:'Custom',e:'➕'}))); }
+  function allDrinks(){ return DB.concat(custom.map(c=>({n:c.n,mg:c.mg,c:'Personnalisé',e:'➕'}))); }
   function renderResults(q){
     const el=$('results'); const query=(q||'').trim().toLowerCase(); let items=allDrinks();
     if(query) items=items.filter(d=>d.n.toLowerCase().includes(query)||d.c.toLowerCase().includes(query));
     items=items.slice(0, query?40:12); el.innerHTML='';
-    if(items.length===0){ const li=document.createElement('li'); li.className='results-empty'; li.textContent='No match — add it as a custom drink below.'; el.appendChild(li); return; }
+    if(items.length===0){ const li=document.createElement('li'); li.className='results-empty'; li.textContent='Aucun résultat — ajoutez-la comme boisson personnalisée ci-dessous.'; el.appendChild(li); return; }
     items.forEach(d=>{ const li=document.createElement('li'); li.className='result';
       li.innerHTML='<span class="result-emoji">'+(d.e||'☕')+'</span><span class="result-name">'+escapeHtml(d.n)+' <span class="result-cat">· '+d.c+'</span></span><span class="result-mg">'+d.mg+'<small> mg</small></span>';
       li.addEventListener('click',()=>{ logDrink(d); $('search').value=''; renderResults(''); }); el.appendChild(li); });
   }
   function addCustom(){
     const name=$('customName').value.trim(); const mg=parseInt($('customMg').value,10);
-    if(!name||!(mg>=0)) return; custom.push({n:name,mg:mg,e:'➕',c:'Custom'}); saveJSON(CUSTOM_KEY,custom);
+    if(!name||!(mg>=0)) return; custom.push({n:name,mg:mg,e:'➕',c:'Personnalisé'}); saveJSON(CUSTOM_KEY,custom);
     logDrink({n:name,mg:mg,e:'➕'}); $('customName').value=''; $('customMg').value=''; renderResults($('search').value);
   }
 

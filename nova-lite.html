@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Nova Lite · AI Mentor</title>
+<title>Nova Lite · Mentor IA</title>
 <!-- ============================================================
  * NOVA LITE — a simple, drop-in AI mentor for ANY dashboard.
  * Single self-contained file. No backend, no build step.
@@ -87,26 +87,26 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
   <div class="wrap">
     <div class="top">
       <div class="orb" id="orb"></div>
-      <div class="title"><h1>Nova Lite</h1><div class="role">your mentor</div></div>
-      <button id="keyToggle" class="key-toggle" aria-label="API key settings" title="API key">🔑</button>
+      <div class="title"><h1>Nova Lite</h1><div class="role">votre mentor</div></div>
+      <button id="keyToggle" class="key-toggle" aria-label="Paramètres de la clé API" title="Clé API">🔑</button>
     </div>
 
     <div class="keypanel" id="keypanel">
       <div class="keybar">
-        <input id="keyInput" type="password" placeholder="paste your Anthropic API key (sk-ant-…)" autocomplete="off" />
-        <button id="keySave">Save</button>
+        <input id="keyInput" type="password" placeholder="collez votre clé API Anthropic (sk-ant-…)" autocomplete="off" />
+        <button id="keySave">Enregistrer</button>
       </div>
       <div class="hint" id="hint">
-        Your key is stored only in <b>this browser</b> and sent straight to Anthropic — never to us.
-        Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+        Votre clé est stockée uniquement dans <b>ce navigateur</b> et envoyée directement à Anthropic — jamais à nous.
+        Obtenez-en une sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
       </div>
     </div>
 
     <div class="feed" id="feed"></div>
 
     <div class="composer">
-      <input id="chatInput" placeholder="ask Nova anything…" autocomplete="off" />
-      <button id="send" aria-label="Send">→</button>
+      <input id="chatInput" placeholder="demandez n'importe quoi à Nova…" autocomplete="off" />
+      <button id="send" aria-label="Envoyer">→</button>
     </div>
   </div>
 
@@ -127,13 +127,13 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
 
   // ---- key handling ----
   function savedKey(){ try { return localStorage.getItem(KEY_LS) || ''; } catch(e){ return ''; } }
-  if (savedKey()) { hint.classList.add('saved'); hint.innerHTML = '✓ Key saved in this browser. Ask away.'; keyInput.placeholder = '•••• key saved ••••'; keyToggle.classList.add('has-key'); }
+  if (savedKey()) { hint.classList.add('saved'); hint.innerHTML = '✓ Clé enregistrée dans ce navigateur. Posez vos questions.'; keyInput.placeholder = '•••• clé enregistrée ••••'; keyToggle.classList.add('has-key'); }
   document.getElementById('keySave').addEventListener('click', () => {
     const k = keyInput.value.trim();
     if (!k) return;
     try { localStorage.setItem(KEY_LS, k); } catch(e){}
-    keyInput.value = ''; keyInput.placeholder = '•••• key saved ••••';
-    hint.classList.add('saved'); hint.innerHTML = '✓ Key saved in this browser. Ask away.';
+    keyInput.value = ''; keyInput.placeholder = '•••• clé enregistrée ••••';
+    hint.classList.add('saved'); hint.innerHTML = '✓ Clé enregistrée dans ce navigateur. Posez vos questions.';
     keyToggle.classList.add('has-key');
     keypanel.classList.remove('open'); // tuck it away so it's not on screen
   });
@@ -179,7 +179,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
   async function ask(text){
     text = (text||'').trim(); if (!text || busy) return;
     const key = savedKey();
-    if (!key){ addCoach('- Paste your **Anthropic API key** above first, then ask me again.'); return; }
+    if (!key){ addCoach('- Colle ta **clé API Anthropic** ci-dessus d\'abord, puis redemande-moi.'); return; }
     busy = true; addUser(text); input.value = '';
     setOrb('think');
     const loading = addCoach('<span class="dots"><i></i><i></i><i></i></span>');
@@ -200,12 +200,12 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
         }),
       });
       const json = await res.json();
-      if (json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error.message || 'Something went wrong — check your API key.')); setOrb(''); busy = false; return; }
-      const reply = (json.content && json.content[0] && json.content[0].text) || 'Hmm, no reply.';
+      if (json.error){ loading.querySelector('div:last-child').innerHTML = render('- ' + (json.error.message || 'Un problème est survenu — vérifie ta clé API.')); setOrb(''); busy = false; return; }
+      const reply = (json.content && json.content[0] && json.content[0].text) || 'Hmm, pas de réponse.';
       loading.querySelector('div:last-child').innerHTML = render(reply);
       setOrb('happy'); setTimeout(() => setOrb(''), 2500);
     } catch(e){
-      loading.querySelector('div:last-child').innerHTML = render('- Could not reach Anthropic — check your connection and key.');
+      loading.querySelector('div:last-child').innerHTML = render('- Impossible de joindre Anthropic — vérifie ta connexion et ta clé.');
       setOrb('');
     }
     busy = false;
@@ -214,7 +214,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
   document.getElementById('send').addEventListener('click', () => ask(input.value));
   input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(input.value); });
 
-  addCoach('Hey — I am <b>Nova</b>. Paste your key above, then ask me about food, training, sleep, or where to start. I keep it short and give you <b>one thing to act on</b>.');
+  addCoach('Hey — je suis <b>Nova</b>. Colle ta clé ci-dessus, puis pose-moi des questions sur la nourriture, l\'entraînement, le sommeil, ou par où commencer. Je reste bref et je te donne <b>une seule chose à faire</b>.');
 })();
 </script>
 </body>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
 <script src="lock.js"></script>
 <script src="/api/config"></script>
@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
 <meta name="color-scheme" content="dark">
-<title>Daily Stack — Customizable Template</title>
+<title>Stack quotidien — Modèle personnalisable</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -258,7 +258,7 @@ main {
   color: var(--text-secondary);
 }
 .stack-item-meta:empty::before {
-  content: 'add notes…';
+  content: 'ajouter des notes…';
   color: var(--text-quaternary);
   font-style: italic;
 }
@@ -607,16 +607,16 @@ main {
     <div class="whoop-card">
       <div id="whDisc" class="wh-disc">
         <div class="wh-brand"><span class="wh-brand-mark">W</span><span class="wh-brand-text">WHOOP</span></div>
-        <div class="wh-disc-title">Not connected</div>
-        <div class="wh-disc-sub">Link your account to see live recovery, sleep, and strain.</div>
-        <button id="whConnectBtn" class="wh-connect" type="button">Connect WHOOP</button>
+        <div class="wh-disc-title">Non connecté</div>
+        <div class="wh-disc-sub">Reliez votre compte pour voir la récupération, le sommeil et l'effort en direct.</div>
+        <button id="whConnectBtn" class="wh-connect" type="button">Connecter WHOOP</button>
       </div>
       <div id="whConn" style="display:none">
         <div class="wh-head">
-          <div class="wh-brand"><span class="wh-brand-mark">W</span><span class="wh-brand-text">WHOOP</span><span class="wh-live"><span class="wh-live-dot"></span>live</span></div>
+          <div class="wh-brand"><span class="wh-brand-mark">W</span><span class="wh-brand-text">WHOOP</span><span class="wh-live"><span class="wh-live-dot"></span>en direct</span></div>
           <div class="wh-head-right">
             <span id="whUpdated" class="wh-updated">—</span>
-            <button id="whRefresh" class="wh-refresh" type="button" aria-label="Refresh"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1 1 5.64 5.64L23 10"/></svg></button>
+            <button id="whRefresh" class="wh-refresh" type="button" aria-label="Actualiser"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1 1 5.64 5.64L23 10"/></svg></button>
           </div>
         </div>
         <div id="whErr" class="wh-err" style="display:none"></div>
@@ -627,12 +627,12 @@ main {
           </svg>
           <div class="wh-ring-center">
             <div id="whRecNum" class="wh-ring-num">—</div>
-            <div class="wh-ring-unit">recovery</div>
+            <div class="wh-ring-unit">récupération</div>
             <div id="whRecLabel" class="wh-ring-label">—</div>
           </div>
         </div>
         <div id="whStages" class="wh-stages" style="display:none">
-          <div class="wh-stages-head"><span class="wh-stages-eye">Sleep stages</span><span class="wh-stages-meta" id="whStagesMeta">—</span></div>
+          <div class="wh-stages-head"><span class="wh-stages-eye">Phases de sommeil</span><span class="wh-stages-meta" id="whStagesMeta">—</span></div>
           <div class="wh-stages-bar">
             <div class="wh-stage wh-stage-rem"   id="whBarRem"   style="width:0%"></div>
             <div class="wh-stage wh-stage-deep"  id="whBarDeep"  style="width:0%"></div>
@@ -640,35 +640,35 @@ main {
             <div class="wh-stage wh-stage-awake" id="whBarAwake" style="width:0%"></div>
           </div>
           <div class="wh-stages-legend">
-            <div class="wh-leg"><span class="wh-leg-dot d-rem"></span>REM<span class="wh-leg-num" id="whRem">—</span></div>
-            <div class="wh-leg"><span class="wh-leg-dot d-deep"></span>Deep<span class="wh-leg-num" id="whDeep">—</span></div>
-            <div class="wh-leg"><span class="wh-leg-dot d-light"></span>Light<span class="wh-leg-num" id="whLight">—</span></div>
-            <div class="wh-leg"><span class="wh-leg-dot d-awake"></span>Awake<span class="wh-leg-num" id="whAwake">—</span></div>
+            <div class="wh-leg"><span class="wh-leg-dot d-rem"></span>Paradoxal<span class="wh-leg-num" id="whRem">—</span></div>
+            <div class="wh-leg"><span class="wh-leg-dot d-deep"></span>Profond<span class="wh-leg-num" id="whDeep">—</span></div>
+            <div class="wh-leg"><span class="wh-leg-dot d-light"></span>Léger<span class="wh-leg-num" id="whLight">—</span></div>
+            <div class="wh-leg"><span class="wh-leg-dot d-awake"></span>Éveil<span class="wh-leg-num" id="whAwake">—</span></div>
           </div>
         </div>
         <div class="wh-stats">
-          <div class="wh-stat"><span class="wh-zone" id="whZoneSleep"></span><div class="wh-stat-label">Sleep</div><div class="wh-stat-val" id="whSleep">—</div><div class="wh-stat-sub" id="whSleepSub">—</div></div>
-          <div class="wh-stat"><span class="wh-zone" id="whZoneStrain"></span><div class="wh-stat-label">Strain</div><div class="wh-stat-val" id="whStrain">—</div><div class="wh-stat-sub" id="whStrainSub">today</div></div>
-          <div class="wh-stat"><span class="wh-zone" id="whZoneHrv"></span><div class="wh-stat-label">HRV</div><div class="wh-stat-val" id="whHrv">—</div><div class="wh-stat-sub">ms</div></div>
-          <div class="wh-stat"><span class="wh-zone" id="whZoneRhr"></span><div class="wh-stat-label">RHR</div><div class="wh-stat-val" id="whRhr">—</div><div class="wh-stat-sub">bpm</div></div>
+          <div class="wh-stat"><span class="wh-zone" id="whZoneSleep"></span><div class="wh-stat-label">Sommeil</div><div class="wh-stat-val" id="whSleep">—</div><div class="wh-stat-sub" id="whSleepSub">—</div></div>
+          <div class="wh-stat"><span class="wh-zone" id="whZoneStrain"></span><div class="wh-stat-label">Effort</div><div class="wh-stat-val" id="whStrain">—</div><div class="wh-stat-sub" id="whStrainSub">aujourd'hui</div></div>
+          <div class="wh-stat"><span class="wh-zone" id="whZoneHrv"></span><div class="wh-stat-label">VFC</div><div class="wh-stat-val" id="whHrv">—</div><div class="wh-stat-sub">ms</div></div>
+          <div class="wh-stat"><span class="wh-zone" id="whZoneRhr"></span><div class="wh-stat-label">FCR</div><div class="wh-stat-val" id="whRhr">—</div><div class="wh-stat-sub">bpm</div></div>
         </div>
         <div id="whBio" class="wh-bio" style="display:none">
-          <div class="wh-bio-item"><span class="wh-zone" id="whZoneSkin"></span><span class="wh-bio-label">Skin temp</span><span class="wh-bio-val" id="whSkin">—</span></div>
-          <div class="wh-bio-item"><span class="wh-zone" id="whZoneSpo2"></span><span class="wh-bio-label">Blood O₂</span><span class="wh-bio-val" id="whSpo2">—</span></div>
-          <div class="wh-bio-item"><span class="wh-zone" id="whZoneResp"></span><span class="wh-bio-label">Resp rate</span><span class="wh-bio-val" id="whResp">—</span></div>
+          <div class="wh-bio-item"><span class="wh-zone" id="whZoneSkin"></span><span class="wh-bio-label">Temp. cutanée</span><span class="wh-bio-val" id="whSkin">—</span></div>
+          <div class="wh-bio-item"><span class="wh-zone" id="whZoneSpo2"></span><span class="wh-bio-label">O₂ sanguin</span><span class="wh-bio-val" id="whSpo2">—</span></div>
+          <div class="wh-bio-item"><span class="wh-zone" id="whZoneResp"></span><span class="wh-bio-label">Fréq. respiratoire</span><span class="wh-bio-val" id="whResp">—</span></div>
         </div>
         <div class="wh-legend">
-          <span class="wh-leg-item"><span class="wh-zone z-good"></span>Good</span>
+          <span class="wh-leg-item"><span class="wh-zone z-good"></span>Bon</span>
           <span class="wh-leg-item"><span class="wh-zone z-norm"></span>Normal</span>
-          <span class="wh-leg-item"><span class="wh-zone z-warn"></span>Watch</span>
-          <span class="wh-leg-item"><span class="wh-zone z-bad"></span>High / Low</span>
+          <span class="wh-leg-item"><span class="wh-zone z-warn"></span>À surveiller</span>
+          <span class="wh-leg-item"><span class="wh-zone z-bad"></span>Élevé / Bas</span>
         </div>
         <div id="whVerdict" class="wh-verdict" style="display:none">
-          <div class="wh-verdict-head"><span class="wh-verdict-eye">Today's call</span><span id="whVerdictBadge" class="wh-verdict-badge"></span></div>
+          <div class="wh-verdict-head"><span class="wh-verdict-eye">Bilan du jour</span><span id="whVerdictBadge" class="wh-verdict-badge"></span></div>
           <div id="whVerdictHead" class="wh-verdict-headline"></div>
           <div id="whVerdictReasons" class="wh-verdict-reasons"></div>
         </div>
-        <button id="whDisconnectBtn" class="wh-disconnect-link" type="button">Disconnect</button>
+        <button id="whDisconnectBtn" class="wh-disconnect-link" type="button">Déconnecter</button>
       </div>
     </div>
   </div>
@@ -725,7 +725,7 @@ main {
       const [p, qs] = path.split('?');
       const params = new URLSearchParams(qs || ''); params.set('path', p);
       const r = await fetch('/api/whoop-data?' + params.toString(), { headers: { 'Authorization': 'Bearer ' + t.access, 'Accept':'application/json' } });
-      if (r.status === 401) { const n = await refreshTok(t); if (n) return whFetch(path, n); throw new Error('unauthorized — reconnect'); }
+      if (r.status === 401) { const n = await refreshTok(t); if (n) return whFetch(path, n); throw new Error('non autorisé — reconnectez-vous'); }
       if (!r.ok) throw new Error('WHOOP ' + r.status + ': ' + (await r.text()));
       return await r.json();
     }
@@ -749,16 +749,16 @@ main {
       return '#FF8A8A';
     }
     function recoveryLabel(score) {
-      if (score >= 67) return 'Go hard today';
-      if (score >= 34) return 'Moderate — listen to body';
-      return 'Recover today';
+      if (score >= 67) return 'Poussez fort aujourd\'hui';
+      if (score >= 34) return 'Modéré — écoutez votre corps';
+      return 'Récupération aujourd\'hui';
     }
 
     function verdict(rec, strain, sleepPerf) {
       if (rec == null) return null;
-      let cls = 'green', badge = 'GREEN', headline = 'Push hard today. Body\'s primed — go for the PR, do the harder workout, take on the heavy task.';
-      if (rec < 67 && rec >= 34) { cls = 'yellow'; badge = 'YELLOW'; headline = 'Moderate day. Train, but don\'t max out. Stick to planned volume, skip the max effort sets.'; }
-      else if (rec < 34) { cls = 'red'; badge = 'RED'; headline = 'Recover. Body is asking for rest — light movement, walk, mobility, sleep early.'; }
+      let cls = 'green', badge = 'VERT', headline = 'Poussez fort aujourd\'hui. Le corps est prêt — visez le record, faites la séance la plus dure, attaquez la tâche difficile.';
+      if (rec < 67 && rec >= 34) { cls = 'yellow'; badge = 'JAUNE'; headline = 'Journée modérée. Entraînez-vous, mais sans tout donner. Respectez le volume prévu, évitez les séries à l\'échec.'; }
+      else if (rec < 34) { cls = 'red'; badge = 'ROUGE'; headline = 'Récupération. Le corps réclame du repos — mouvement léger, marche, mobilité, coucher tôt.'; }
       return { cls, badge, headline };
     }
 
@@ -865,15 +865,15 @@ main {
           badge.className = 'wh-verdict-badge ' + v.cls;
           $('whVerdictHead').textContent = v.headline;
           const reasons = [];
-          if (sleepPerf != null) reasons.push((sleepPerf >= 80 ? '✓' : '·') + ' Sleep score ' + sleepPerf + '% — ' + (sleepPerf >= 80 ? 'you slept well.' : 'sub-par sleep.'));
-          if (strain != null)   reasons.push((strain < 14 ? '·' : '✓') + ' Strain ' + strain.toFixed(1) + ' yesterday — ' + (strain < 14 ? 'room to push today if recovery allows.' : 'high load logged.'));
-          if (hrv != null)      reasons.push((hrv >= 50 ? '✓' : '·') + ' HRV ' + hrv + 'ms — ' + (hrv >= 50 ? 'strong autonomic state.' : 'autonomic stress.'));
-          if (rhr != null)      reasons.push((rhr <= 60 ? '✓' : '·') + ' RHR ' + rhr + 'bpm — ' + (rhr <= 60 ? 'well-conditioned.' : 'elevated.'));
+          if (sleepPerf != null) reasons.push((sleepPerf >= 80 ? '✓' : '·') + ' Score de sommeil ' + sleepPerf + '% — ' + (sleepPerf >= 80 ? 'vous avez bien dormi.' : 'sommeil insuffisant.'));
+          if (strain != null)   reasons.push((strain < 14 ? '·' : '✓') + ' Effort de ' + strain.toFixed(1) + ' hier — ' + (strain < 14 ? 'marge pour pousser aujourd\'hui si la récupération le permet.' : 'charge élevée enregistrée.'));
+          if (hrv != null)      reasons.push((hrv >= 50 ? '✓' : '·') + ' VFC de ' + hrv + 'ms — ' + (hrv >= 50 ? 'état autonome solide.' : 'stress autonome.'));
+          if (rhr != null)      reasons.push((rhr <= 60 ? '✓' : '·') + ' FCR de ' + rhr + 'bpm — ' + (rhr <= 60 ? 'bien entraîné.' : 'élevée.'));
           $('whVerdictReasons').innerHTML = reasons.join('<br>');
         }
 
         const now = new Date();
-        $('whUpdated').textContent = 'Updated ' + now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        $('whUpdated').textContent = 'Actualisé à ' + now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
       } catch (e) {
         showErr(e.message || String(e));
       }
@@ -888,21 +888,21 @@ main {
   })();
   </script>
 
-  <div class="section-title">Daily Stack</div>
+  <div class="section-title">Stack quotidien</div>
 
   <div class="stack-card">
     <div class="stack-ticker" id="stackTicker">
       <span class="stack-ticker-dot"></span>
       <span class="stack-ticker-label">STACK</span>
       <span class="stack-ticker-sep">·</span>
-      <span class="stack-ticker-msg" id="stackTickerMsg">All caught up — keep it rolling</span>
+      <span class="stack-ticker-msg" id="stackTickerMsg">Tout est à jour — continuez comme ça</span>
       <span class="stack-ticker-count" id="stackTickerCount">0/0</span>
     </div>
 
     <div class="stack-head">
-      <div class="sf-eyebrow">Daily stack</div>
-      <div class="sf-title">Tap each as you take it</div>
-      <div class="stack-progress-text" id="stackProgressText">— / — taken today · resets at 6 AM</div>
+      <div class="sf-eyebrow">Stack quotidien</div>
+      <div class="sf-title">Cochez chaque élément une fois pris</div>
+      <div class="stack-progress-text" id="stackProgressText">— / — pris aujourd'hui · réinitialisation à 6 h</div>
     </div>
 
     <div class="stack-progress-track">
@@ -912,30 +912,30 @@ main {
     <div id="stackGroups"></div>
 
     <div class="stack-add-wrap">
-      <div class="sf-eyebrow stack-add-label">Add to stack</div>
+      <div class="sf-eyebrow stack-add-label">Ajouter au stack</div>
       <div class="stack-add-row">
         <div class="stack-name-wrap">
-          <input id="stackAddName" type="text" placeholder="Name (e.g. B-complex)" class="stack-input" autocomplete="off" spellcheck="false" />
+          <input id="stackAddName" type="text" placeholder="Nom (ex. Complexe B)" class="stack-input" autocomplete="off" spellcheck="false" />
           <div id="stackSearchResults" class="stack-search-results" hidden></div>
         </div>
-        <input id="stackAddDose" type="text" placeholder="Dose (e.g. 1 cap)" class="stack-input" />
+        <input id="stackAddDose" type="text" placeholder="Dose (ex. 1 gélule)" class="stack-input" />
         <select id="stackAddWindow" class="stack-input stack-select">
-          <option value="morning">Morning</option>
-          <option value="lunch">Lunch</option>
-          <option value="evening">Evening</option>
-          <option value="anytime">Anytime</option>
+          <option value="morning">Matin</option>
+          <option value="lunch">Midi</option>
+          <option value="evening">Soir</option>
+          <option value="anytime">N'importe quand</option>
         </select>
-        <button id="stackAddBtn" class="stack-add-btn">+ Add</button>
+        <button id="stackAddBtn" class="stack-add-btn">+ Ajouter</button>
       </div>
     </div>
   </div>
 
   <section id="water" class="water-embed">
-    <div class="section-title">Water Tracker</div>
-    <iframe src="po-water.html" class="water-iframe" loading="lazy" title="Water Tracker"></iframe>
+    <div class="section-title">Suivi de l'eau</div>
+    <iframe src="po-water.html" class="water-iframe" loading="lazy" title="Suivi de l'eau"></iframe>
   </section>
 
-  <div class="attribution">// editable template · all data stays in your browser</div>
+  <div class="attribution">// modèle personnalisable · toutes les données restent dans votre navigateur</div>
 </main>
 
 <script>
@@ -957,99 +957,99 @@ main {
   const TEMPLATE_VERSION = 5;
 
   const STACK_DEFAULTS = [
-    { id: 'm1', name: 'XXXXX - Supplement of choice', dose: '', window: 'morning', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'm2', name: 'XXXXX - Supplement of choice', dose: '', window: 'morning', note: 'how much MG, meal times, any data below', tag: 'stack', ordered: true  },
-    { id: 'm3', name: 'XXXXX - Supplement of choice', dose: '', window: 'morning', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'l1', name: 'XXXXX - Supplement of choice', dose: '', window: 'lunch',   note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'l2', name: 'XXXXX - Supplement of choice', dose: '', window: 'lunch',   note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'e1', name: 'XXXXX - Supplement of choice', dose: '', window: 'evening', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'e2', name: 'XXXXX - Supplement of choice', dose: '', window: 'evening', note: 'how much MG, meal times, any data below', tag: 'not-ordered', ordered: false },
-    { id: 'e3', name: 'XXXXX - Supplement of choice', dose: '', window: 'evening', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
+    { id: 'm1', name: 'XXXXX - Complément de votre choix', dose: '', window: 'morning', note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: null,    ordered: true  },
+    { id: 'm2', name: 'XXXXX - Complément de votre choix', dose: '', window: 'morning', note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: 'stack', ordered: true  },
+    { id: 'm3', name: 'XXXXX - Complément de votre choix', dose: '', window: 'morning', note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: null,    ordered: true  },
+    { id: 'l1', name: 'XXXXX - Complément de votre choix', dose: '', window: 'lunch',   note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: null,    ordered: true  },
+    { id: 'l2', name: 'XXXXX - Complément de votre choix', dose: '', window: 'lunch',   note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: null,    ordered: true  },
+    { id: 'e1', name: 'XXXXX - Complément de votre choix', dose: '', window: 'evening', note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: null,    ordered: true  },
+    { id: 'e2', name: 'XXXXX - Complément de votre choix', dose: '', window: 'evening', note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: 'not-ordered', ordered: false },
+    { id: 'e3', name: 'XXXXX - Complément de votre choix', dose: '', window: 'evening', note: 'combien de MG, horaires des repas, toute donnée ci-dessous', tag: null,    ordered: true  },
   ];
 
   const STACK_WINDOWS = [
-    { key: 'morning', icon: '🌅', title: 'Morning', time: '7–10 AM', cutoffHour: 10 },
-    { key: 'lunch',   icon: '🍽️', title: 'Lunch',   time: '12–2 PM', cutoffHour: 14 },
-    { key: 'evening', icon: '🌙', title: 'Evening', time: '9–11 PM', cutoffHour: 23 },
-    { key: 'anytime', icon: '⏱️', title: 'Anytime', time: 'No fixed window', cutoffHour: null },
+    { key: 'morning', icon: '🌅', title: 'Matin', time: '7h–10h', cutoffHour: 10 },
+    { key: 'lunch',   icon: '🍽️', title: 'Midi',   time: '12h–14h', cutoffHour: 14 },
+    { key: 'evening', icon: '🌙', title: 'Soir', time: '21h–23h', cutoffHour: 23 },
+    { key: 'anytime', icon: '⏱️', title: 'N\'importe quand', time: 'Pas d\'horaire fixe', cutoffHour: null },
   ];
 
   // ====== SUPPLEMENT DATABASE — researched defaults ======
   const SUPPLEMENT_DB = [
-    { name: 'Creatine monohydrate', dose: '5g', window: 'anytime', note: 'Daily — consistency matters more than timing', icon: '🏋️', aliases: ['creatine'] },
-    { name: 'Beta-alanine', dose: '2–5g', window: 'morning', note: 'Pre-workout — split doses to avoid tingles', icon: '🏋️', aliases: ['beta alanine'] },
-    { name: 'L-citrulline', dose: '6–8g', window: 'morning', note: '~30 min pre-workout for pump', icon: '🏋️', aliases: ['citrulline'] },
-    { name: 'BCAAs', dose: '5–10g', window: 'anytime', note: 'Around workout window', icon: '🏋️', aliases: ['bcaa'] },
-    { name: 'Whey protein', dose: '25–40g', window: 'anytime', note: 'Post-workout or to hit daily target', icon: '🥤', aliases: ['whey'] },
-    { name: 'Casein protein', dose: '25–40g', window: 'evening', note: 'Before bed for slow overnight aminos', icon: '🥤', aliases: ['casein'] },
-    { name: 'L-carnitine', dose: '1–2g', window: 'morning', note: 'With carbs for best uptake', icon: '🏋️', aliases: ['carnitine'] },
-    { name: 'Acetyl-L-carnitine', dose: '500mg–2g', window: 'morning', note: 'Cognitive variant — crosses BBB', icon: '🧠', aliases: ['alcar'] },
-    { name: 'HMB', dose: '3g', window: 'anytime', note: 'Split 3x daily — muscle preservation', icon: '🏋️', aliases: ['hmb'] },
-    { name: 'Glutamine', dose: '5g', window: 'anytime', note: 'Recovery — post-workout or before bed', icon: '🏋️', aliases: ['l-glutamine'] },
-    { name: 'Vitamin D3', dose: '2000–5000 IU', window: 'lunch', note: 'Fat-soluble — take with biggest meal', icon: '☀️', aliases: ['vit d', 'vitamin d', 'd3', 'cholecalciferol'] },
-    { name: 'Vitamin K2 (MK-7)', dose: '100–200 mcg', window: 'lunch', note: 'Pairs with D3 — same meal', icon: '💊', aliases: ['vit k', 'vitamin k', 'k2', 'mk7'] },
-    { name: 'Vitamin C', dose: '500–1000mg', window: 'morning', note: 'Water-soluble — split if over 500mg', icon: '🍊', aliases: ['vit c', 'ascorbic acid'] },
-    { name: 'Vitamin B12', dose: '500–1000mcg', window: 'morning', note: 'Methylcobalamin form preferred', icon: '⚡', aliases: ['b12', 'methylcobalamin'] },
-    { name: 'B-complex', dose: '1 cap', window: 'morning', note: 'All B vitamins — energy', icon: '⚡', aliases: ['b complex', 'b vitamins'] },
-    { name: 'Vitamin A', dose: '5000 IU', window: 'lunch', note: 'Fat-soluble — with fat', icon: '💊', aliases: ['vit a', 'retinol'] },
-    { name: 'Vitamin E', dose: '400 IU', window: 'lunch', note: 'Fat-soluble — with fat', icon: '💊', aliases: ['vit e', 'tocopherol'] },
-    { name: 'Folate', dose: '400–800mcg', window: 'morning', note: 'Methylfolate preferred', icon: '💊', aliases: ['folic acid', 'b9', 'methylfolate'] },
-    { name: 'Biotin', dose: '30mcg–5mg', window: 'anytime', note: 'Hair, skin, nails', icon: '💅', aliases: ['biotin', 'b7'] },
-    { name: 'Multivitamin', dose: '1 serving', window: 'lunch', note: 'Take with food', icon: '💊', aliases: ['multi', 'multivitamin'] },
-    { name: 'Magnesium glycinate', dose: '200–400mg', window: 'evening', note: '30–60 min before bed — sleep helper', icon: '🌙', aliases: ['magnesium', 'mag glycinate', 'bisglycinate'] },
-    { name: 'Magnesium L-threonate', dose: '144mg elemental', window: 'evening', note: 'Cognitive variant — crosses BBB', icon: '🧠', aliases: ['magtein', 'threonate'] },
-    { name: 'Magnesium citrate', dose: '200–400mg', window: 'evening', note: 'Also supports digestion', icon: '🌙', aliases: ['mag citrate'] },
-    { name: 'Zinc', dose: '15–30mg', window: 'evening', note: 'With food — not with calcium or iron', icon: '💊', aliases: ['zinc'] },
-    { name: 'Iron', dose: '18–65mg', window: 'morning', note: 'Empty stomach with vit C', icon: '💊', aliases: ['iron'] },
-    { name: 'Calcium', dose: '500mg', window: 'evening', note: 'With food — not with iron', icon: '🦴', aliases: ['calcium'] },
-    { name: 'Selenium', dose: '100–200mcg', window: 'anytime', note: 'Thyroid + antioxidant', icon: '💊', aliases: ['selenium'] },
-    { name: 'Iodine', dose: '150mcg', window: 'morning', note: 'Thyroid support', icon: '💊', aliases: ['iodine'] },
-    { name: 'Omega-3 (Fish oil)', dose: '2–3g EPA+DHA', window: 'lunch', note: 'With biggest fatty meal', icon: '🐟', aliases: ['omega 3', 'omega3', 'fish oil', 'epa', 'dha'] },
-    { name: 'Krill oil', dose: '500–1000mg', window: 'lunch', note: 'More absorbable than fish oil', icon: '🐟', aliases: ['krill'] },
-    { name: 'MCT oil', dose: '1–2 tbsp', window: 'morning', note: 'Fast energy — start low', icon: '🥥', aliases: ['mct'] },
-    { name: 'Flaxseed oil', dose: '1–2g', window: 'lunch', note: 'Plant omega-3 — with food', icon: '🌱', aliases: ['flax', 'flaxseed'] },
-    { name: 'L-theanine', dose: '100–200mg', window: 'morning', note: 'Stacks with caffeine 2:1', icon: '🧠', aliases: ['theanine'] },
-    { name: 'Caffeine', dose: '100–200mg', window: 'morning', note: 'Stack with L-theanine for cleaner focus', icon: '☕', aliases: ['caffeine'] },
-    { name: 'Rhodiola rosea', dose: '200–400mg', window: 'morning', note: 'Adaptogen — energy and stress', icon: '🌿', aliases: ['rhodiola'] },
-    { name: 'Lion\'s mane', dose: '500–1000mg', window: 'morning', note: 'Cognitive support — daily', icon: '🍄', aliases: ['lions mane', 'hericium'] },
-    { name: 'Bacopa monnieri', dose: '300–600mg', window: 'morning', note: 'With fat — long-term memory', icon: '🌿', aliases: ['bacopa'] },
-    { name: 'Ginkgo biloba', dose: '120–240mg', window: 'morning', note: 'Circulation and cognition', icon: '🌿', aliases: ['ginkgo'] },
-    { name: 'Alpha-GPC', dose: '300–600mg', window: 'morning', note: 'Choline — focus and learning', icon: '🧠', aliases: ['alpha gpc'] },
-    { name: 'Phosphatidylserine', dose: '100–300mg', window: 'evening', note: 'Cortisol regulation', icon: '🧠', aliases: ['ps'] },
-    { name: 'NAC', dose: '600–1800mg', window: 'morning', note: 'Glutathione precursor — split doses', icon: '💊', aliases: ['nac', 'n-acetyl cysteine'] },
-    { name: 'Melatonin', dose: '0.3–3mg', window: 'evening', note: '30–60 min before bed — start low', icon: '🌙', aliases: ['melatonin'] },
-    { name: 'Glycine', dose: '3g', window: 'evening', note: 'Body temp drop = better sleep onset', icon: '🌙', aliases: ['glycine'] },
-    { name: 'Apigenin', dose: '50mg', window: 'evening', note: 'From chamomile — before bed', icon: '🌙', aliases: ['apigenin'] },
-    { name: 'Ashwagandha', dose: '300–600mg', window: 'evening', note: 'KSM-66 form — stress and cortisol', icon: '🌿', aliases: ['ashwagandha', 'ksm-66'] },
-    { name: 'L-tryptophan', dose: '500mg–1g', window: 'evening', note: 'Serotonin precursor — sleep onset', icon: '🌙', aliases: ['tryptophan'] },
-    { name: 'GABA', dose: '500–750mg', window: 'evening', note: 'Calming — before bed', icon: '🌙', aliases: ['gaba'] },
-    { name: 'Valerian root', dose: '300–600mg', window: 'evening', note: 'Sleep onset support', icon: '🌙', aliases: ['valerian'] },
-    { name: 'Probiotics', dose: '10–50 billion CFU', window: 'morning', note: 'Empty stomach or with food', icon: '🦠', aliases: ['probiotic'] },
-    { name: 'Quercetin', dose: '500–1000mg', window: 'anytime', note: 'Pairs well with vitamin C', icon: '🌿', aliases: ['quercetin'] },
-    { name: 'Curcumin', dose: '500–1000mg', window: 'lunch', note: 'With black pepper + fat', icon: '🌿', aliases: ['curcumin', 'turmeric'] },
-    { name: 'Resveratrol', dose: '250–500mg', window: 'morning', note: 'With fat for absorption', icon: '🍇', aliases: ['resveratrol'] },
-    { name: 'CoQ10 / Ubiquinol', dose: '100–200mg', window: 'lunch', note: 'Fat-soluble — with biggest meal', icon: '💊', aliases: ['coq10', 'ubiquinol'] },
-    { name: 'Alpha lipoic acid', dose: '300–600mg', window: 'morning', note: 'Empty stomach for absorption', icon: '💊', aliases: ['ala', 'alpha lipoic'] },
-    { name: 'Glutathione', dose: '250–1000mg', window: 'morning', note: 'Liposomal form for absorption', icon: '💊', aliases: ['glutathione'] },
-    { name: 'Astaxanthin', dose: '4–12mg', window: 'lunch', note: 'Fat-soluble — with fatty meal', icon: '💊', aliases: ['astaxanthin'] },
-    { name: 'Berberine', dose: '500mg', window: 'lunch', note: 'Before meals — glucose support', icon: '💊', aliases: ['berberine'] },
-    { name: 'Milk thistle', dose: '200–400mg', window: 'anytime', note: 'Silymarin — liver support', icon: '🌿', aliases: ['milk thistle', 'silymarin'] },
-    { name: 'Spirulina', dose: '3–5g', window: 'morning', note: 'Algae — protein and antioxidants', icon: '🌱', aliases: ['spirulina'] },
-    { name: 'Chlorella', dose: '2–4g', window: 'morning', note: 'Algae — detox support', icon: '🌱', aliases: ['chlorella'] },
-    { name: 'Tongkat ali', dose: '200–400mg', window: 'morning', note: 'Cycle 8 weeks on/off', icon: '🌿', aliases: ['tongkat', 'longjack'] },
-    { name: 'Fadogia agrestis', dose: '600mg', window: 'morning', note: 'Cycle 8 weeks on/off', icon: '🌿', aliases: ['fadogia'] },
-    { name: 'DHEA', dose: '25–50mg', window: 'morning', note: 'Hormonal — consult doctor', icon: '💊', aliases: ['dhea'] },
-    { name: 'Pregnenolone', dose: '10–50mg', window: 'morning', note: 'Hormonal — consult doctor', icon: '💊', aliases: ['pregnenolone'] },
-    { name: 'Tribulus terrestris', dose: '250–750mg', window: 'morning', note: 'Libido and energy', icon: '🌿', aliases: ['tribulus'] },
-    { name: 'Maca root', dose: '1.5–3g', window: 'morning', note: 'Adaptogen — energy and libido', icon: '🌿', aliases: ['maca'] },
-    { name: 'Collagen peptides', dose: '10–20g', window: 'anytime', note: 'With vitamin C for synthesis', icon: '💅', aliases: ['collagen'] },
-    { name: 'Glucosamine', dose: '1500mg', window: 'lunch', note: 'With food', icon: '🦴', aliases: ['glucosamine'] },
-    { name: 'Chondroitin', dose: '1200mg', window: 'lunch', note: 'Often paired with glucosamine', icon: '🦴', aliases: ['chondroitin'] },
-    { name: 'MSM', dose: '1–3g', window: 'anytime', note: 'Joint support', icon: '🦴', aliases: ['msm'] },
-    { name: 'Hyaluronic acid', dose: '120–200mg', window: 'anytime', note: 'Skin and joint hydration', icon: '💅', aliases: ['hyaluronic', 'ha'] },
-    { name: 'Cordyceps', dose: '1–3g', window: 'morning', note: 'Energy and endurance', icon: '🍄', aliases: ['cordyceps'] },
-    { name: 'Reishi', dose: '1–2g', window: 'evening', note: 'Calming adaptogen', icon: '🍄', aliases: ['reishi', 'ganoderma'] },
-    { name: 'Chaga', dose: '1–2g', window: 'morning', note: 'Antioxidant and immune', icon: '🍄', aliases: ['chaga'] },
+    { name: 'Créatine monohydrate', dose: '5g', window: 'anytime', note: 'Quotidien — la régularité compte plus que le moment de la prise', icon: '🏋️', aliases: ['creatine'] },
+    { name: 'Bêta-alanine', dose: '2–5g', window: 'morning', note: 'Avant l\'entraînement — fractionnez les doses pour éviter les picotements', icon: '🏋️', aliases: ['beta alanine'] },
+    { name: 'L-citrulline', dose: '6–8g', window: 'morning', note: '~30 min avant l\'entraînement pour la congestion musculaire', icon: '🏋️', aliases: ['citrulline'] },
+    { name: 'BCAA', dose: '5–10g', window: 'anytime', note: 'Autour de la séance d\'entraînement', icon: '🏋️', aliases: ['bcaa'] },
+    { name: 'Protéine de whey', dose: '25–40g', window: 'anytime', note: 'Après l\'entraînement ou pour atteindre l\'objectif quotidien', icon: '🥤', aliases: ['whey'] },
+    { name: 'Protéine de caséine', dose: '25–40g', window: 'evening', note: 'Avant le coucher pour des acides aminés à libération lente', icon: '🥤', aliases: ['casein'] },
+    { name: 'L-carnitine', dose: '1–2g', window: 'morning', note: 'Avec des glucides pour une meilleure absorption', icon: '🏋️', aliases: ['carnitine'] },
+    { name: 'Acétyl-L-carnitine', dose: '500mg–2g', window: 'morning', note: 'Variante cognitive — traverse la barrière hémato-encéphalique', icon: '🧠', aliases: ['alcar'] },
+    { name: 'HMB', dose: '3g', window: 'anytime', note: 'À fractionner 3x/jour — préservation musculaire', icon: '🏋️', aliases: ['hmb'] },
+    { name: 'Glutamine', dose: '5g', window: 'anytime', note: 'Récupération — après l\'entraînement ou avant le coucher', icon: '🏋️', aliases: ['l-glutamine'] },
+    { name: 'Vitamine D3', dose: '2000–5000 IU', window: 'lunch', note: 'Liposoluble — à prendre avec le repas le plus copieux', icon: '☀️', aliases: ['vit d', 'vitamin d', 'd3', 'cholecalciferol'] },
+    { name: 'Vitamine K2 (MK-7)', dose: '100–200 mcg', window: 'lunch', note: 'Se combine avec la D3 — même repas', icon: '💊', aliases: ['vit k', 'vitamin k', 'k2', 'mk7'] },
+    { name: 'Vitamine C', dose: '500–1000mg', window: 'morning', note: 'Hydrosoluble — fractionner au-delà de 500 mg', icon: '🍊', aliases: ['vit c', 'ascorbic acid'] },
+    { name: 'Vitamine B12', dose: '500–1000mcg', window: 'morning', note: 'Forme méthylcobalamine préférée', icon: '⚡', aliases: ['b12', 'methylcobalamin'] },
+    { name: 'Complexe B', dose: '1 cap', window: 'morning', note: 'Toutes les vitamines B — énergie', icon: '⚡', aliases: ['b complex', 'b vitamins'] },
+    { name: 'Vitamine A', dose: '5000 IU', window: 'lunch', note: 'Liposoluble — avec un corps gras', icon: '💊', aliases: ['vit a', 'retinol'] },
+    { name: 'Vitamine E', dose: '400 IU', window: 'lunch', note: 'Liposoluble — avec un corps gras', icon: '💊', aliases: ['vit e', 'tocopherol'] },
+    { name: 'Folate', dose: '400–800mcg', window: 'morning', note: 'Méthylfolate préféré', icon: '💊', aliases: ['folic acid', 'b9', 'methylfolate'] },
+    { name: 'Biotine', dose: '30mcg–5mg', window: 'anytime', note: 'Cheveux, peau, ongles', icon: '💅', aliases: ['biotin', 'b7'] },
+    { name: 'Multivitamines', dose: '1 serving', window: 'lunch', note: 'À prendre avec un repas', icon: '💊', aliases: ['multi', 'multivitamin'] },
+    { name: 'Glycinate de magnésium', dose: '200–400mg', window: 'evening', note: '30 à 60 min avant le coucher — aide au sommeil', icon: '🌙', aliases: ['magnesium', 'mag glycinate', 'bisglycinate'] },
+    { name: 'L-thréonate de magnésium', dose: '144mg elemental', window: 'evening', note: 'Variante cognitive — traverse la barrière hémato-encéphalique', icon: '🧠', aliases: ['magtein', 'threonate'] },
+    { name: 'Citrate de magnésium', dose: '200–400mg', window: 'evening', note: 'Favorise aussi la digestion', icon: '🌙', aliases: ['mag citrate'] },
+    { name: 'Zinc', dose: '15–30mg', window: 'evening', note: 'Avec un repas — pas avec du calcium ou du fer', icon: '💊', aliases: ['zinc'] },
+    { name: 'Fer', dose: '18–65mg', window: 'morning', note: 'À jeun avec de la vitamine C', icon: '💊', aliases: ['iron'] },
+    { name: 'Calcium', dose: '500mg', window: 'evening', note: 'Avec un repas — pas avec du fer', icon: '🦴', aliases: ['calcium'] },
+    { name: 'Sélénium', dose: '100–200mcg', window: 'anytime', note: 'Thyroïde + antioxydant', icon: '💊', aliases: ['selenium'] },
+    { name: 'Iode', dose: '150mcg', window: 'morning', note: 'Soutien thyroïdien', icon: '💊', aliases: ['iodine'] },
+    { name: 'Oméga-3 (huile de poisson)', dose: '2–3g EPA+DHA', window: 'lunch', note: 'Avec le repas le plus gras', icon: '🐟', aliases: ['omega 3', 'omega3', 'fish oil', 'epa', 'dha'] },
+    { name: 'Huile de krill', dose: '500–1000mg', window: 'lunch', note: 'Mieux absorbée que l\'huile de poisson', icon: '🐟', aliases: ['krill'] },
+    { name: 'Huile MCT', dose: '1–2 tbsp', window: 'morning', note: 'Énergie rapide — commencer à faible dose', icon: '🥥', aliases: ['mct'] },
+    { name: 'Huile de lin', dose: '1–2g', window: 'lunch', note: 'Oméga-3 végétal — avec un repas', icon: '🌱', aliases: ['flax', 'flaxseed'] },
+    { name: 'L-théanine', dose: '100–200mg', window: 'morning', note: 'Se combine avec la caféine, ratio 2:1', icon: '🧠', aliases: ['theanine'] },
+    { name: 'Caféine', dose: '100–200mg', window: 'morning', note: 'À combiner avec la L-théanine pour une concentration plus nette', icon: '☕', aliases: ['caffeine'] },
+    { name: 'Rhodiola rosea', dose: '200–400mg', window: 'morning', note: 'Adaptogène — énergie et stress', icon: '🌿', aliases: ['rhodiola'] },
+    { name: 'Crinière de lion', dose: '500–1000mg', window: 'morning', note: 'Soutien cognitif — quotidien', icon: '🍄', aliases: ['lions mane', 'hericium'] },
+    { name: 'Bacopa monnieri', dose: '300–600mg', window: 'morning', note: 'Avec un corps gras — mémoire à long terme', icon: '🌿', aliases: ['bacopa'] },
+    { name: 'Ginkgo biloba', dose: '120–240mg', window: 'morning', note: 'Circulation et cognition', icon: '🌿', aliases: ['ginkgo'] },
+    { name: 'Alpha-GPC', dose: '300–600mg', window: 'morning', note: 'Choline — concentration et apprentissage', icon: '🧠', aliases: ['alpha gpc'] },
+    { name: 'Phosphatidylsérine', dose: '100–300mg', window: 'evening', note: 'Régulation du cortisol', icon: '🧠', aliases: ['ps'] },
+    { name: 'NAC', dose: '600–1800mg', window: 'morning', note: 'Précurseur du glutathion — fractionner les doses', icon: '💊', aliases: ['nac', 'n-acetyl cysteine'] },
+    { name: 'Mélatonine', dose: '0.3–3mg', window: 'evening', note: '30 à 60 min avant le coucher — commencer à faible dose', icon: '🌙', aliases: ['melatonin'] },
+    { name: 'Glycine', dose: '3g', window: 'evening', note: 'Baisse de la température corporelle = endormissement facilité', icon: '🌙', aliases: ['glycine'] },
+    { name: 'Apigénine', dose: '50mg', window: 'evening', note: 'Extrait de camomille — avant le coucher', icon: '🌙', aliases: ['apigenin'] },
+    { name: 'Ashwagandha', dose: '300–600mg', window: 'evening', note: 'Forme KSM-66 — stress et cortisol', icon: '🌿', aliases: ['ashwagandha', 'ksm-66'] },
+    { name: 'L-tryptophane', dose: '500mg–1g', window: 'evening', note: 'Précurseur de la sérotonine — endormissement', icon: '🌙', aliases: ['tryptophan'] },
+    { name: 'GABA', dose: '500–750mg', window: 'evening', note: 'Apaisant — avant le coucher', icon: '🌙', aliases: ['gaba'] },
+    { name: 'Valériane', dose: '300–600mg', window: 'evening', note: 'Aide à l\'endormissement', icon: '🌙', aliases: ['valerian'] },
+    { name: 'Probiotiques', dose: '10–50 billion CFU', window: 'morning', note: 'À jeun ou avec un repas', icon: '🦠', aliases: ['probiotic'] },
+    { name: 'Quercétine', dose: '500–1000mg', window: 'anytime', note: 'Se combine bien avec la vitamine C', icon: '🌿', aliases: ['quercetin'] },
+    { name: 'Curcumine', dose: '500–1000mg', window: 'lunch', note: 'Avec du poivre noir et un corps gras', icon: '🌿', aliases: ['curcumin', 'turmeric'] },
+    { name: 'Resvératrol', dose: '250–500mg', window: 'morning', note: 'Avec un corps gras pour l\'absorption', icon: '🍇', aliases: ['resveratrol'] },
+    { name: 'CoQ10 / Ubiquinol', dose: '100–200mg', window: 'lunch', note: 'Liposoluble — avec le repas le plus copieux', icon: '💊', aliases: ['coq10', 'ubiquinol'] },
+    { name: 'Acide alpha-lipoïque', dose: '300–600mg', window: 'morning', note: 'À jeun pour l\'absorption', icon: '💊', aliases: ['ala', 'alpha lipoic'] },
+    { name: 'Glutathion', dose: '250–1000mg', window: 'morning', note: 'Forme liposomale pour l\'absorption', icon: '💊', aliases: ['glutathione'] },
+    { name: 'Astaxanthine', dose: '4–12mg', window: 'lunch', note: 'Liposoluble — avec un repas gras', icon: '💊', aliases: ['astaxanthin'] },
+    { name: 'Berbérine', dose: '500mg', window: 'lunch', note: 'Avant les repas — soutien glycémique', icon: '💊', aliases: ['berberine'] },
+    { name: 'Chardon-Marie', dose: '200–400mg', window: 'anytime', note: 'Silymarine — soutien hépatique', icon: '🌿', aliases: ['milk thistle', 'silymarin'] },
+    { name: 'Spiruline', dose: '3–5g', window: 'morning', note: 'Algue — protéines et antioxydants', icon: '🌱', aliases: ['spirulina'] },
+    { name: 'Chlorelle', dose: '2–4g', window: 'morning', note: 'Algue — soutien détox', icon: '🌱', aliases: ['chlorella'] },
+    { name: 'Tongkat ali', dose: '200–400mg', window: 'morning', note: 'Cycles de 8 semaines avec/sans pause', icon: '🌿', aliases: ['tongkat', 'longjack'] },
+    { name: 'Fadogia agrestis', dose: '600mg', window: 'morning', note: 'Cycles de 8 semaines avec/sans pause', icon: '🌿', aliases: ['fadogia'] },
+    { name: 'DHEA', dose: '25–50mg', window: 'morning', note: 'Hormonal — consulter un médecin', icon: '💊', aliases: ['dhea'] },
+    { name: 'Prégnénolone', dose: '10–50mg', window: 'morning', note: 'Hormonal — consulter un médecin', icon: '💊', aliases: ['pregnenolone'] },
+    { name: 'Tribulus terrestris', dose: '250–750mg', window: 'morning', note: 'Libido et énergie', icon: '🌿', aliases: ['tribulus'] },
+    { name: 'Racine de maca', dose: '1.5–3g', window: 'morning', note: 'Adaptogène — énergie et libido', icon: '🌿', aliases: ['maca'] },
+    { name: 'Peptides de collagène', dose: '10–20g', window: 'anytime', note: 'Avec de la vitamine C pour la synthèse', icon: '💅', aliases: ['collagen'] },
+    { name: 'Glucosamine', dose: '1500mg', window: 'lunch', note: 'Avec un repas', icon: '🦴', aliases: ['glucosamine'] },
+    { name: 'Chondroïtine', dose: '1200mg', window: 'lunch', note: 'Souvent associée à la glucosamine', icon: '🦴', aliases: ['chondroitin'] },
+    { name: 'MSM', dose: '1–3g', window: 'anytime', note: 'Soutien articulaire', icon: '🦴', aliases: ['msm'] },
+    { name: 'Acide hyaluronique', dose: '120–200mg', window: 'anytime', note: 'Hydratation de la peau et des articulations', icon: '💅', aliases: ['hyaluronic', 'ha'] },
+    { name: 'Cordyceps', dose: '1–3g', window: 'morning', note: 'Énergie et endurance', icon: '🍄', aliases: ['cordyceps'] },
+    { name: 'Reishi', dose: '1–2g', window: 'evening', note: 'Adaptogène apaisant', icon: '🍄', aliases: ['reishi', 'ganoderma'] },
+    { name: 'Chaga', dose: '1–2g', window: 'morning', note: 'Antioxydant et immunitaire', icon: '🍄', aliases: ['chaga'] },
   ];
 
   let todayKey = `stack:taken:${getActiveDate()}`;
@@ -1120,7 +1120,7 @@ main {
     const totalCount = items.length;
     const takenCount = items.filter(i => taken[i.id]).length;
     document.getElementById('stackProgressText').textContent =
-      `${takenCount} / ${totalCount} taken today · resets at 6 AM`;
+      `${takenCount} / ${totalCount} pris aujourd'hui · réinitialisation à 6 h`;
     const pct = totalCount === 0 ? 0 : (takenCount / totalCount) * 100;
     document.getElementById('stackProgressBar').style.width = pct + '%';
 
@@ -1155,18 +1155,18 @@ main {
 
         let tagHtml = '';
         if (item.tag === 'stack') tagHtml = '<span class="stack-item-tag tag-stack">stack</span>';
-        else if (item.tag === 'not-ordered') tagHtml = '<span class="stack-item-tag tag-not-ordered">not ordered</span>';
+        else if (item.tag === 'not-ordered') tagHtml = '<span class="stack-item-tag tag-not-ordered">non commandé</span>';
 
         row.innerHTML = `
-          <button class="stack-check ${isTaken ? 'checked' : ''}" data-action="toggle" data-id="${item.id}" aria-label="Mark taken">${isTaken ? '✓' : ''}</button>
+          <button class="stack-check ${isTaken ? 'checked' : ''}" data-action="toggle" data-id="${item.id}" aria-label="Marquer comme pris">${isTaken ? '✓' : ''}</button>
           <div class="stack-item-body">
             <div class="stack-item-name" data-edit="name" data-id="${item.id}">
               <span class="stack-item-name-text">${escapeHtml(item.name)}</span>${tagHtml}
             </div>
             <div class="stack-item-meta" data-edit="meta" data-id="${item.id}">${escapeHtml(metaText(item))}</div>
           </div>
-          <button class="stack-low-btn ${isLow ? 'is-low' : ''}" data-action="low" data-id="${item.id}">↓ Running low</button>
-          <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Delete">×</button>`;
+          <button class="stack-low-btn ${isLow ? 'is-low' : ''}" data-action="low" data-id="${item.id}">↓ Stock faible</button>
+          <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Supprimer">×</button>`;
 
         group.appendChild(row);
       });
@@ -1175,7 +1175,7 @@ main {
     });
 
     if (groupsEl.children.length === 0) {
-      groupsEl.innerHTML = `<div class="stack-window-empty">No items yet — add one below to start your stack.</div>`;
+      groupsEl.innerHTML = `<div class="stack-window-empty">Aucun élément pour l'instant — ajoutez-en un ci-dessous pour démarrer votre stack.</div>`;
     }
 
     // Sync ticker after every render
@@ -1204,13 +1204,13 @@ main {
       if (isPastCutoff && !isTaken) {
         missed.push({
           type: 'missed',
-          text: `${item.name} — missed ${win.title.toLowerCase()} dose`
+          text: `${item.name} — dose du ${win.title.toLowerCase()} manquée`
         });
       }
       if (low.includes(item.id)) {
         lowList.push({
           type: 'low',
-          text: `${item.name} — running low, reorder soon`
+          text: `${item.name} — stock faible, recommandez bientôt`
         });
       }
     });
@@ -1228,7 +1228,7 @@ main {
     cachedIssues = issues;
 
     if (issues.length === 0) {
-      msgEl.textContent = 'All caught up — keep it rolling';
+      msgEl.textContent = 'Tout est à jour — continuez comme ça';
       tickerEl.classList.remove('status-low', 'status-missed');
       countEl.textContent = `0/${totalItems}`;
       tickerIndex = 0;

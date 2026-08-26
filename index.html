@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
 <script src="lock.js"></script>
 <script src="/api/config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
-<title>Dashboard</title>
+<title>Tableau de bord</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
@@ -210,8 +210,8 @@ body::after {
 <div class="page">
 
   <div class="hub-head">
-    <h1 class="dash-title">Rowans Dashboard</h1>
-    <button class="gear-btn" id="settingsOpen" type="button" aria-label="Settings">
+    <h1 class="dash-title">Tableau de bord Rowans</h1>
+    <button class="gear-btn" id="settingsOpen" type="button" aria-label="Paramètres">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -228,9 +228,9 @@ body::after {
         <span class="tile-emoji">🏠</span>
       </div>
       <div class="tile-spacer"></div>
-      <h2 class="tile-title">Main</h2>
+      <h2 class="tile-title">Accueil</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Goals & daily plan</span>
+        <span class="tile-sub">Objectifs et plan quotidien</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -244,7 +244,7 @@ body::after {
       <div class="tile-spacer"></div>
       <h2 class="tile-title">Fitness</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Workouts, splits, sessions</span>
+        <span class="tile-sub">Entraînements, répartitions, séances</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -256,9 +256,9 @@ body::after {
         <span class="tile-emoji">💊</span>
       </div>
       <div class="tile-spacer"></div>
-      <h2 class="tile-title">Health</h2>
+      <h2 class="tile-title">Santé</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Supplements & vitals</span>
+        <span class="tile-sub">Compléments et signes vitaux</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -270,9 +270,9 @@ body::after {
         <span class="tile-emoji">💧</span>
       </div>
       <div class="tile-spacer"></div>
-      <h2 class="tile-title">Water</h2>
+      <h2 class="tile-title">Eau</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Hydration</span>
+        <span class="tile-sub">Hydratation</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -286,7 +286,7 @@ body::after {
       <div class="tile-spacer"></div>
       <h2 class="tile-title">Finance</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Net worth & spending</span>
+        <span class="tile-sub">Patrimoine net et dépenses</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -298,9 +298,9 @@ body::after {
         <span class="tile-emoji">☕</span>
       </div>
       <div class="tile-spacer"></div>
-      <h2 class="tile-title">Caffeine</h2>
+      <h2 class="tile-title">Caféine</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Intake & timing</span>
+        <span class="tile-sub">Consommation et horaires</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -314,7 +314,7 @@ body::after {
       <div class="tile-spacer"></div>
       <h2 class="tile-title">Nova</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Your AI mentor</span>
+        <span class="tile-sub">Votre mentor IA</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
@@ -324,28 +324,28 @@ body::after {
 
 <!-- ===== Settings / Your Data ===== -->
 <div class="modal-bg" id="settingsBg">
-  <div class="modal" role="dialog" aria-label="Your data">
+  <div class="modal" role="dialog" aria-label="Vos données">
     <div class="modal-head">
-      <span class="modal-title">Your Data</span>
-      <button class="modal-close" id="settingsClose" type="button" aria-label="Close">×</button>
+      <span class="modal-title">Vos données</span>
+      <button class="modal-close" id="settingsClose" type="button" aria-label="Fermer">×</button>
     </div>
 
     <div class="field">
-      <label class="field-label">Height</label>
+      <label class="field-label">Taille</label>
       <div class="field-row">
         <input class="set-input" id="heightA" type="number" min="0" inputmode="decimal" placeholder="cm">
-        <input class="set-input" id="heightB" type="number" min="0" inputmode="decimal" placeholder="in" style="display:none">
+        <input class="set-input" id="heightB" type="number" min="0" inputmode="decimal" placeholder="po" style="display:none">
         <div class="seg" id="heightUnitSeg">
           <button type="button" data-u="cm" class="on">cm</button>
-          <button type="button" data-u="ft">ft/in</button>
+          <button type="button" data-u="ft">pi/po</button>
         </div>
       </div>
     </div>
 
     <div class="field">
-      <label class="field-label">Weight</label>
+      <label class="field-label">Poids</label>
       <div class="field-row">
-        <input class="set-input" id="weight" type="number" min="0" inputmode="decimal" placeholder="weight">
+        <input class="set-input" id="weight" type="number" min="0" inputmode="decimal" placeholder="poids">
         <div class="seg" id="weightUnitSeg">
           <button type="button" data-u="kg" class="on">kg</button>
           <button type="button" data-u="lb">lb</button>
@@ -354,24 +354,24 @@ body::after {
     </div>
 
     <div class="field">
-      <label class="field-label">Age</label>
-      <input class="set-input" id="age" type="number" min="0" inputmode="numeric" placeholder="years">
+      <label class="field-label">Âge</label>
+      <input class="set-input" id="age" type="number" min="0" inputmode="numeric" placeholder="ans">
     </div>
 
     <div class="field">
-      <label class="field-label">Sex</label>
+      <label class="field-label">Sexe</label>
       <div class="seg" id="sexSeg" style="width:100%;display:flex">
-        <button type="button" data-s="m" style="flex:1">Male</button>
-        <button type="button" data-s="f" style="flex:1">Female</button>
+        <button type="button" data-s="m" style="flex:1">Homme</button>
+        <button type="button" data-s="f" style="flex:1">Femme</button>
       </div>
     </div>
 
     <div class="field">
-      <label class="field-label">Active hours / week</label>
-      <input class="set-input" id="activity" type="number" min="0" inputmode="decimal" placeholder="e.g. 5">
+      <label class="field-label">Heures actives / semaine</label>
+      <input class="set-input" id="activity" type="number" min="0" inputmode="decimal" placeholder="ex. 5">
     </div>
 
-    <button class="set-save" id="settingsSave" type="button">Save</button>
+    <button class="set-save" id="settingsSave" type="button">Enregistrer</button>
     <div class="set-status" id="settingsStatus"></div>
 
     <div class="section-divider"></div>
@@ -379,15 +379,15 @@ body::after {
     <label class="field-label">WHOOP</label>
     <div class="whoop-box">
       <div class="whoop-row">
-        <span class="whoop-status" id="whStatus"><span class="dot"></span><span id="whStatusText">Not connected</span></span>
+        <span class="whoop-status" id="whStatus"><span class="dot"></span><span id="whStatusText">Non connecté</span></span>
         <span class="whoop-sync" id="whSync"></span>
       </div>
       <div class="whoop-stats" id="whStats" style="display:none">
-        <div class="whoop-stat"><div class="v" id="whRec">—</div><div class="l">Recovery</div></div>
-        <div class="whoop-stat"><div class="v" id="whSleep">—</div><div class="l">Sleep</div></div>
-        <div class="whoop-stat"><div class="v" id="whRhr">—</div><div class="l">Rest HR</div></div>
+        <div class="whoop-stat"><div class="v" id="whRec">—</div><div class="l">Récupération</div></div>
+        <div class="whoop-stat"><div class="v" id="whSleep">—</div><div class="l">Sommeil</div></div>
+        <div class="whoop-stat"><div class="v" id="whRhr">—</div><div class="l">FC repos</div></div>
       </div>
-      <button class="whoop-btn" id="whAction" type="button">Sync now</button>
+      <button class="whoop-btn" id="whAction" type="button">Synchroniser</button>
     </div>
   </div>
 </div>
@@ -470,7 +470,7 @@ body::after {
     w.profile.sex = sex;
     const act = parseFloat($('activity').value); if (act >= 0 && !isNaN(act)) w.profile.activityHrsPerWeek = act;
     saveJSON(WATER_KEY, w);
-    const s = $('settingsStatus'); s.textContent = 'Saved ✓';
+    const s = $('settingsStatus'); s.textContent = 'Enregistré ✓';
     setTimeout(() => { s.textContent = ''; }, 1800);
   }
 
@@ -496,26 +496,26 @@ body::after {
   /* ---------- WHOOP ---------- */
   let whStats = null;
   function relTime(ts) {
-    if (!ts) return 'never';
+    if (!ts) return 'jamais';
     const s = Math.floor((Date.now() - ts) / 1000);
-    if (s < 60) return 'just now';
-    if (s < 3600) return Math.floor(s/60) + ' min ago';
-    if (s < 86400) return Math.floor(s/3600) + ' h ago';
-    return Math.floor(s/86400) + ' d ago';
+    if (s < 60) return "à l'instant";
+    if (s < 3600) return 'il y a ' + Math.floor(s/60) + ' min';
+    if (s < 86400) return 'il y a ' + Math.floor(s/3600) + ' h';
+    return 'il y a ' + Math.floor(s/86400) + ' j';
   }
   function renderWhoop(err) {
     const t = loadJSON(WHOOP_KEY, null);
     const statusEl = $('whStatus'), txt = $('whStatusText'), syncEl = $('whSync'), action = $('whAction');
     if (!t || !t.access) {
-      statusEl.classList.remove('on'); txt.textContent = 'Not connected';
+      statusEl.classList.remove('on'); txt.textContent = 'Non connecté';
       syncEl.textContent = ''; $('whStats').style.display = 'none';
-      action.textContent = 'Connect on Health page';
+      action.textContent = 'Se connecter sur la page Santé';
       return;
     }
-    statusEl.classList.add('on'); txt.textContent = err ? 'Connected (sync failed)' : 'Connected';
+    statusEl.classList.add('on'); txt.textContent = err ? 'Connecté (échec de synchro)' : 'Connecté';
     const last = Number(localStorage.getItem(SYNC_KEY)) || 0;
-    syncEl.textContent = 'Last synced ' + relTime(last);
-    action.textContent = 'Sync now';
+    syncEl.textContent = 'Dernière synchro : ' + relTime(last);
+    action.textContent = 'Synchroniser';
     if (whStats) {
       $('whStats').style.display = '';
       $('whRec').textContent   = whStats.rec   != null ? whStats.rec + '%'  : '—';
@@ -563,7 +563,7 @@ body::after {
   $('whAction').addEventListener('click', () => {
     const t = loadJSON(WHOOP_KEY, null);
     if (!t || !t.access) { window.location.href = 'health.html'; return; }
-    $('whAction').textContent = 'Syncing…'; syncWhoop();
+    $('whAction').textContent = 'Synchronisation…'; syncWhoop();
   });
 })();
 </script>
