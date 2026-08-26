@@ -1526,7 +1526,16 @@ img, video, canvas, svg { max-width: 100%; }
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
+    // One-time cleanup: exercises seeded by the old CONFIG.defaultExercises
+    // list all carry a "seed_..." id (see buildDefaultExercises above).
+    // That seed list is now empty, but browsers that already saved those
+    // exercises need them purged explicitly — emptying the config alone
+    // doesn't remove what's already in localStorage.
+    s.exercises = s.exercises.filter(e => !String(e.id || '').startsWith('seed_'));
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
+    Object.keys(s.logs).forEach(exId => {
+      if (!s.exercises.find(e => e.id === exId)) delete s.logs[exId];
+    });
     s.filterGym = s.filterGym || s.gyms[0].id;
     // Split rotation lives in state so the user can edit it via the pill modal.
     // Stored as a plain array of names (e.g. ["Push", "Pull", "Legs", "Rest"]).
