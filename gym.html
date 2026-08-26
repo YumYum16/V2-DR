@@ -80,37 +80,17 @@ const CONFIG = {
   // First-run defaults. Once a user logs anything, they edit through
   // the in-app + / gear buttons; this block stays as the seed.
   defaultExercises: [
-    { name: "Développé couché",     gym: "comm", days: ["push"], repMin: 5, repMax: 8,  step: 2.5, startWeight: 60, primaryMuscles: ["chest"], secondaryMuscles: ["front_delts","triceps"] },
-    { name: "Développé militaire",  gym: "comm", days: ["push"], repMin: 5, repMax: 8,  step: 2.5, startWeight: 35, primaryMuscles: ["front_delts","side_delts"], secondaryMuscles: ["triceps"] },
-    { name: "Extension triceps à la poulie", gym: "comm", days: ["push"], repMin: 8, repMax: 12, step: 2.5, startWeight: 25, primaryMuscles: ["triceps"], secondaryMuscles: [] },
-    { name: "Tractions",        gym: "both", days: ["pull"], repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true, primaryMuscles: ["lats"], secondaryMuscles: ["biceps"] },
-    { name: "Rowing barre",     gym: "comm", days: ["pull"], repMin: 6, repMax: 10, step: 2.5, startWeight: 50, primaryMuscles: ["lats"], secondaryMuscles: ["biceps","rear_delts"] },
-    { name: "Curl biceps",      gym: "comm", days: ["pull"], repMin: 8, repMax: 12, step: 1.25,startWeight: 15, primaryMuscles: ["biceps"], secondaryMuscles: ["forearms"] },
-    { name: "Squat arrière",      gym: "comm", days: ["legs"], repMin: 5, repMax: 8,  step: 5,   startWeight: 80, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] },
-    { name: "Soulevé de terre roumain", gym: "comm", days: ["legs"], repMin: 6, repMax: 10, step: 5, startWeight: 60, primaryMuscles: ["hamstrings"], secondaryMuscles: ["glutes","lower_back"] },
-    { name: "Presse à cuisses",       gym: "comm", days: ["legs"], repMin: 8, repMax: 12, step: 5,   startWeight: 100, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] }
+    { name: "Développé couché",     gym: "comm", days: ["push"], repMin: 5, repMax: 8,  step: 2.5, startWeight: 60 },
+    { name: "Développé militaire",  gym: "comm", days: ["push"], repMin: 5, repMax: 8,  step: 2.5, startWeight: 35 },
+    { name: "Extension triceps à la poulie", gym: "comm", days: ["push"], repMin: 8, repMax: 12, step: 2.5, startWeight: 25 },
+    { name: "Tractions",        gym: "both", days: ["pull"], repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true },
+    { name: "Rowing barre",     gym: "comm", days: ["pull"], repMin: 6, repMax: 10, step: 2.5, startWeight: 50 },
+    { name: "Curl biceps",      gym: "comm", days: ["pull"], repMin: 8, repMax: 12, step: 1.25,startWeight: 15 },
+    { name: "Squat arrière",      gym: "comm", days: ["legs"], repMin: 5, repMax: 8,  step: 5,   startWeight: 80 },
+    { name: "Soulevé de terre roumain", gym: "comm", days: ["legs"], repMin: 6, repMax: 10, step: 5, startWeight: 60 },
+    { name: "Presse à cuisses",       gym: "comm", days: ["legs"], repMin: 8, repMax: 12, step: 5,   startWeight: 100 }
   ]
 };
-
-// Muscle groups used by the exercise editor (primary/secondary picks),
-// the weekly muscle-volume "Corps" view, and Nova's context.
-const MUSCLE_GROUPS = [
-  { id: "chest",       label: "Pectoraux" },
-  { id: "front_delts", label: "Épaules avant" },
-  { id: "side_delts",  label: "Épaules latérales" },
-  { id: "rear_delts",  label: "Épaules arrière" },
-  { id: "biceps",      label: "Biceps" },
-  { id: "triceps",     label: "Triceps" },
-  { id: "forearms",    label: "Avant-bras" },
-  { id: "abs",         label: "Abdominaux" },
-  { id: "lats",        label: "Dorsaux" },
-  { id: "traps",       label: "Trapèzes" },
-  { id: "lower_back",  label: "Lombaires" },
-  { id: "glutes",      label: "Fessiers" },
-  { id: "quads",       label: "Quadriceps" },
-  { id: "hamstrings",  label: "Ischio-jambiers" },
-  { id: "calves",      label: "Mollets" }
-];
 </script>
 
 <style>
@@ -745,11 +725,6 @@ img, video, canvas, svg { max-width: 100%; }
   .po-modal-bg { padding: 16px; }
   .po-modal { padding: 18px; max-height: 86vh; max-width: calc(100vw - 32px); }
 
-  /* Today's / Past workouts — tighter rows, allow text to wrap */
-  .po-tw { padding: 14px; }
-  .po-tw-row { gap: 8px; }
-  .po-tw-row-name { min-width: 0; word-break: break-word; }
-
   /* Progress photos grid — match the available width */
   .wt-photo-grid { gap: 8px; }
 
@@ -763,131 +738,6 @@ img, video, canvas, svg { max-width: 100%; }
   .po-shell { padding-left: 8px; padding-right: 8px; }
   .po-title { font-size: 17px; }
   .po-reps-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-/* Today's Workout + Past Workouts */
-.po-tw {
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-}
-.po-tw-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin-bottom: 12px;
-}
-.po-tw-eyebrow {
-  font-size: 10px; letter-spacing: 0.16em; font-weight: 700;
-  text-transform: uppercase; color: var(--text-3);
-  margin-bottom: 4px;
-}
-.po-tw-summary {
-  display: flex; align-items: baseline; gap: 6px;
-  font-variant-numeric: tabular-nums;
-}
-.po-tw-summary-num {
-  font-size: 28px; font-weight: 700; color: var(--text-1);
-  letter-spacing: -0.02em;
-}
-.po-tw-summary-label {
-  font-size: 12px; color: var(--text-3); font-weight: 500;
-}
-.po-tw-summary-sep { color: var(--text-4); margin: 0 4px; }
-.po-tw-summary-vol { font-size: 13px; color: var(--text-2); font-weight: 500; }
-.po-tw-done-btn {
-  background: linear-gradient(180deg, #ffffff 0%, #e8e5dd 100%);
-  color: #0a0a0b; border: none; border-radius: 999px;
-  padding: 9px 16px;
-  font-family: inherit; font-size: 12px; font-weight: 700;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  white-space: nowrap;
-}
-.po-tw-done-btn:hover { transform: translateY(-1px); }
-.po-tw-done-btn:active { transform: scale(0.98); }
-.po-tw-done-btn.is-done {
-  background: rgba(110,231,183,0.16);
-  color: var(--good);
-}
-.po-tw-list {
-  list-style: none; margin: 0; padding: 0;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.po-tw-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-}
-.po-tw-row-name { font-weight: 600; color: var(--text-1); }
-.po-tw-row-meta {
-  font-size: 11px; color: var(--text-3);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-.po-tw-empty {
-  text-align: center; padding: 14px 0;
-  font-size: 12px; color: var(--text-3); font-style: italic;
-}
-.po-tw-empty.hidden { display: none; }
-
-.po-tw-past-toggle {
-  width: 100%; margin-top: 10px;
-  display: flex; align-items: center; justify-content: space-between;
-  background: transparent; border: 1px solid var(--border);
-  color: var(--text-2); border-radius: 10px;
-  padding: 11px 14px; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 600;
-  letter-spacing: 0.04em;
-  -webkit-tap-highlight-color: transparent;
-}
-.po-tw-past-toggle:hover { background: rgba(255,255,255,0.04); color: var(--text-1); }
-.po-tw-past-count {
-  display: inline-block; margin-left: 6px;
-  background: rgba(255,255,255,0.06); color: var(--text-2);
-  padding: 1px 7px; border-radius: 999px;
-  font-size: 11px; font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.po-tw-past-arrow {
-  transition: transform 0.2s; font-size: 14px;
-}
-.po-tw-past-toggle[aria-expanded="true"] .po-tw-past-arrow {
-  transform: rotate(180deg);
-}
-.po-tw-past-body {
-  margin-top: 6px;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.po-tw-past-day {
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-.po-tw-past-day-h {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px;
-}
-.po-tw-past-day-date {
-  font-size: 11px; color: var(--text-3);
-  font-family: var(--font-mono); font-weight: 700;
-  letter-spacing: 0.06em;
-}
-.po-tw-past-day-summary {
-  font-size: 12px; color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-.po-tw-past-day-done {
-  display: inline-block; padding: 2px 7px; border-radius: 999px;
-  background: rgba(110,231,183,0.14); color: var(--good);
-  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
-}
-.po-tw-past-empty {
-  text-align: center; padding: 16px;
-  color: var(--text-3); font-size: 12px; font-style: italic;
 }
 
 /* ============================================================
@@ -1327,126 +1177,18 @@ img, video, canvas, svg { max-width: 100%; }
   background: rgba(110,231,183,0.16); color: var(--good); border-color: rgba(110,231,183,0.35);
 }
 
-/* ===== Generic small heatmap cell — reused by the per-exercise weekly
-   heatmap ("Régularité") and the monthly calendar heatmap ("Résumé du mois") ===== */
-.po-heat-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-bottom: 10px; }
-.po-heat-cell { aspect-ratio: 1; border-radius: 4px; }
-
-/* ===== Reminders ===== */
-#remindersList .po-tw-row-meta { color: var(--warn); }
-
-/* ===== Corps (muscle volume) view ===== */
-.corps-meta {
-  text-align: center; font-size: 11px; color: var(--text-3);
-  font-family: var(--font-mono); margin-bottom: 14px;
+/* ===== Monthly gym-attendance heatmap ===== */
+.gym-heat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
 }
-.corps-body-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
-.corps-svg { width: 100%; max-width: 320px; height: auto; display: block; }
-.corps-region { cursor: pointer; transition: fill 0.25s; }
-.corps-region:hover { opacity: 0.85; }
-.corps-region-label { font-size: 7px; fill: var(--text-4); pointer-events: none; }
-
-/* ===== Month view calendar heatmap ===== */
-.mo-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-
-/* ===== Scan-to-log drop zone ===== */
-.po-scan-zone {
-  border: 1px dashed var(--border-strong);
-  border-radius: 14px; padding: 18px; text-align: center;
-  margin-bottom: 14px; cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+.gym-heat-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
 }
-.po-scan-zone:hover, .po-scan-zone.drag-over {
-  border-color: rgba(110,231,183,0.4); background: rgba(110,231,183,0.04);
-}
-.po-scan-icon { font-size: 22px; margin-bottom: 6px; }
-.po-scan-text { font-size: 13px; color: var(--text-2); font-weight: 600; margin-bottom: 2px; }
-.po-scan-sub { font-size: 11px; color: var(--text-3); }
-.po-scan-error { color: var(--bad); font-size: 12px; }
-.scan-set-row {
-  display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px;
-  align-items: center; margin-bottom: 8px;
-}
-.scan-set-row input {
-  padding: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.28);
-  color: var(--text-1); border-radius: 10px; font-family: inherit; font-size: 14px;
-  text-align: center; font-variant-numeric: tabular-nums; width: 100%; box-sizing: border-box;
-  -moz-appearance: textfield;
-}
-
-/* ===== Séance du jour — entry card + picker + guided overlay ===== */
-.sesh-card { background: linear-gradient(180deg, rgba(110,231,183,0.06), var(--bg-card)); border-color: rgba(110,231,183,0.14); }
-.sesh-eyebrow {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--text-3); margin-bottom: 6px;
-}
-.sesh-headline { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 14px; }
-.sesh-progress { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden; margin-bottom: 14px; }
-.sesh-progress-bar { height: 100%; background: var(--good); border-radius: 3px; transition: width 0.3s ease; }
-.sesh-card .po-btn-secondary { width: 100%; margin-top: 8px; }
-
-.sesh-dots { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 16px; }
-.sesh-dot {
-  width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.14);
-  cursor: pointer; transition: background 0.15s, transform 0.15s;
-}
-.sesh-dot.done { background: rgba(110,231,183,0.55); }
-.sesh-dot.active { background: var(--good); transform: scale(1.3); }
-
-.sesh-carousel { touch-action: pan-y; }
-.sesh-card-eyebrow {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--text-3); margin-bottom: 6px; text-align: center;
-}
-.sesh-card-title { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 14px; text-align: center; }
-.sesh-carousel .po-last-set { justify-content: center; }
-.sesh-series-picker {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
-  margin: 18px 0 14px;
-}
-.sesh-series-stepper { display: flex; align-items: center; gap: 12px; }
-.sesh-series-count { font-size: 20px; font-weight: 700; min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
-.sesh-sets { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
-.sesh-set-row {
-  display: grid; grid-template-columns: 20px 1fr 1fr auto; gap: 8px; align-items: center;
-  background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 12px;
-  padding: 10px 12px;
-}
-.sesh-set-num { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); font-weight: 700; }
-.sesh-set-row input[type="number"] {
-  padding: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.28);
-  color: var(--text-1); border-radius: 10px; font-family: inherit; font-size: 15px;
-  text-align: center; font-variant-numeric: tabular-nums; width: 100%; box-sizing: border-box;
-  -moz-appearance: textfield;
-}
-.sesh-fail {
-  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2);
-  white-space: nowrap; cursor: pointer;
-}
-.sesh-fail input { accent-color: var(--bad); }
-.sesh-skip {
-  display: block; margin: 0 auto; background: transparent; border: none;
-  color: var(--text-3); text-decoration: underline; font-size: 12px; cursor: pointer;
-  padding: 6px;
-}
-.sesh-nav { display: flex; justify-content: space-between; margin-top: 4px; }
-.sesh-finish-top { flex-shrink: 0; padding: 8px 14px; font-size: 12px; }
-
-@media (max-width: 480px) {
-  .sesh-set-row { grid-template-columns: 16px 1fr 1fr auto; gap: 6px; padding: 9px 10px; }
-  .sesh-fail { font-size: 10px; }
-  .sesh-card-title { font-size: 20px; }
-}
-
-/* ===== Desktop: stop stretching everything into one long mobile-style
-   column — use the extra width with a two-column layout. ===== */
-@media (min-width: 900px) {
-  .po-shell { max-width: min(1080px, 100vw); }
-  #mainCard { display: flex; flex-wrap: wrap; column-gap: 28px; align-items: flex-start; }
-  #mainCard > .po-filters, #mainCard > #secTodayWorkout { flex: 1 1 100%; }
-  #colLeft, #colRight { flex: 1 1 0; min-width: 0; }
-  .sesh-set-row { grid-template-columns: 24px 1fr 1fr auto; }
-}
+.gym-heat-month { font-size: 12px; color: var(--text-2); font-weight: 600; }
+.gym-heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.gym-heat-cell { aspect-ratio: 1; border-radius: 5px; background: var(--border); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1463,13 +1205,6 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="po-day-sep">·</span>
     <span class="po-day-split" id="dayPillSplit">—</span>
   </button>
-
-  <!-- Séance du jour — the main way to log now. Starting one timestamps
-       it and walks you through its exercises one at a time; it stays
-       "active" (resumable) across closing the tab until you finish it. -->
-  <div class="card sesh-card">
-    <div id="seshCardInner"></div>
-  </div>
 
   <!-- WEIGHT + PROGRESS PHOTOS -->
   <div class="wt-section">
@@ -1552,6 +1287,17 @@ img, video, canvas, svg { max-width: 100%; }
     </button>
   </div>
 
+  <!-- Monthly gym-attendance heatmap — one square per day of the current
+       month, shaded by that day's set count. Derived from state.logs via
+       logsByDay() on every render; no separate "mark done" storage. -->
+  <div class="card">
+    <div class="gym-heat-head">
+      <span class="gym-heat-title">Assiduité</span>
+      <span class="gym-heat-month" id="gymHeatMonth">—</span>
+    </div>
+    <div class="gym-heat-grid" id="gymHeatGrid"></div>
+  </div>
+
   <!-- Progress photos overlay -->
   <div class="wt-overlay" id="wtOverlay" aria-hidden="true">
     <div class="wt-overlay-inner">
@@ -1631,17 +1377,9 @@ img, video, canvas, svg { max-width: 100%; }
 
   <div class="po-header">
     <h1 class="po-title" id="appTitle">Coach de surcharge progressive</h1>
-    <div style="display:flex; gap:8px;">
-    <button class="po-icon-btn" id="corpsBtn" title="Volume par muscle" aria-label="Corps">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="6" r="3"/><path d="M6 21v-2a6 6 0 0 1 12 0v2"/></svg>
-    </button>
-    <button class="po-icon-btn" id="monthBtn" title="Résumé du mois" aria-label="Résumé du mois">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    </button>
     <button class="po-icon-btn" id="settingsBtn" title="Paramètres" aria-label="Paramètres">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
-    </div>
   </div>
 
   <div class="card" id="mainCard">
@@ -1657,23 +1395,9 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
-    <div id="colLeft">
-    <!-- Exercise stats browser -->
-    <div class="po-sub-section" id="secStatsPicker">
-      <div class="po-sub-title">Consulter un exercice</div>
-      <div class="po-scan-zone" id="scanZone">
-        <input type="file" id="scanFile" accept="image/*" style="display:none">
-        <div id="scanZoneEmpty">
-          <div class="po-scan-icon">📷</div>
-          <div class="po-scan-text">Déposez une capture d'écran ou une photo de votre séance</div>
-          <div class="po-scan-sub">l'IA lit les séries — touchez pour choisir un fichier</div>
-        </div>
-        <div id="scanZoneBusy" class="hidden">
-          <span class="nv-dots"><i></i><i></i><i></i></span>
-          <div class="po-scan-sub" style="margin-top:6px;">Lecture en cours…</div>
-        </div>
-        <div id="scanZoneError" class="hidden po-scan-error"></div>
-      </div>
+    <!-- Exercise -->
+    <div class="po-sub-section">
+      <div class="po-sub-title">Exercice</div>
       <div class="po-exercise-bar">
         <select class="po-ex-select" id="exSelect"></select>
         <button class="po-btn-icon" id="addExBtn" title="Ajouter un exercice" aria-label="Ajouter">
@@ -1684,109 +1408,42 @@ img, video, canvas, svg { max-width: 100%; }
         </button>
       </div>
       <div class="po-no-ex" id="noExMsg" style="display:none">Aucun exercice ici pour l'instant. Touchez <strong>+</strong> pour en ajouter un.</div>
+    </div>
+
+    <!-- Log a set -->
+    <div class="po-sub-section">
+      <div class="po-sub-title">Enregistrer la meilleure série du jour</div>
+      <div class="po-bw-banner" id="bwBanner">Poids du corps — enregistre uniquement les répétitions</div>
       <div class="po-last-set" id="lastSet">
         <span class="po-last-label">Dernière fois</span>
         <span class="po-last-value" id="lastSetValue"></span>
         <span class="po-last-meta" id="lastSetMeta"></span>
       </div>
-    </div>
-
-    <!-- Prescription -->
-    <div class="po-sub-section" id="secPrescription">
-      <div class="po-sub-title">Prochaine séance</div>
-      <div id="rxWrap"></div>
-    </div>
-
-    <!-- Stats -->
-    <div class="po-sub-section" id="secStats">
-      <div class="po-sub-title">Statistiques</div>
-      <div class="po-stats-row">
-        <div class="po-stat-box">
-          <div class="po-stat-label" id="oneRmLabel">1RM est.</div>
-          <div class="po-stat-val" id="oneRm">—<span class="po-unit" id="oneRmUnit">kg</span></div>
-        </div>
-        <div class="po-stat-box">
-          <div class="po-stat-label">Meilleure série</div>
-          <div class="po-stat-val" id="bestSet">—</div>
-        </div>
-        <div class="po-stat-box">
-          <div class="po-stat-label">Séances</div>
-          <div class="po-stat-val" id="sessionCount">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Trend -->
-    <div class="po-sub-section" id="secTrend">
-      <div class="po-sub-title">Tendance (10 dernières séances)</div>
-      <div class="po-spark-wrap">
-        <svg class="po-spark-svg" id="sparkline" viewBox="0 0 300 60" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
-              <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="po-spark-empty" id="sparkEmpty">Il faut 2+ séances pour la tendance</div>
-      </div>
-    </div>
-
-    <!-- History -->
-    <div class="po-sub-section" id="secHistory">
-      <div class="po-sub-title">Historique</div>
-      <div id="historyCard">
-        <div class="po-empty">Aucun enregistrement pour l'instant.</div>
-      </div>
-    </div>
-    </div><!-- /colLeft -->
-
-    <div id="colRight">
-    <!-- Régularité — 12-week heatmap + flame streak for the current
-         exercise, derived from state.logs on every render (no cache). -->
-    <div class="po-sub-section" id="secRegularity">
-      <div class="po-sub-title">Régularité</div>
-      <div class="po-heat-row" id="exHeatRow"></div>
-      <div class="wt-streak hidden" id="exFlameStreak">🔥<span id="exFlameStreakNum"></span></div>
-    </div>
-
-    <!-- Reminders — exercises whose most recent logged set is older than
-         their own reminderDays (default 10), most-overdue first. Purely
-         derived from state.exercises + state.logs on every render. -->
-    <div class="po-sub-section" id="secReminders">
-      <div class="po-sub-title">Rappels</div>
-      <div id="remindersList"><div class="po-empty">Rien en retard.</div></div>
-    </div>
-    </div><!-- /colRight -->
-
-    <!-- Today's Workout — every set logged today, grouped by exercise.
-         "Mark done" stamps the day so the past-workouts list shows it
-         as a completed session. The volume here also feeds the
-         composition estimate at the top of the page. -->
-    <div class="po-sub-section" id="secTodayWorkout">
-      <div class="po-sub-title">Séance du jour</div>
-      <div class="po-tw" id="poTw">
-        <div class="po-tw-head">
-          <div>
-            <div class="po-tw-eyebrow" id="poTwDateLabel">AUJOURD'HUI</div>
-            <div class="po-tw-summary">
-              <span class="po-tw-summary-num" id="poTwSetCount">0</span>
-              <span class="po-tw-summary-label">séries</span>
-              <span class="po-tw-summary-sep">·</span>
-              <span class="po-tw-summary-vol" id="poTwTotalVol">0 kg soulevés</span>
-            </div>
+      <div class="po-log-grid" id="logGrid">
+        <div class="po-field" id="weightField">
+          <label id="weightLabel">Poids (kg)</label>
+          <div class="po-weight-row">
+            <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
+            <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
+            <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
           </div>
-          <button class="po-tw-done-btn" id="poTwDoneBtn" type="button">Marquer la séance comme terminée</button>
         </div>
-        <ul class="po-tw-list" id="poTwList"></ul>
-        <div class="po-tw-empty" id="poTwEmpty">Aucune série enregistrée aujourd'hui — enregistrez-en une ci-dessus et elle apparaîtra ici.</div>
+        <div class="po-field">
+          <label>Répétitions</label>
+          <div class="po-reps-row" id="repsRow" data-value="8">
+            <button type="button" class="po-reps-pill" data-v="4">4</button>
+            <button type="button" class="po-reps-pill" data-v="5">5</button>
+            <button type="button" class="po-reps-pill" data-v="6">6</button>
+            <button type="button" class="po-reps-pill" data-v="7">7</button>
+            <button type="button" class="po-reps-pill active" data-v="8">8</button>
+            <button type="button" class="po-reps-pill" data-v="9">9</button>
+            <button type="button" class="po-reps-pill" data-v="10">10</button>
+            <button type="button" class="po-reps-pill" data-v="11">11</button>
+            <button type="button" class="po-reps-pill" data-v="12">12</button>
+          </div>
+        </div>
       </div>
-
-      <button type="button" class="po-tw-past-toggle" id="poTwPastToggle" aria-expanded="false">
-        <span>Séances passées <span class="po-tw-past-count" id="poTwPastCount">0</span></span>
-        <span class="po-tw-past-arrow" id="poTwPastArrow">▾</span>
-      </button>
-      <div class="po-tw-past-body" id="poTwPastBody" style="display:none"></div>
+      <button class="po-btn-primary" id="logBtn">Enregistrer la série</button>
     </div>
   </div>
 </div>
@@ -1830,153 +1487,11 @@ img, video, canvas, svg { max-width: 100%; }
       <input type="number" id="exStep" step="0.5" value="2.5">
       <div class="po-field-hint">Le poids ajouté automatiquement à la barre quand vous dépassez les répétitions max — ex. 2.5 kg de plus la prochaine séance.</div>
     </div>
-    <div class="po-field">
-      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Muscles principaux</label>
-      <div class="po-muscle-grid" id="exPrimaryMuscles"></div>
-    </div>
-    <div class="po-field">
-      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Muscles secondaires</label>
-      <div class="po-muscle-grid" id="exSecondaryMuscles"></div>
-    </div>
-    <div class="po-field">
-      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Rappel après (jours)</label>
-      <input type="number" id="exReminderDays" value="10" min="1">
-      <div class="po-field-hint">S'il se passe plus de ce nombre de jours sans enregistrement, l'exercice apparaît dans « Rappels ».</div>
-    </div>
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="exModalCancel">Annuler</button>
       <button class="po-btn-primary" id="exModalSave">Enregistrer</button>
     </div>
     <span class="po-delete-link" id="exDelete" style="display:none">Supprimer cet exercice</span>
-  </div>
-</div>
-
-<!-- Scan-to-log confirm modal — appears after the AI reads a workout
-     photo/screenshot dropped into #scanZone. -->
-<div class="po-modal-bg" id="scanConfirmBg">
-  <div class="po-modal">
-    <h3>Confirmer la séance importée</h3>
-    <div class="po-field">
-      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Exercice</label>
-      <input type="text" id="scanExName" list="scanExList" placeholder="Nom de l'exercice">
-      <datalist id="scanExList"></datalist>
-    </div>
-    <div class="po-last-set" id="scanLastSetCompare" style="display:none">
-      <span class="po-last-label">Dernière fois</span>
-      <span class="po-last-value" id="scanLastSetValue"></span>
-    </div>
-    <div id="scanSetsList"></div>
-    <button class="po-add-row-btn" id="scanAddSetBtn">+ Ajouter une série</button>
-    <div class="po-modal-actions">
-      <button class="po-btn-secondary" id="scanDiscardBtn">Ignorer</button>
-      <button class="po-btn-primary" id="scanApplyBtn">Appliquer</button>
-    </div>
-  </div>
-</div>
-
-<!-- Séance du jour: pick which day's exercises to load before starting. -->
-<div class="po-modal-bg" id="seshPickerBg">
-  <div class="po-modal">
-    <h3>Quel jour ?</h3>
-    <div class="po-modal-seg" id="seshDaySeg"></div>
-    <div class="po-modal-actions">
-      <button class="po-btn-secondary" id="seshPickerCancel">Annuler</button>
-      <button class="po-btn-primary" id="seshPickerStart">Commencer</button>
-    </div>
-  </div>
-</div>
-
-<!-- Séance du jour: guided one-exercise-at-a-time logging. Swipe (touch)
-     or use the arrows to move between exercises; every field auto-saves
-     on change so closing this (or the whole tab) never loses progress. -->
-<div class="wt-overlay" id="sessionOverlay" aria-hidden="true">
-  <div class="wt-overlay-inner">
-    <div class="wt-overlay-h">
-      <button class="wt-back" id="seshClose" aria-label="Fermer">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <div class="wt-overlay-title">Séance</div>
-      <button class="po-btn-secondary sesh-finish-top" id="seshOverlayFinish">Terminer</button>
-    </div>
-    <div class="sesh-dots" id="seshDots"></div>
-    <div class="sesh-carousel" id="seshCarousel"></div>
-    <div class="sesh-nav">
-      <button class="po-btn-icon" id="seshPrevBtn" aria-label="Exercice précédent">‹</button>
-      <button class="po-btn-icon" id="seshNextBtn" aria-label="Exercice suivant">›</button>
-    </div>
-  </div>
-</div>
-
-<!-- Corps — weekly volume per muscle group, attributed from state.logs
-     (primary muscles at full weight×reps, secondary at half), scaled
-     against that muscle's own recent 8-week max. -->
-<div class="wt-overlay" id="corpsOverlay" aria-hidden="true">
-  <div class="wt-overlay-inner">
-    <div class="wt-overlay-h">
-      <button class="wt-back" id="corpsBack" aria-label="Retour">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <div class="wt-overlay-title">Corps</div>
-    </div>
-    <div class="corps-meta" id="corpsWeekLabel">—</div>
-    <div class="corps-body-wrap">
-      <svg class="corps-svg" id="corpsSvg" viewBox="0 0 220 260">
-        <!-- Front figure -->
-        <circle cx="50" cy="16" r="13" fill="rgba(255,255,255,0.06)"></circle>
-        <g id="muscle-front_delts" class="corps-region" data-muscle="front_delts"><circle cx="26" cy="48" r="9"></circle><circle cx="74" cy="48" r="9"></circle></g>
-        <g id="muscle-side_delts" class="corps-region" data-muscle="side_delts"><circle cx="17" cy="50" r="6"></circle><circle cx="83" cy="50" r="6"></circle></g>
-        <g id="muscle-chest" class="corps-region" data-muscle="chest"><rect x="33" y="42" width="34" height="24" rx="9"></rect></g>
-        <g id="muscle-biceps" class="corps-region" data-muscle="biceps"><rect x="10" y="58" width="11" height="26" rx="5"></rect><rect x="79" y="58" width="11" height="26" rx="5"></rect></g>
-        <g id="muscle-forearms" class="corps-region" data-muscle="forearms"><rect x="8" y="86" width="10" height="24" rx="4"></rect><rect x="82" y="86" width="10" height="24" rx="4"></rect></g>
-        <g id="muscle-abs" class="corps-region" data-muscle="abs"><rect x="39" y="68" width="22" height="26" rx="6"></rect></g>
-        <g id="muscle-quads" class="corps-region" data-muscle="quads"><rect x="32" y="96" width="16" height="48" rx="7"></rect><rect x="52" y="96" width="16" height="48" rx="7"></rect></g>
-        <text x="50" y="158" text-anchor="middle" class="corps-region-label">AVANT</text>
-
-        <!-- Back figure -->
-        <circle cx="160" cy="16" r="13" fill="rgba(255,255,255,0.06)"></circle>
-        <g id="muscle-traps" class="corps-region" data-muscle="traps"><rect x="143" y="32" width="34" height="14" rx="6"></rect></g>
-        <g id="muscle-rear_delts" class="corps-region" data-muscle="rear_delts"><circle cx="136" cy="48" r="9"></circle><circle cx="184" cy="48" r="9"></circle></g>
-        <g id="muscle-lats" class="corps-region" data-muscle="lats"><rect x="132" y="58" width="14" height="30" rx="6"></rect><rect x="174" y="58" width="14" height="30" rx="6"></rect></g>
-        <g id="muscle-triceps" class="corps-region" data-muscle="triceps"><rect x="121" y="58" width="10" height="26" rx="5"></rect><rect x="189" y="58" width="10" height="26" rx="5"></rect></g>
-        <g id="muscle-lower_back" class="corps-region" data-muscle="lower_back"><rect x="149" y="88" width="22" height="18" rx="6"></rect></g>
-        <g id="muscle-glutes" class="corps-region" data-muscle="glutes"><rect x="140" y="106" width="17" height="20" rx="8"></rect><rect x="163" y="106" width="17" height="20" rx="8"></rect></g>
-        <g id="muscle-hamstrings" class="corps-region" data-muscle="hamstrings"><rect x="141" y="126" width="16" height="40" rx="7"></rect><rect x="163" y="126" width="16" height="40" rx="7"></rect></g>
-        <g id="muscle-calves" class="corps-region" data-muscle="calves"><rect x="141" y="168" width="13" height="32" rx="6"></rect><rect x="166" y="168" width="13" height="32" rx="6"></rect></g>
-        <text x="160" y="158" text-anchor="middle" class="corps-region-label">ARRIÈRE</text>
-      </svg>
-    </div>
-    <div id="corpsDetail" class="hidden">
-      <div class="po-sub-title" id="corpsDetailTitle">—</div>
-      <div id="corpsDetailList"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Résumé du mois — reuses .po-stats-row/.po-stat-box, plus a calendar
-     heatmap for the current month, all derived from logsByDay(). -->
-<div class="wt-overlay" id="monthOverlay" aria-hidden="true">
-  <div class="wt-overlay-inner">
-    <div class="wt-overlay-h">
-      <button class="wt-back" id="monthBack" aria-label="Retour">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <div class="wt-overlay-title">Résumé du mois</div>
-    </div>
-    <div class="po-stats-row" style="margin-bottom:8px;">
-      <div class="po-stat-box"><div class="po-stat-label">Séances</div><div class="po-stat-val" id="moStatSessions">—</div></div>
-      <div class="po-stat-box"><div class="po-stat-label">Séries</div><div class="po-stat-val" id="moStatSets">—</div></div>
-      <div class="po-stat-box"><div class="po-stat-label">Volume</div><div class="po-stat-val" id="moStatVol">—</div></div>
-    </div>
-    <div class="po-stats-row" style="margin-bottom:18px;">
-      <div class="po-stat-box"><div class="po-stat-label">Jours actifs</div><div class="po-stat-val" id="moStatActive">—</div></div>
-      <div class="po-stat-box"><div class="po-stat-label">Série actuelle</div><div class="po-stat-val" id="moStatStreak">—</div></div>
-      <div class="po-stat-box"><div class="po-stat-label">Plus longue série</div><div class="po-stat-val" id="moStatLongest">—</div></div>
-    </div>
-    <div class="po-sub-title">Exercice favori</div>
-    <div class="po-rx-card" style="margin-bottom:18px;"><div class="po-rx-headline" id="moStatFav">—</div></div>
-    <div class="po-sub-title">Calendrier</div>
-    <div class="mo-cal-grid" id="moCalGrid"></div>
-    <div class="wt-meta" id="moFoot" style="margin-top:14px;"></div>
   </div>
 </div>
 
@@ -2065,23 +1580,13 @@ img, video, canvas, svg { max-width: 100%; }
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
-    // Backfill fields added after this exercise was first saved, so old
-    // states (from before muscle groups / reminders existed) still work.
+    // Exercises used to belong to exactly one day (e.g. "push"); now they
+    // can belong to several (e.g. both "push" and "upper body").
     s.exercises.forEach(e => {
-      if (!Array.isArray(e.primaryMuscles)) e.primaryMuscles = [];
-      if (!Array.isArray(e.secondaryMuscles)) e.secondaryMuscles = [];
-      if (typeof e.reminderDays !== 'number' || !(e.reminderDays > 0)) e.reminderDays = 10;
-      // Exercises used to belong to exactly one day (e.g. "push"); now they
-      // can belong to several (e.g. both "push" and "upper body").
       if (!Array.isArray(e.days)) e.days = e.day ? [e.day] : [];
       delete e.day;
     });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
-    // Guided "Séance du jour" sessions — small registry (start time, day,
-    // which exercises), separate from the heavy per-set logs. Only one can
-    // be active/resumable at a time.
-    if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
-    if (s.activeSessionId && !s.sessions[s.activeSessionId]) s.activeSessionId = null;
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Split rotation lives in state so the user can edit it via the pill modal.
@@ -2139,35 +1644,6 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function getLogs() { return (state.logs[state.currentEx] || []).slice(); }
 
-  // Prescription engine — "what should I do next session?"
-  // Upgrade trigger: hits CONFIG.upgradeAtReps (default 8) OR the
-  // exercise's repMax, whichever fires first. So a 5-8 lifter hits
-  // upgrade at 8; a 6-12 lifter ALSO hits it at 8 instead of grinding
-  // out 12 reps before adding weight.
-  function getRx(ex, logs) {
-    if (!logs.length) return null;
-    const last = logs[logs.length - 1];
-    const { weight, reps } = last;
-    const { repMin, repMax, step, bw } = ex;
-    const upgradeAt = Math.min(CONFIG.upgradeAtReps || 8, repMax);
-    let stuck = 0;
-    for (let i = logs.length - 1; i >= 0; i--) {
-      if (logs[i].weight === weight) stuck++; else break;
-    }
-    if (bw) {
-      if (reps >= upgradeAt) return { type: 'up', weight: 0, reps: reps + 1, tag: 'Visez plus', reason: reps + ' répétitions — solide. Visez ' + (reps + 1) + ' la prochaine fois.', bw: true };
-      if (reps >= repMin) return { type: 'hold', weight: 0, reps: reps + 1, tag: 'Ajouter une répétition', reason: reps + ' répétitions. Visez ' + (reps + 1) + ' à la prochaine séance.', bw: true };
-      return { type: 'hold', weight: 0, reps: repMin, tag: 'Répéter', reason: reps + ' répétitions, objectif non atteint. Répétez jusqu\'à atteindre ' + repMin + '+.', bw: true };
-    }
-    if (stuck >= 3 && reps < repMin) {
-      const dl = roundToStep(weight * 0.9, step);
-      return { type: 'down', weight: dl, reps: repMax, tag: 'Décharge', reason: 'Bloqué à ' + weight + unit() + ' depuis ' + stuck + ' séances. Réduisez de 10 %, repartez, progressez plus proprement.' };
-    }
-    if (reps >= upgradeAt) return { type: 'up', weight: weight + step, reps: repMin, tag: 'Ajouter du poids', reason: 'Vous avez atteint ' + reps + ' répétitions — il est temps d\'ajouter ' + step + unit() + '. Visez ' + repMin + '-' + (repMin + 1) + ' à la prochaine séance.' };
-    if (reps >= repMin && reps < upgradeAt) return { type: 'hold', weight: weight, reps: reps + 1, tag: 'Ajouter une répétition', reason: reps + ' répétitions dans la cible. Restez à ' + weight + unit() + ', visez ' + (reps + 1) + '.' };
-    return { type: 'hold', weight: weight, reps: repMin, tag: 'Répéter', reason: reps + ' répétitions, en dessous de ' + repMin + '-' + upgradeAt + '. Répétez ' + weight + unit() + ' jusqu\'à atteindre ' + repMin + '+ proprement.' };
-  }
-
   // ============================================================
   // RENDER
   // ============================================================
@@ -2213,7 +1689,19 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function renderForm() {
     const ex = getCurrentEx();
-    $('oneRmLabel').textContent = (ex && ex.bw) ? 'Meilleures répétitions' : '1RM est.';
+    const banner = $('bwBanner');
+    const wField = $('weightField');
+    const grid = $('logGrid');
+    $('weightLabel').textContent = 'Poids (' + unit() + ')';
+    if (ex && ex.bw) {
+      banner.classList.add('show');
+      wField.style.display = 'none';
+      grid.classList.add('po-bw-mode');
+    } else {
+      banner.classList.remove('show');
+      wField.style.display = '';
+      grid.classList.remove('po-bw-mode');
+    }
   }
   function renderLastSet() {
     const wrap = $('lastSet');
@@ -2230,114 +1718,6 @@ img, video, canvas, svg { max-width: 100%; }
     v.textContent = setStr;
     m.textContent = ago;
     wrap.classList.add('show');
-  }
-  function renderRx() {
-    const wrap = $('rxWrap');
-    const ex = getCurrentEx();
-    if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Choisissez une salle et un jour ci-dessus.</div>'; return; }
-    const logs = getLogs();
-    const rx = getRx(ex, logs);
-    if (!rx) {
-      const sw = ex.startWeight, sr = ex.repMin;
-      const head = ex.bw
-        ? '<span class="po-accent">' + sr + '</span> répétitions'
-        : '<span class="po-accent">' + (sw || 0) + unit() + '</span> × ' + sr + ' répétitions';
-      const reason = ex.bw
-        ? 'Visez ' + ex.repMin + '-' + ex.repMax + ' répétitions propres. Une fois ' + ex.repMax + '+ atteintes, visez plus.'
-        : 'Atteignez ' + ex.repMin + '-' + ex.repMax + ' répétitions. Une fois enregistré, le coach commencera à prescrire.';
-      wrap.innerHTML = '<div class="po-rx-card"><div class="po-rx-label">' + escape(ex.name) + ' · point de départ</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Commencez ici</span><p class="po-rx-reason">' + reason + '</p></div>';
-      return;
-    }
-    const head = rx.bw
-      ? '<span class="po-accent">' + rx.reps + '</span> répétitions'
-      : '<span class="po-accent">' + rx.weight + unit() + '</span> × ' + rx.reps + ' répétitions';
-    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + '"><div class="po-rx-label">' + escape(ex.name) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + '</p></div>';
-  }
-  function renderStats() {
-    const ex = getCurrentEx();
-    const logs = ex ? getLogs() : [];
-    if (!logs.length) {
-      $('oneRm').innerHTML = '—<span class="po-unit">' + unit() + '</span>';
-      $('bestSet').textContent = '—';
-      $('sessionCount').textContent = '—';
-      return;
-    }
-    if (ex.bw) {
-      const br = Math.max.apply(null, logs.map(l => l.reps));
-      $('oneRm').innerHTML = br + '<span class="po-unit">répétitions</span>';
-    } else {
-      const orm = Math.max.apply(null, logs.map(l => estimate1RM(l.weight, l.reps)));
-      $('oneRm').innerHTML = Math.round(orm) + '<span class="po-unit">' + unit() + '</span>';
-    }
-    let best = logs[0];
-    logs.forEach(l => {
-      const cur = ex.bw ? l.reps : estimate1RM(l.weight, l.reps);
-      const bestVal = ex.bw ? best.reps : estimate1RM(best.weight, best.reps);
-      if (cur > bestVal) best = l;
-    });
-    $('bestSet').textContent = ex.bw ? (best.reps + 'r') : (best.weight + '×' + best.reps);
-    $('sessionCount').textContent = logs.length;
-  }
-  function renderSparkline() {
-    const svg = $('sparkline');
-    const empty = $('sparkEmpty');
-    const ex = getCurrentEx();
-    const logs = ex ? getLogs().slice(-10) : [];
-    if (logs.length < 2) {
-      svg.style.display = 'none'; empty.style.display = 'block';
-      return;
-    }
-    svg.style.display = 'block'; empty.style.display = 'none';
-    const vals = logs.map(l => ex.bw ? l.reps : estimate1RM(l.weight, l.reps));
-    const min = Math.min.apply(null, vals);
-    const max = Math.max.apply(null, vals);
-    const range = max - min || 1;
-    const W = 300, H = 60, pad = 4;
-    const pts = vals.map((v, i) => {
-      const x = pad + (W - pad * 2) * (i / (vals.length - 1));
-      const y = H - pad - (H - pad * 2) * ((v - min) / range);
-      return [x, y];
-    });
-    const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-    const fillPath = linePath + ' L' + pts[pts.length - 1][0].toFixed(1) + ' ' + H + ' L' + pts[0][0].toFixed(1) + ' ' + H + ' Z';
-    // Keep <defs> in place; replace any prior paths
-    const defsHTML = '<defs><linearGradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,0.18)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient></defs>';
-    svg.innerHTML = defsHTML
-      + '<path class="po-spark-fill" d="' + fillPath + '"/>'
-      + '<path class="po-spark-line" d="' + linePath + '"/>';
-  }
-  function renderHistory() {
-    const wrap = $('historyCard');
-    const ex = getCurrentEx();
-    const logs = ex ? getLogs().slice().reverse() : [];
-    if (!logs.length) {
-      wrap.innerHTML = '<div class="po-empty">Aucun enregistrement pour l\'instant.</div>';
-      return;
-    }
-    wrap.innerHTML = logs.slice(0, 12).map((l, i) => {
-      const d = new Date(l.date);
-      const dStr = (d.getMonth() + 1) + '/' + d.getDate();
-      const setStr = ex.bw ? (l.reps + ' répétitions') : (l.weight + unit() + ' × ' + l.reps);
-      const realIdx = logs.length - 1 - i; // since we reversed
-      return '<div class="po-hist-row">'
-        + '<div class="po-hist-date">' + dStr + '</div>'
-        + '<div class="po-hist-set">' + setStr + '</div>'
-        + '<button class="po-hist-del" data-idx="' + realIdx + '" aria-label="Supprimer">×</button>'
-        + '</div>';
-    }).join('');
-    wrap.querySelectorAll('.po-hist-del').forEach(b => {
-      b.addEventListener('click', () => {
-        if (!confirm('Supprimer cet enregistrement ?')) return;
-        const realIdx = parseInt(b.dataset.idx, 10);
-        const arr = state.logs[state.currentEx] || [];
-        // realIdx is index in REVERSED list; map back to original
-        const origIdx = arr.length - 1 - realIdx;
-        arr.splice(origIdx, 1);
-        if (!arr.length) delete state.logs[state.currentEx];
-        else state.logs[state.currentEx] = arr;
-        saveState(); renderAll();
-      });
-    });
   }
   // Compute today's split from state.splitRotation + state.splitAnchor.
   // Returns the rotation entry name (e.g. "Push" or "Rest") AND the index.
@@ -2374,287 +1754,100 @@ img, video, canvas, svg { max-width: 100%; }
     splitEl.classList.toggle('is-rest', isRestName(split.name));
   }
 
-  // ============================================================
-  // WEEKLY HEATMAP + FLAMES ("Régularité") + REMINDERS
-  // Both derived at render time from state.logs / state.exercises —
-  // no separate cache, same philosophy as logsByDay() below.
-  // ============================================================
-  // Monday-start ISO week key, e.g. "2026-W35".
-  function isoWeekKey(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+  // Build the rep buttons based on the current exercise's repMin/repMax.
+  // Always spans repMin → repMax + 2 (a small buffer for over-performing
+  // sets that trigger the upgrade signal), capped at 16 buttons total so
+  // wide ranges don't break the mobile layout.
+  function renderRepsRow() {
+    const row = document.getElementById('repsRow');
+    if (!row) return;
+    const ex = getCurrentEx();
+    let repMin, repMax;
+    if (ex) {
+      repMin = Math.max(1, parseInt(ex.repMin, 10) || 1);
+      repMax = Math.max(repMin, parseInt(ex.repMax, 10) || repMin);
+    } else {
+      repMin = 4; repMax = 12;
+    }
+    const upper = Math.max(repMax + 2, repMin + 5);
+    const end = Math.min(upper, repMin + 15);
+
+    // Preserve the previously-selected rep if it still fits in the new
+    // range; otherwise default to the target (repMax).
+    const prev = parseInt(row.dataset.value, 10);
+    const active = (prev >= repMin && prev <= end) ? prev : repMax;
+
+    let html = '';
+    for (let i = repMin; i <= end; i++) {
+      html += '<button type="button" class="po-reps-pill' +
+        (i === active ? ' active' : '') +
+        '" data-v="' + i + '">' + i + '</button>';
+    }
+    row.innerHTML = html;
+    row.dataset.value = String(active);
   }
-  // Interpolates rgba(255,255,255,~0) → var(--good) by t (0..1). Shared
-  // by the per-exercise weekly heatmap, the monthly calendar heatmap,
-  // and the Corps muscle-volume fills.
-  function heatFillColor(t) {
-    t = Math.max(0, Math.min(1, t));
+
+  // ============================================================
+  // MONTHLY GYM-ATTENDANCE HEATMAP — one square per day of the current
+  // month, shaded by that day's set count. Derived from logsByDay()
+  // (defined below) on every render — no separate "mark done" storage.
+  // ============================================================
+  function gymHeatColor(t) {
+    t = Math.max(0.15, Math.min(1, t));
     const from = [255, 255, 255], to = [110, 231, 183];
     const r = Math.round(from[0] + (to[0] - from[0]) * t);
     const g = Math.round(from[1] + (to[1] - from[1]) * t);
     const b = Math.round(from[2] + (to[2] - from[2]) * t);
-    const a = 0.10 + t * 0.80;
+    const a = 0.20 + t * 0.75;
     return 'rgba(' + r + ',' + g + ',' + b + ',' + a.toFixed(2) + ')';
   }
-  function lastNIsoWeeks(n) {
-    const weeks = [];
-    const now = new Date();
-    for (let i = n - 1; i >= 0; i--) {
-      const d = new Date(now); d.setDate(d.getDate() - i * 7);
-      weeks.push(isoWeekKey(d));
-    }
-    return weeks;
-  }
-  function renderRegularity() {
-    const row = $('exHeatRow');
-    const flameWrap = $('exFlameStreak');
-    if (!row) return;
-    const ex = getCurrentEx();
-    if (!ex) { row.innerHTML = ''; flameWrap.classList.add('hidden'); return; }
-    const logs = state.logs[ex.id] || [];
-    const weeks = lastNIsoWeeks(12);
-    const counts = {};
-    logs.forEach(l => {
-      const wk = isoWeekKey(new Date(l.date));
-      counts[wk] = (counts[wk] || 0) + 1;
-    });
-    const max = Math.max.apply(null, weeks.map(w => counts[w] || 0)) || 1;
-    row.innerHTML = weeks.map(w => {
-      const c = counts[w] || 0;
-      const bg = c === 0 ? 'var(--border)' : heatFillColor(c / max);
-      return '<div class="po-heat-cell" style="background:' + bg + '" title="' + w + ' · ' + c + ' série' + (c === 1 ? '' : 's') + '"></div>';
-    }).join('');
-    let streak = 0;
-    for (let i = weeks.length - 1; i >= 0; i--) {
-      if (counts[weeks[i]] > 0) streak++; else break;
-    }
-    if (streak >= 2) {
-      $('exFlameStreakNum').textContent = streak + ' semaines de suite';
-      flameWrap.classList.remove('hidden');
-    } else {
-      flameWrap.classList.add('hidden');
-    }
-  }
-  function renderReminders() {
-    const wrap = $('remindersList');
-    if (!wrap) return;
-    const now = Date.now();
-    const items = state.exercises.map(ex => {
-      const logs = state.logs[ex.id] || [];
-      if (!logs.length) return null;
-      const last = logs[logs.length - 1];
-      const days = Math.floor((now - new Date(last.date).getTime()) / 86400000);
-      const reminderDays = ex.reminderDays || 10;
-      return days >= reminderDays ? { ex, days, reminderDays } : null;
-    }).filter(Boolean).sort((a, b) => b.days - a.days);
-    if (!items.length) {
-      wrap.innerHTML = '<div class="po-empty">Rien en retard.</div>';
-      return;
-    }
-    wrap.innerHTML = '<ul class="po-tw-list">' + items.map(x =>
-      '<li class="po-tw-row"><span class="po-tw-row-name">' + escape(x.ex.name) + '</span>'
-      + '<span class="po-tw-row-meta">' + x.days + ' j sans entraînement (rappel à ' + x.reminderDays + ' j)</span></li>'
-    ).join('') + '</ul>';
-  }
-
-  // ============================================================
-  // CORPS — weekly volume per muscle group, attributed from state.logs:
-  // primary muscles get the full weight×reps (or reps for bw exercises),
-  // secondary muscles get half. Scaled per-muscle against that muscle's
-  // own recent 8-week max so the color scale adapts to the user.
-  // ============================================================
-  function computeMuscleVolumes(weeksBack) {
-    weeksBack = weeksBack || 8;
-    const weekKeys = lastNIsoWeeks(weeksBack);
-    const currentWeek = weekKeys[weekKeys.length - 1];
-    const perWeekPerMuscle = {};
-    weekKeys.forEach(w => { perWeekPerMuscle[w] = {}; });
-    state.exercises.forEach(ex => {
-      const logs = state.logs[ex.id] || [];
-      logs.forEach(l => {
-        const wk = isoWeekKey(new Date(l.date));
-        if (!perWeekPerMuscle[wk]) return;
-        const vol = ex.bw ? (l.reps || 0) : (l.weight || 0) * (l.reps || 0);
-        (ex.primaryMuscles || []).forEach(m => {
-          perWeekPerMuscle[wk][m] = (perWeekPerMuscle[wk][m] || 0) + vol;
-        });
-        (ex.secondaryMuscles || []).forEach(m => {
-          perWeekPerMuscle[wk][m] = (perWeekPerMuscle[wk][m] || 0) + vol * 0.5;
-        });
-      });
-    });
-    const result = {};
-    MUSCLE_GROUPS.forEach(m => {
-      const weekVals = weekKeys.map(w => perWeekPerMuscle[w][m.id] || 0);
-      const max = Math.max.apply(null, weekVals);
-      const current = perWeekPerMuscle[currentWeek][m.id] || 0;
-      result[m.id] = { current: current, t: max > 0 ? current / max : 0 };
-    });
-    return { result, currentWeek };
-  }
-  function muscleContributors(muscleId) {
-    const wk = isoWeekKey(new Date());
-    const out = [];
-    state.exercises.forEach(ex => {
-      const isPrimary = (ex.primaryMuscles || []).includes(muscleId);
-      const isSecondary = (ex.secondaryMuscles || []).includes(muscleId);
-      if (!isPrimary && !isSecondary) return;
-      const logs = (state.logs[ex.id] || []).filter(l => isoWeekKey(new Date(l.date)) === wk);
-      if (!logs.length) return;
-      out.push({ ex, sets: logs.length, primary: isPrimary });
-    });
-    return out.sort((a, b) => b.sets - a.sets);
-  }
-  function renderCorps() {
-    const { result, currentWeek } = computeMuscleVolumes(8);
-    $('corpsWeekLabel').textContent = 'Semaine ' + currentWeek;
-    MUSCLE_GROUPS.forEach(m => {
-      const el = document.getElementById('muscle-' + m.id);
-      if (el) el.style.fill = heatFillColor(result[m.id].t);
-    });
-  }
-  function showMuscleDetail(muscleId) {
-    const label = (MUSCLE_GROUPS.find(m => m.id === muscleId) || {}).label || muscleId;
-    const contribs = muscleContributors(muscleId);
-    $('corpsDetailTitle').textContent = label + ' · cette semaine';
-    const list = $('corpsDetailList');
-    if (!contribs.length) {
-      list.innerHTML = '<div class="po-empty">Aucun exercice cette semaine.</div>';
-    } else {
-      list.innerHTML = contribs.map(c =>
-        '<div class="po-hist-row"><div class="po-hist-set">' + escape(c.ex.name) + '</div>'
-        + '<div class="po-hist-date">' + c.sets + ' série' + (c.sets === 1 ? '' : 's') + (c.primary ? '' : ' · secondaire') + '</div></div>'
-      ).join('');
-    }
-    $('corpsDetail').classList.remove('hidden');
-  }
-
-  // ============================================================
-  // RÉSUMÉ DU MOIS — reuses logsByDay()/summarizeDay() (defined below,
-  // but hoisted as function declarations so calling them here, before
-  // their point in the file, is safe — this only ever runs at click time).
-  // ============================================================
-  function monthStats() {
+  function renderGymHeatmap() {
+    const grid = $('gymHeatGrid');
+    if (!grid) return;
     const now = new Date();
     const y = now.getFullYear(), m = now.getMonth();
-    const all = logsByDay();
+    const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    $('gymHeatMonth').textContent = monthNames[m] + ' ' + y;
     const daysInMonth = new Date(y, m + 1, 0).getDate();
-    let sessions = 0, sets = 0, vol = 0, activeDays = 0;
-    const exCounts = {};
-    const dayVolumes = {};
+    const all = logsByDay();
+    const counts = {};
+    let maxSets = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      const daySets = all[dk];
-      if (daySets && daySets.length) {
-        activeDays++; sessions++;
-        const sum = summarizeDay(daySets);
-        sets += sum.totalSets; vol += sum.totalVol;
-        dayVolumes[d] = sum.totalVol;
-        daySets.forEach(({ ex }) => { exCounts[ex.id] = (exCounts[ex.id] || 0) + 1; });
-      } else {
-        dayVolumes[d] = 0;
-      }
+      const c = all[dk] ? all[dk].length : 0;
+      counts[d] = c;
+      if (c > maxSets) maxSets = c;
     }
-    let favId = null, favCount = 0;
-    Object.keys(exCounts).forEach(id => { if (exCounts[id] > favCount) { favCount = exCounts[id]; favId = id; } });
-    const favEx = favId ? state.exercises.find(e => e.id === favId) : null;
-
-    const dateSet = new Set(Object.keys(all));
-    const allDayKeys = Array.from(dateSet).sort();
-    let longest = 0, run = 0, prevDate = null;
-    allDayKeys.forEach(dk => {
-      const d = wtParseKey(dk);
-      run = (prevDate && (d - prevDate) === 86400000) ? run + 1 : 1;
-      if (run > longest) longest = run;
-      prevDate = d;
-    });
-    let current = 0;
-    let cursor = new Date();
-    if (!dateSet.has(wtDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
-    while (dateSet.has(wtDateKey(cursor))) { current++; cursor.setDate(cursor.getDate() - 1); }
-
-    const lastMonthDate = new Date(y, m - 1, 1);
-    const ly = lastMonthDate.getFullYear(), lm = lastMonthDate.getMonth();
-    const lastDaysInMonth = new Date(ly, lm + 1, 0).getDate();
-    let lastVol = 0;
-    for (let d = 1; d <= lastDaysInMonth; d++) {
-      const dk = ly + '-' + String(lm + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      if (all[dk]) lastVol += summarizeDay(all[dk]).totalVol;
+    grid.innerHTML = '';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const c = counts[d];
+      const t = maxSets > 0 ? c / maxSets : 0;
+      const cell = document.createElement('div');
+      cell.className = 'gym-heat-cell';
+      if (c > 0) cell.style.background = gymHeatColor(t);
+      cell.title = d + ' — ' + c + ' série' + (c === 1 ? '' : 's');
+      grid.appendChild(cell);
     }
-    return { sessions, sets, vol, activeDays, current, longest, favEx, dayVolumes, daysInMonth, lastVol };
-  }
-  function renderMonthSummary() {
-    const s = monthStats();
-    const u = state.units;
-    $('moStatSessions').textContent = s.sessions;
-    $('moStatSets').textContent = s.sets;
-    $('moStatVol').innerHTML = Math.round(s.vol).toLocaleString() + '<span class="po-unit">' + u + '</span>';
-    $('moStatActive').textContent = s.activeDays + '/' + s.daysInMonth;
-    $('moStatStreak').textContent = s.current;
-    $('moStatLongest').textContent = s.longest;
-    $('moStatFav').textContent = s.favEx ? s.favEx.name : '—';
-
-    const maxVol = Math.max.apply(null, Object.values(s.dayVolumes)) || 1;
-    let html = '';
-    for (let d = 1; d <= s.daysInMonth; d++) {
-      const v = s.dayVolumes[d] || 0;
-      const bg = v === 0 ? 'var(--border)' : heatFillColor(v / maxVol);
-      html += '<div class="po-heat-cell" style="background:' + bg + '" title="' + d + ' · ' + Math.round(v).toLocaleString() + ' ' + u + '"></div>';
-    }
-    $('moCalGrid').innerHTML = html;
-
-    let footTxt;
-    if (s.lastVol <= 0 && s.vol <= 0) {
-      footTxt = 'Aucune donnée de volume pour l\'instant.';
-    } else if (s.lastVol <= 0) {
-      footTxt = 'Premier mois avec du volume enregistré — ' + Math.round(s.vol).toLocaleString() + ' ' + u + '.';
-    } else {
-      const pct = Math.round(((s.vol - s.lastVol) / s.lastVol) * 100);
-      footTxt = (s.vol >= s.lastVol)
-        ? 'Volume en hausse de ' + pct + '% par rapport au mois dernier.'
-        : 'Volume en baisse de ' + Math.abs(pct) + '% par rapport au mois dernier.';
-    }
-    $('moFoot').textContent = footTxt;
   }
 
   function renderAll() {
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
-    renderRx(); renderStats(); renderSparkline(); renderHistory();
-    renderRegularity();
-    renderReminders();
-    renderTodaysWorkout();
-    renderPastWorkouts();
-    renderSessionCard();
+    renderRepsRow();
+    renderGymHeatmap();
+    // Pre-fill weight input with last logged weight (or starting weight)
+    const ex = getCurrentEx();
+    if (ex && !ex.bw) {
+      const logs = getLogs();
+      const w = logs.length ? logs[logs.length - 1].weight : (ex.startWeight || 0);
+      $('weightInput').value = w;
+    }
   }
 
   // ============================================================
-  // TODAY'S WORKOUT + PAST WORKOUTS
-  //
-  // Reads state.logs, groups by date, surfaces:
-  //  - Today: every set logged today, per exercise, with set count + total
-  //    volume (kg lifted = sum of weight × reps across all working sets).
-  //  - Past: every previous workout day, sorted newest-first, with the
-  //    same summary numbers + a DONE badge if the user marked that day.
-  //
-  // The total volume here is what the composition-estimate uses (combined
-  // with the 1RM trend) — more weekly volume + strength gain = more of
-  // recent body-weight delta gets attributed to muscle.
+  // Reads state.logs and groups entries by calendar date. Used by the
+  // monthly gym-attendance heatmap (renderGymHeatmap, above).
   // ============================================================
-  const WORKOUT_DONE_KEY = 'po_coach_workout_done';
-  function loadDoneDays() {
-    try { const raw = localStorage.getItem(WORKOUT_DONE_KEY); return raw ? JSON.parse(raw) : {}; }
-    catch (e) { return {}; }
-  }
-  function saveDoneDays(d) {
-    try { localStorage.setItem(WORKOUT_DONE_KEY, JSON.stringify(d)); } catch (e) {}
-  }
-  let doneDays = loadDoneDays();
-
   function logsByDay() {
     const byDay = {};
     state.exercises.forEach(ex => {
@@ -2666,155 +1859,6 @@ img, video, canvas, svg { max-width: 100%; }
     });
     return byDay;
   }
-
-  function fmtPastDate(dk) {
-    const [y, m, d] = dk.split('-').map(Number);
-    const dt = new Date(y, m - 1, d);
-    const dows = ['DIM','LUN','MAR','MER','JEU','VEN','SAM'];
-    const mons = ['JAN','FÉV','MAR','AVR','MAI','JUIN','JUIL','AOU','SEP','OCT','NOV','DÉC'];
-    return dows[dt.getDay()] + ' ' + mons[dt.getMonth()] + ' ' + dt.getDate();
-  }
-
-  function summarizeDay(daySets) {
-    // daySets: [{ex, log}]. Group by exercise, return {sets: N, vol: kg, perEx: [...]}.
-    const byEx = {};
-    daySets.forEach(({ex, log}) => {
-      if (!byEx[ex.id]) byEx[ex.id] = { ex, sets: [], vol: 0 };
-      byEx[ex.id].sets.push(log);
-      byEx[ex.id].vol += (log.weight || 0) * (log.reps || 0);
-    });
-    const perEx = Object.values(byEx);
-    const totalSets = perEx.reduce((s, e) => s + e.sets.length, 0);
-    const totalVol = perEx.reduce((s, e) => s + e.vol, 0);
-    return { perEx, totalSets, totalVol };
-  }
-
-  function renderTodaysWorkout() {
-    const todayKey = wtDateKey(new Date());
-    const all = logsByDay();
-    const todaySets = all[todayKey] || [];
-    const sum = summarizeDay(todaySets);
-    const u = state.units;
-
-    const eyebrow = $('poTwDateLabel');
-    const dows = ['DIM','LUN','MAR','MER','JEU','VEN','SAM'];
-    const mons = ['JAN','FÉV','MAR','AVR','MAI','JUIN','JUIL','AOU','SEP','OCT','NOV','DÉC'];
-    const d = new Date();
-    eyebrow.textContent = 'AUJOURD\'HUI · ' + dows[d.getDay()] + ', ' + mons[d.getMonth()] + ' ' + d.getDate();
-
-    $('poTwSetCount').textContent = sum.totalSets;
-    $('poTwTotalVol').textContent = Math.round(sum.totalVol).toLocaleString() + ' ' + u + ' soulevés';
-
-    const list = $('poTwList');
-    const empty = $('poTwEmpty');
-    if (sum.totalSets === 0) {
-      list.innerHTML = '';
-      empty.classList.remove('hidden');
-    } else {
-      empty.classList.add('hidden');
-      list.innerHTML = sum.perEx.map(e => {
-        const top = e.ex.bw
-          ? 'max ' + Math.max.apply(null, e.sets.map(s => s.reps)) + ' répétitions'
-          : 'max ' + Math.max.apply(null, e.sets.map(s => s.weight)) + u;
-        const meta = e.ex.bw
-          ? (e.sets.length + ' série' + (e.sets.length === 1 ? '' : 's') + ' · ' + top)
-          : (e.sets.length + ' série' + (e.sets.length === 1 ? '' : 's') + ' · ' + top + ' · ' + Math.round(e.vol) + u + ' au total');
-        return '<li class="po-tw-row">'
-          + '<span class="po-tw-row-name">' + escape(e.ex.name) + '</span>'
-          + '<span class="po-tw-row-meta">' + meta + '</span>'
-          + '</li>';
-      }).join('');
-    }
-
-    // Done button state
-    const btn = $('poTwDoneBtn');
-    const isDone = !!doneDays[todayKey];
-    btn.textContent = isDone ? '✓ Terminé' : 'Marquer la séance comme terminée';
-    btn.classList.toggle('is-done', isDone);
-    btn.disabled = sum.totalSets === 0 && !isDone;
-    btn.style.opacity = btn.disabled ? '0.4' : '';
-  }
-
-  function renderPastWorkouts() {
-    const todayKey = wtDateKey(new Date());
-    const all = logsByDay();
-    const past = Object.entries(all)
-      .filter(([dk]) => dk !== todayKey)
-      .sort((a, b) => b[0].localeCompare(a[0]));
-    $('poTwPastCount').textContent = past.length;
-    const body = $('poTwPastBody');
-    if (!past.length) {
-      body.innerHTML = '<div class="po-tw-past-empty">Aucune séance passée pour l\'instant.</div>';
-      return;
-    }
-    const u = state.units;
-    body.innerHTML = past.slice(0, 30).map(([dk, sets]) => {
-      const sum = summarizeDay(sets);
-      const isDone = !!doneDays[dk];
-      const exNames = sum.perEx.map(e => e.ex.name).slice(0, 3).join(', ')
-        + (sum.perEx.length > 3 ? '…' : '');
-      return '<div class="po-tw-past-day">'
-        + '<div class="po-tw-past-day-h">'
-        +   '<span class="po-tw-past-day-date">' + fmtPastDate(dk) + '</span>'
-        +   '<span class="po-tw-past-day-summary">'
-        +     sum.totalSets + ' séries · ' + Math.round(sum.totalVol).toLocaleString() + ' ' + u
-        +     (isDone ? ' <span class="po-tw-past-day-done">TERMINÉ</span>' : '')
-        +   '</span>'
-        + '</div>'
-        + '<div class="po-tw-past-day-summary" style="margin-top:6px; font-size:11px; color:var(--text-3);">'
-        +   escape(exNames)
-        + '</div>'
-        + '</div>';
-    }).join('');
-  }
-
-  $('poTwDoneBtn').addEventListener('click', () => {
-    const todayKey = wtDateKey(new Date());
-    if (doneDays[todayKey]) {
-      delete doneDays[todayKey];
-    } else {
-      doneDays[todayKey] = new Date().toISOString();
-    }
-    saveDoneDays(doneDays);
-    renderTodaysWorkout();
-    renderPastWorkouts();
-  });
-  $('poTwPastToggle').addEventListener('click', () => {
-    const body = $('poTwPastBody');
-    const toggle = $('poTwPastToggle');
-    const open = body.style.display !== 'none';
-    body.style.display = open ? 'none' : 'flex';
-    body.style.flexDirection = 'column';
-    toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
-  });
-
-  // Corps overlay open/close + click-a-muscle detail
-  $('corpsBtn').addEventListener('click', () => {
-    renderCorps();
-    $('corpsDetail').classList.add('hidden');
-    $('corpsOverlay').classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  });
-  $('corpsBack').addEventListener('click', () => {
-    $('corpsOverlay').classList.remove('is-open');
-    document.body.style.overflow = '';
-  });
-  $('corpsSvg').addEventListener('click', (e) => {
-    const g = e.target.closest('[data-muscle]');
-    if (!g) return;
-    showMuscleDetail(g.dataset.muscle);
-  });
-
-  // Résumé du mois overlay open/close
-  $('monthBtn').addEventListener('click', () => {
-    renderMonthSummary();
-    $('monthOverlay').classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  });
-  $('monthBack').addEventListener('click', () => {
-    $('monthOverlay').classList.remove('is-open');
-    document.body.style.overflow = '';
-  });
 
   // ============================================================
   // EVENT WIRING
@@ -2838,27 +1882,52 @@ img, video, canvas, svg { max-width: 100%; }
   $('exSelect').addEventListener('change', e => {
     state.currentEx = e.target.value; saveState(); renderAll();
   });
+  $('weightDownBtn').addEventListener('click', () => {
+    const ex = getCurrentEx(); if (!ex || ex.bw) return;
+    const w = parseFloat($('weightInput').value) || 0;
+    $('weightInput').value = Math.max(0, w - (ex.step || 2.5));
+  });
+  $('weightUpBtn').addEventListener('click', () => {
+    const ex = getCurrentEx(); if (!ex || ex.bw) return;
+    const w = parseFloat($('weightInput').value) || 0;
+    $('weightInput').value = w + (ex.step || 2.5);
+  });
+  // Delegated click handler — reps row is regenerated per exercise via
+  // renderRepsRow(), so we listen on the container rather than the
+  // individual buttons.
+  $('repsRow').addEventListener('click', (e) => {
+    const p = e.target.closest('.po-reps-pill');
+    if (!p) return;
+    $('repsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+    $('repsRow').dataset.value = p.dataset.v;
+  });
+  $('logBtn').addEventListener('click', () => {
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const reps = parseInt($('repsRow').dataset.value, 10) || 0;
+    if (reps <= 0) { alert('Choisissez un nombre de répétitions.'); return; }
+    const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
+    if (!ex.bw && w <= 0) { alert('Entrez un poids.'); return; }
+    const arr = state.logs[ex.id] || [];
+    arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
+    state.logs[ex.id] = arr;
+    saveState(); renderAll();
+    // Strength changed → composition estimate may shift
+    if (typeof wtRender === 'function') wtRender();
+    // Tiny pulse on the button so the user feels the save
+    const btn = $('logBtn');
+    btn.style.transition = 'transform 0.15s';
+    btn.style.transform = 'scale(0.96)';
+    setTimeout(() => { btn.style.transform = ''; }, 160);
+  });
 
   // ============================================================
   // EXERCISE MODAL (add / edit)
   // ============================================================
   let editingExId = null;
   let modalGym = null;
-  let modalPrimary = [], modalSecondary = [], modalDays = [];
-  function renderMuscleGrid(containerId, selectedArr) {
-    const el = $(containerId);
-    el.innerHTML = MUSCLE_GROUPS.map(m =>
-      '<button type="button" class="po-muscle-chip' + (selectedArr.includes(m.id) ? ' active' : '') + '" data-m="' + m.id + '">' + escape(m.label) + '</button>'
-    ).join('');
-    el.querySelectorAll('.po-muscle-chip').forEach(b => {
-      b.addEventListener('click', () => {
-        const id = b.dataset.m;
-        const i = selectedArr.indexOf(id);
-        if (i === -1) selectedArr.push(id); else selectedArr.splice(i, 1);
-        b.classList.toggle('active');
-      });
-    });
-  }
+  let modalDays = [];
   function renderModalSegs() {
     $('exGymSeg').innerHTML = state.gyms.map(g =>
       '<button data-gym="' + g.id + '" class="' + (modalGym === g.id ? 'active' : '') + '">' + escape(g.name) + '</button>'
@@ -2898,9 +1967,6 @@ img, video, canvas, svg { max-width: 100%; }
       $('exRepMin').value = ex.repMin;
       $('exRepMax').value = ex.repMax;
       $('exStep').value = ex.step;
-      modalPrimary = (ex.primaryMuscles || []).slice();
-      modalSecondary = (ex.secondaryMuscles || []).slice();
-      $('exReminderDays').value = ex.reminderDays || 10;
     } else {
       $('exName').value = '';
       modalGym = state.filterGym;
@@ -2910,14 +1976,9 @@ img, video, canvas, svg { max-width: 100%; }
       $('exRepMin').value = 6;
       $('exRepMax').value = 8;
       $('exStep').value = 2.5;
-      modalPrimary = [];
-      modalSecondary = [];
-      $('exReminderDays').value = 10;
     }
     renderModalSegs();
     renderDaysGrid();
-    renderMuscleGrid('exPrimaryMuscles', modalPrimary);
-    renderMuscleGrid('exSecondaryMuscles', modalSecondary);
     toggleBwFields();
     $('exModalBg').classList.add('show');
     setTimeout(() => $('exName').focus(), 60);
@@ -2947,10 +2008,7 @@ img, video, canvas, svg { max-width: 100%; }
       bw: isBw,
       startWeight: isBw ? 0 : (parseFloat($('exStartWeight').value) || 0),
       repMin, repMax,
-      step: isBw ? 1 : (parseFloat($('exStep').value) || 2.5),
-      primaryMuscles: modalPrimary.slice(),
-      secondaryMuscles: modalSecondary.slice(),
-      reminderDays: parseInt($('exReminderDays').value, 10) || 10
+      step: isBw ? 1 : (parseFloat($('exStep').value) || 2.5)
     };
     if (editingExId) {
       const ex = state.exercises.find(e => e.id === editingExId);
@@ -3863,503 +2921,6 @@ img, video, canvas, svg { max-width: 100%; }
   $('wtCmpSideB').addEventListener('click', cycleCompareTarget);
 
   // ============================================================
-  // SCAN-TO-LOG — reads a workout screenshot/photo directly from the
-  // browser using the SAME Anthropic key + client-side call already
-  // used by the Nova widget below (stored in localStorage under
-  // nova_lite_api_key). No server endpoint — this app's AI calls are
-  // all client-side, unlike the dashboard's finance.html.
-  // ============================================================
-  const SCAN_TOOL = {
-    name: 'read_workout_image',
-    description: "Extract logged sets from a photo of a workout — an app screenshot, a smartwatch/tracker screen, a handwritten log, or a photo of loaded plates with a caption.",
-    input_schema: {
-      type: 'object',
-      properties: {
-        readable: { type: 'boolean', description: 'false ONLY if no exercise/set data is visible in the image' },
-        exerciseName: { type: 'string' },
-        sets: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              reps: { type: 'number' },
-              weight: { type: 'number' },
-              failureAtRep: { type: 'number' }
-            },
-            required: ['reps']
-          }
-        },
-        date: { type: 'string', description: 'YYYY-MM-DD if visible, else empty string' }
-      },
-      required: ['readable']
-    }
-  };
-  let scanDraftSets = [];
-
-  function scanDownscale(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 1568;
-          let w = img.naturalWidth, h = img.naturalHeight;
-          if (w > maxDim || h > maxDim) {
-            if (w >= h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
-            else { w = Math.round(w * (maxDim / h)); h = maxDim; }
-          }
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          c.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
-        };
-        img.onerror = reject;
-        img.src = reader.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-  function scanShowBusy() {
-    $('scanZoneEmpty').classList.add('hidden');
-    $('scanZoneError').classList.add('hidden');
-    $('scanZoneBusy').classList.remove('hidden');
-  }
-  function scanShowError(msg) {
-    $('scanZoneBusy').classList.add('hidden');
-    $('scanZoneEmpty').classList.add('hidden');
-    const el = $('scanZoneError');
-    el.textContent = msg;
-    el.classList.remove('hidden');
-  }
-  function scanShowIdle() {
-    $('scanZoneBusy').classList.add('hidden');
-    $('scanZoneError').classList.add('hidden');
-    $('scanZoneEmpty').classList.remove('hidden');
-  }
-  function scanReset() { scanShowIdle(); $('scanFile').value = ''; scanDraftSets = []; }
-
-  async function scanHandleFile(file) {
-    if (!file || !file.type || file.type.indexOf('image/') !== 0) return;
-    scanShowBusy();
-    let key = '';
-    try { key = localStorage.getItem('nova_lite_api_key') || ''; } catch (e) {}
-    if (!key) {
-      scanShowError("Collez d'abord votre clé API Anthropic sur la page Nova (bouton en haut à droite) pour utiliser le scan.");
-      return;
-    }
-    try {
-      const b64 = await scanDownscale(file);
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-opus-4-8',
-          max_tokens: 1024,
-          system: "Tu lis des photos de séances de sport : captures d'écran d'applications de fitness, écrans de montre connectée, journaux manuscrits, ou une photo de disques chargés avec une légende. Extrait les séries loguées (poids, répétitions, série d'échec le cas échéant). L'unité de poids probable est \"" + state.units + "\". Ne refuse pas seulement parce que ce n'est pas un export propre d'application — fais de ton mieux avec ce qui est visible. Mets readable à false UNIQUEMENT si vraiment aucune donnée d'exercice/série n'est visible.",
-          tool_choice: { type: 'tool', name: 'read_workout_image' },
-          tools: [SCAN_TOOL],
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-              { type: 'text', text: 'Lis cette image et extrait les séries.' }
-            ]
-          }]
-        })
-      });
-      const json = await res.json();
-      if (json.error) { scanShowError(json.error.message || 'Erreur API.'); return; }
-      const toolBlock = (json.content || []).find(b => b.type === 'tool_use');
-      if (!toolBlock) { scanShowError("Réponse inattendue de l'IA."); return; }
-      const data = toolBlock.input || {};
-      if (!data.readable) { scanShowError('Aucune donnée de séance lisible sur cette image.'); return; }
-      scanOpenConfirm(data);
-    } catch (e) {
-      scanShowError('Échec de la lecture — vérifiez votre connexion et votre clé.');
-    }
-  }
-  function scanOpenConfirm(data) {
-    scanShowIdle();
-    scanDraftSets = (Array.isArray(data.sets) ? data.sets : []).map(s => ({
-      weight: (s.weight == null || s.weight === '') ? 0 : Number(s.weight),
-      reps: Number(s.reps) || 0,
-      failureAtRep: (s.failureAtRep == null || s.failureAtRep === '') ? null : Number(s.failureAtRep)
-    }));
-    if (!scanDraftSets.length) scanDraftSets.push({ weight: 0, reps: 0, failureAtRep: null });
-    $('scanExName').value = data.exerciseName || '';
-    $('scanExList').innerHTML = state.exercises.map(e => '<option value="' + escape(e.name) + '">').join('');
-    scanRenderSets();
-    scanUpdateLastSetCompare();
-    $('scanConfirmBg').classList.add('show');
-  }
-  function scanRenderSets() {
-    const wrap = $('scanSetsList');
-    wrap.innerHTML = scanDraftSets.map((s, i) =>
-      '<div class="scan-set-row" data-i="' + i + '">'
-      + '<input type="number" class="ss-weight" placeholder="' + state.units + '" step="0.5" value="' + (s.weight || '') + '">'
-      + '<input type="number" class="ss-reps" placeholder="reps" value="' + (s.reps || '') + '">'
-      + '<input type="number" class="ss-fail" placeholder="échec à" value="' + (s.failureAtRep == null ? '' : s.failureAtRep) + '">'
-      + '<button type="button" class="po-hist-del ss-del" aria-label="Supprimer">×</button>'
-      + '</div>'
-    ).join('');
-    wrap.querySelectorAll('.scan-set-row').forEach(row => {
-      const i = parseInt(row.dataset.i, 10);
-      row.querySelector('.ss-weight').addEventListener('input', e => { scanDraftSets[i].weight = parseFloat(e.target.value) || 0; });
-      row.querySelector('.ss-reps').addEventListener('input', e => { scanDraftSets[i].reps = parseInt(e.target.value, 10) || 0; });
-      row.querySelector('.ss-fail').addEventListener('input', e => { scanDraftSets[i].failureAtRep = e.target.value === '' ? null : (parseInt(e.target.value, 10) || null); });
-      row.querySelector('.ss-del').addEventListener('click', () => { scanDraftSets.splice(i, 1); scanRenderSets(); });
-    });
-  }
-  function scanUpdateLastSetCompare() {
-    const name = $('scanExName').value.trim().toLowerCase();
-    const match = name ? state.exercises.find(e => e.name.trim().toLowerCase() === name) : null;
-    const wrap = $('scanLastSetCompare');
-    if (!match) { wrap.style.display = 'none'; return; }
-    const logs = state.logs[match.id] || [];
-    if (!logs.length) { wrap.style.display = 'none'; return; }
-    const last = logs[logs.length - 1];
-    $('scanLastSetValue').textContent = match.bw ? (last.reps + ' répétitions') : (last.weight + state.units + ' × ' + last.reps);
-    wrap.style.display = 'flex';
-  }
-
-  const scanZoneEl = $('scanZone');
-  scanZoneEl.addEventListener('click', () => $('scanFile').click());
-  $('scanFile').addEventListener('change', (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f) scanHandleFile(f);
-    e.target.value = '';
-  });
-  scanZoneEl.addEventListener('dragover', (e) => { e.preventDefault(); scanZoneEl.classList.add('drag-over'); });
-  scanZoneEl.addEventListener('dragleave', () => scanZoneEl.classList.remove('drag-over'));
-  scanZoneEl.addEventListener('drop', (e) => {
-    e.preventDefault(); scanZoneEl.classList.remove('drag-over');
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) scanHandleFile(f);
-  });
-  document.addEventListener('paste', (e) => {
-    const ae = document.activeElement;
-    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
-    const items = (e.clipboardData && e.clipboardData.items) || [];
-    for (const item of items) {
-      if (item.type.indexOf('image/') === 0) {
-        const f = item.getAsFile();
-        if (f) scanHandleFile(f);
-        break;
-      }
-    }
-  });
-  $('scanExName').addEventListener('input', scanUpdateLastSetCompare);
-  $('scanAddSetBtn').addEventListener('click', () => { scanDraftSets.push({ weight: 0, reps: 0, failureAtRep: null }); scanRenderSets(); });
-  $('scanDiscardBtn').addEventListener('click', () => {
-    $('scanConfirmBg').classList.remove('show');
-    scanReset();
-  });
-  $('scanApplyBtn').addEventListener('click', () => {
-    const name = $('scanExName').value.trim();
-    if (!name) { alert("Le nom de l'exercice est requis."); return; }
-    let ex = state.exercises.find(e => e.name.trim().toLowerCase() === name.toLowerCase());
-    if (!ex) {
-      ex = {
-        id: uid(), name: name, gym: state.filterGym, days: [state.filterDay],
-        bw: false, startWeight: (scanDraftSets[0] && scanDraftSets[0].weight) || 0,
-        repMin: 6, repMax: 8, step: 2.5,
-        primaryMuscles: [], secondaryMuscles: [], reminderDays: 10
-      };
-      state.exercises.push(ex);
-    }
-    const dateIso = new Date().toISOString();
-    const arr = state.logs[ex.id] || [];
-    scanDraftSets.forEach(s => {
-      if (!s.reps) return;
-      arr.push({ weight: ex.bw ? 0 : (s.weight || 0), reps: s.reps, date: dateIso });
-    });
-    state.logs[ex.id] = arr;
-    state.currentEx = ex.id;
-    saveState();
-    $('scanConfirmBg').classList.remove('show');
-    scanReset();
-    renderAll();
-  });
-
-  // ============================================================
-  // SÉANCE DU JOUR — guided, resumable session logging. Replaces the old
-  // "pick one exercise, log one set" flow. A session is a small metadata
-  // record { id, startedAt, dayId, exIds, cursor, finishedAt } stored in
-  // state.sessions; the actual sets it logs go straight into state.logs
-  // (same shape the rest of the app already reads), tagged with
-  // sessionId + setIndex so this screen can find/update its own rows.
-  // Only one session can be active/resumable at a time — closing the tab
-  // or the overlay just leaves it active, so re-opening the app picks
-  // straight back up via the "Reprendre" card.
-  // ============================================================
-  function uidSession() { return 'sess_' + Date.now() + '_' + Math.floor(Math.random() * 9999); }
-  function getActiveSession() { return state.activeSessionId ? state.sessions[state.activeSessionId] : null; }
-  function sessionExercises(s) { return (s.exIds || []).map(id => state.exercises.find(e => e.id === id)).filter(Boolean); }
-  function sessionLoggedCount(s, exId) { return (state.logs[exId] || []).filter(l => l.sessionId === s.id).length; }
-  function sessionDoneCount(s) { return sessionExercises(s).filter(ex => sessionLoggedCount(s, ex.id) > 0).length; }
-  function startSession(dayId) {
-    // Not gym-filtered — a session is "what I do this day", regardless of
-    // which gym happens to be selected in the stats browser above.
-    const exIds = state.exercises
-      .filter(e => (e.days || []).includes(dayId))
-      .map(e => e.id);
-    const id = uidSession();
-    state.sessions[id] = { id, startedAt: new Date().toISOString(), dayId, exIds, cursor: 0, finishedAt: null };
-    state.activeSessionId = id;
-    saveState();
-    return state.sessions[id];
-  }
-  function finishActiveSession() {
-    const s = getActiveSession();
-    if (!s) return;
-    s.finishedAt = new Date().toISOString();
-    state.activeSessionId = null;
-    saveState();
-  }
-
-  function renderSessionCard() {
-    const wrap = $('seshCardInner');
-    if (!wrap) return;
-    const s = getActiveSession();
-    if (!s) {
-      wrap.innerHTML =
-        '<div class="sesh-eyebrow">SÉANCE</div>'
-        + '<div class="sesh-headline">Prêt à vous entraîner ?</div>'
-        + '<button type="button" class="po-btn-primary" id="seshStartBtn">Démarrer une séance</button>';
-      $('seshStartBtn').addEventListener('click', openSessionPicker);
-      return;
-    }
-    const done = sessionDoneCount(s);
-    const total = sessionExercises(s).length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
-    wrap.innerHTML =
-      '<div class="sesh-eyebrow">SÉANCE EN COURS · ' + escape(dayName(s.dayId)) + '</div>'
-      + '<div class="sesh-headline">' + done + ' / ' + total + ' exercices</div>'
-      + '<div class="sesh-progress"><div class="sesh-progress-bar" style="width:' + pct + '%"></div></div>'
-      + '<button type="button" class="po-btn-primary" id="seshResumeBtn">Reprendre la séance</button>'
-      + '<button type="button" class="po-btn-secondary" id="seshFinishCardBtn">Terminer la séance</button>';
-    $('seshResumeBtn').addEventListener('click', () => openSessionOverlay());
-    $('seshFinishCardBtn').addEventListener('click', () => {
-      if (!confirm('Terminer la séance maintenant ?')) return;
-      finishActiveSession();
-      renderSessionCard();
-      renderAll();
-    });
-  }
-
-  // ----- Day picker (before starting a session) -----
-  let seshPickedDay = null;
-  function openSessionPicker() {
-    const active = getActiveSession();
-    if (active) { openSessionOverlay(); return; }
-    const split = todaySplit();
-    const matched = (!isRestName(split.name) && split.name)
-      ? state.days.find(d => d.name.toLowerCase() === split.name.toLowerCase())
-      : null;
-    seshPickedDay = matched ? matched.id : state.filterDay;
-    renderSeshDaySeg();
-    $('seshPickerBg').classList.add('show');
-  }
-  function renderSeshDaySeg() {
-    $('seshDaySeg').innerHTML = state.days.map(d =>
-      '<button type="button" data-day="' + d.id + '" class="' + (seshPickedDay === d.id ? 'active' : '') + '">' + escape(d.name) + '</button>'
-    ).join('');
-    $('seshDaySeg').querySelectorAll('button').forEach(b => {
-      b.addEventListener('click', () => { seshPickedDay = b.dataset.day; renderSeshDaySeg(); });
-    });
-  }
-  $('seshPickerCancel').addEventListener('click', () => $('seshPickerBg').classList.remove('show'));
-  $('seshPickerStart').addEventListener('click', () => {
-    if (!seshPickedDay) return;
-    startSession(seshPickedDay);
-    $('seshPickerBg').classList.remove('show');
-    renderSessionCard();
-    openSessionOverlay();
-  });
-
-  // ----- Guided overlay: one exercise at a time -----
-  let seshCursor = 0;
-  let seshSeriesCount = 3;
-
-  function seshSetRowHtml(ex, k, set) {
-    return '<div class="sesh-set-row" data-k="' + k + '">'
-      + '<span class="sesh-set-num">' + (k + 1) + '</span>'
-      + (ex.bw ? '' : '<input type="number" class="sesh-w" step="0.5" inputmode="decimal" placeholder="' + unit() + '" value="' + (set.weight || '') + '">')
-      + '<input type="number" class="sesh-r" inputmode="numeric" placeholder="reps" value="' + (set.reps || '') + '">'
-      + '<label class="sesh-fail"><input type="checkbox" class="sesh-f"' + (set.failure ? ' checked' : '') + '> Échec ?</label>'
-      + '</div>';
-  }
-  function seshSetsHtml(s, ex, setCount) {
-    const bySetIndex = {};
-    (state.logs[ex.id] || []).filter(l => l.sessionId === s.id).forEach(l => { bySetIndex[l.setIndex] = l; });
-    let rows = '';
-    for (let k = 0; k < setCount; k++) rows += seshSetRowHtml(ex, k, bySetIndex[k] || {});
-    return rows;
-  }
-  function seshCardHtml(s, ex, i, total, setCount) {
-    const logs = state.logs[ex.id] || [];
-    const last = logs.filter(l => l.sessionId !== s.id);
-    const lastLog = last.length ? last[last.length - 1] : null;
-    const lastStr = lastLog ? (ex.bw ? (lastLog.reps + ' répétitions') : (lastLog.weight + unit() + ' × ' + lastLog.reps)) : null;
-    return '<div class="sesh-card">'
-      + '<div class="sesh-card-eyebrow">EXERCICE ' + (i + 1) + ' / ' + total + '</div>'
-      + '<div class="sesh-card-title">' + escape(ex.name) + '</div>'
-      + (lastStr ? '<div class="po-last-set show"><span class="po-last-label">Dernière fois</span><span class="po-last-value">' + lastStr + '</span></div>' : '')
-      + '<div class="sesh-series-picker">'
-      +   '<span class="po-seg-label">Séries</span>'
-      +   '<div class="sesh-series-stepper">'
-      +     '<button type="button" class="po-w-btn" id="seshSeriesDown">−</button>'
-      +     '<span class="sesh-series-count" id="seshSeriesCount">' + setCount + '</span>'
-      +     '<button type="button" class="po-w-btn" id="seshSeriesUp">+</button>'
-      +   '</div>'
-      + '</div>'
-      + '<div class="sesh-sets" id="seshSetsWrap">' + seshSetsHtml(s, ex, setCount) + '</div>'
-      + '<button type="button" class="sesh-skip" id="seshSkipBtn">Passer cet exercice</button>'
-      + '</div>';
-  }
-  function seshUpsertRow(s, ex, k) {
-    const row = document.querySelector('#seshSetsWrap .sesh-set-row[data-k="' + k + '"]');
-    if (!row) return;
-    const wInput = row.querySelector('.sesh-w');
-    const rInput = row.querySelector('.sesh-r');
-    const fInput = row.querySelector('.sesh-f');
-    const reps = parseInt(rInput.value, 10) || 0;
-    const arr = state.logs[ex.id] || [];
-    let entry = arr.find(l => l.sessionId === s.id && l.setIndex === k);
-    if (reps <= 0) {
-      // Empty row — drop any previously-saved entry for this slot.
-      if (entry) { state.logs[ex.id] = arr.filter(l => l !== entry); saveState(); renderSeshDots(); renderSessionCard(); }
-      return;
-    }
-    const weight = ex.bw ? 0 : (parseFloat(wInput && wInput.value) || 0);
-    if (!entry) {
-      entry = { sessionId: s.id, setIndex: k, date: new Date().toISOString() };
-      arr.push(entry);
-      state.logs[ex.id] = arr;
-    }
-    entry.weight = weight;
-    entry.reps = reps;
-    entry.failure = !!(fInput && fInput.checked);
-    saveState();
-    renderSeshDots();
-    renderSessionCard();
-    if (typeof wtRender === 'function') wtRender();
-  }
-  function wireSeshSetRows(s, ex) {
-    document.querySelectorAll('#seshSetsWrap .sesh-set-row').forEach(row => {
-      const k = parseInt(row.dataset.k, 10);
-      row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => seshUpsertRow(s, ex, k)));
-    });
-  }
-  function seshRerenderSetsOnly(s, ex) {
-    $('seshSetsWrap').innerHTML = seshSetsHtml(s, ex, seshSeriesCount);
-    $('seshSeriesCount').textContent = seshSeriesCount;
-    wireSeshSetRows(s, ex);
-  }
-  function renderSeshDots() {
-    const s = getActiveSession();
-    if (!s) return;
-    const exs = sessionExercises(s);
-    $('seshDots').innerHTML = exs.map((ex, i) => {
-      const done = sessionLoggedCount(s, ex.id) > 0;
-      return '<span class="sesh-dot' + (i === seshCursor ? ' active' : '') + (done ? ' done' : '') + '" data-i="' + i + '" title="' + escape(ex.name) + '"></span>';
-    }).join('');
-    $('seshDots').querySelectorAll('.sesh-dot').forEach(d => {
-      d.addEventListener('click', () => goToSeshIndex(parseInt(d.dataset.i, 10)));
-    });
-  }
-  function renderSeshCardOnly() {
-    const s = getActiveSession();
-    if (!s) return;
-    const exs = sessionExercises(s);
-    if (!exs.length) {
-      $('seshCarousel').innerHTML = '<div class="po-rx-empty">Aucun exercice pour ce jour. Ajoutez-en un via « Consulter un exercice » puis touchez « ' + escape(dayName(s.dayId)) + ' » dans ses jours.</div>';
-      $('seshDots').innerHTML = '';
-      $('seshPrevBtn').disabled = true;
-      $('seshNextBtn').disabled = true;
-      return;
-    }
-    const ex = exs[seshCursor];
-    if (!ex) return;
-    const mySets = (state.logs[ex.id] || []).filter(l => l.sessionId === s.id);
-    seshSeriesCount = mySets.length || 3;
-    $('seshCarousel').innerHTML = seshCardHtml(s, ex, seshCursor, exs.length, seshSeriesCount);
-    wireSeshSetRows(s, ex);
-    $('seshSeriesUp').addEventListener('click', () => {
-      seshSeriesCount = Math.min(12, seshSeriesCount + 1);
-      seshRerenderSetsOnly(s, ex);
-    });
-    $('seshSeriesDown').addEventListener('click', () => {
-      if (seshSeriesCount <= 1) return;
-      const newCount = seshSeriesCount - 1;
-      const arr = state.logs[ex.id] || [];
-      state.logs[ex.id] = arr.filter(l => !(l.sessionId === s.id && l.setIndex === newCount));
-      saveState();
-      seshSeriesCount = newCount;
-      seshRerenderSetsOnly(s, ex);
-      renderSeshDots();
-      renderSessionCard();
-    });
-    $('seshSkipBtn').addEventListener('click', () => goToSeshIndex(seshCursor + 1));
-    renderSeshDots();
-    $('seshPrevBtn').disabled = seshCursor === 0;
-    $('seshNextBtn').disabled = seshCursor === exs.length - 1;
-  }
-  function goToSeshIndex(i) {
-    const s = getActiveSession();
-    if (!s) return;
-    const exs = sessionExercises(s);
-    if (!exs.length) return;
-    seshCursor = Math.max(0, Math.min(exs.length - 1, i));
-    s.cursor = seshCursor;
-    saveState();
-    renderSeshCardOnly();
-  }
-  function openSessionOverlay() {
-    const s = getActiveSession();
-    if (!s) return;
-    const exs = sessionExercises(s);
-    seshCursor = Math.min(s.cursor || 0, Math.max(0, exs.length - 1));
-    renderSeshCardOnly();
-    $('sessionOverlay').classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  }
-  function closeSessionOverlay() {
-    $('sessionOverlay').classList.remove('is-open');
-    document.body.style.overflow = '';
-    renderSessionCard();
-    renderAll();
-  }
-  $('seshClose').addEventListener('click', closeSessionOverlay);
-  $('seshOverlayFinish').addEventListener('click', () => {
-    if (!confirm('Terminer la séance maintenant ?')) return;
-    finishActiveSession();
-    closeSessionOverlay();
-  });
-  $('seshPrevBtn').addEventListener('click', () => goToSeshIndex(seshCursor - 1));
-  $('seshNextBtn').addEventListener('click', () => goToSeshIndex(seshCursor + 1));
-  // Swipe support — the carousel div's content is swapped per exercise
-  // rather than scrolled, so this just reads the horizontal drag distance.
-  (function wireSeshSwipe() {
-    let startX = null;
-    const el = $('seshCarousel');
-    el.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
-    el.addEventListener('touchend', (e) => {
-      if (startX == null) return;
-      const dx = e.changedTouches[0].clientX - startX;
-      startX = null;
-      if (Math.abs(dx) < 40) return;
-      if (dx < 0) goToSeshIndex(seshCursor + 1); else goToSeshIndex(seshCursor - 1);
-    }, { passive: true });
-  })();
-
-  // ============================================================
   // BOOT
   // ============================================================
   renderAll();
@@ -4711,33 +3272,6 @@ img, video, canvas, svg { max-width: 100%; }
     if (v && typeof v==='object'){ const o={}; for(const k in v){ if(/img|photo|image|data|base64|url|thumb/i.test(k)) continue; o[k]=sanitize(v[k],depth+1); } return o; }
     return v;
   }
-  // Monday-start ISO week key — mirrors the main app's isoWeekKey() so
-  // Nova's neglected-muscle / overload commentary matches the Régularité
-  // heatmap the user sees on the exercise card.
-  function isoWeekKeyNv(date){
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2,'0');
-  }
-  function exerciseSummaryForNova(){
-    const raw = readLS('po_coach_v1', null);
-    if (!raw || !Array.isArray(raw.exercises)) return [];
-    const weeks = [];
-    const now = new Date();
-    for (let i = 11; i >= 0; i--){ const d = new Date(now); d.setDate(d.getDate()-i*7); weeks.push(isoWeekKeyNv(d)); }
-    return raw.exercises.map(ex => {
-      const logs = (raw.logs && raw.logs[ex.id]) || [];
-      const last3 = logs.slice(-3).map(l => ({ date: (l.date||'').slice(0,10), weight: l.weight, reps: l.reps }));
-      const counts = {};
-      logs.forEach(l => { const wk = isoWeekKeyNv(new Date(l.date)); counts[wk] = (counts[wk]||0)+1; });
-      let streak = 0;
-      for (let i = weeks.length - 1; i >= 0; i--){ if (counts[weeks[i]] > 0) streak++; else break; }
-      return { name: ex.name, primaryMuscles: ex.primaryMuscles || [], last3, weeklyStreak: streak };
-    });
-  }
   function gymContext(){
     const prof = (readLS('po_water_v1', {}) || {}).profile || {};
     const photosRaw = readLS('po_coach_photos', []) || [];
@@ -4749,7 +3283,6 @@ img, video, canvas, svg { max-width: 100%; }
       progressPhotos: { count: photos.length, timeline: photos.slice(-30) },
       workouts: sanitize(readLS('po_coach_v1', null), 0),
       workoutsDone: sanitize(readLS('po_coach_workout_done', null), 0),
-      exercises: exerciseSummaryForNova(),
     };
     let s = JSON.stringify(ctx);
     if (s.length > 80000){ ctx.workouts = '[too large — summarize from weightLog + photos]'; s = JSON.stringify(ctx); }
