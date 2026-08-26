@@ -80,17 +80,37 @@ const CONFIG = {
   // First-run defaults. Once a user logs anything, they edit through
   // the in-app + / gear buttons; this block stays as the seed.
   defaultExercises: [
-    { name: "Développé couché",     gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 60 },
-    { name: "Développé militaire",  gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 35 },
-    { name: "Extension triceps à la poulie", gym: "comm", day: "push", repMin: 8, repMax: 12, step: 2.5, startWeight: 25 },
-    { name: "Tractions",        gym: "both", day: "pull", repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true },
-    { name: "Rowing barre",     gym: "comm", day: "pull", repMin: 6, repMax: 10, step: 2.5, startWeight: 50 },
-    { name: "Curl biceps",      gym: "comm", day: "pull", repMin: 8, repMax: 12, step: 1.25,startWeight: 15 },
-    { name: "Squat arrière",      gym: "comm", day: "legs", repMin: 5, repMax: 8,  step: 5,   startWeight: 80 },
-    { name: "Soulevé de terre roumain", gym: "comm", day: "legs", repMin: 6, repMax: 10, step: 5, startWeight: 60 },
-    { name: "Presse à cuisses",       gym: "comm", day: "legs", repMin: 8, repMax: 12, step: 5,   startWeight: 100 }
+    { name: "Développé couché",     gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 60, primaryMuscles: ["chest"], secondaryMuscles: ["front_delts","triceps"] },
+    { name: "Développé militaire",  gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 35, primaryMuscles: ["front_delts","side_delts"], secondaryMuscles: ["triceps"] },
+    { name: "Extension triceps à la poulie", gym: "comm", day: "push", repMin: 8, repMax: 12, step: 2.5, startWeight: 25, primaryMuscles: ["triceps"], secondaryMuscles: [] },
+    { name: "Tractions",        gym: "both", day: "pull", repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true, primaryMuscles: ["lats"], secondaryMuscles: ["biceps"] },
+    { name: "Rowing barre",     gym: "comm", day: "pull", repMin: 6, repMax: 10, step: 2.5, startWeight: 50, primaryMuscles: ["lats"], secondaryMuscles: ["biceps","rear_delts"] },
+    { name: "Curl biceps",      gym: "comm", day: "pull", repMin: 8, repMax: 12, step: 1.25,startWeight: 15, primaryMuscles: ["biceps"], secondaryMuscles: ["forearms"] },
+    { name: "Squat arrière",      gym: "comm", day: "legs", repMin: 5, repMax: 8,  step: 5,   startWeight: 80, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] },
+    { name: "Soulevé de terre roumain", gym: "comm", day: "legs", repMin: 6, repMax: 10, step: 5, startWeight: 60, primaryMuscles: ["hamstrings"], secondaryMuscles: ["glutes","lower_back"] },
+    { name: "Presse à cuisses",       gym: "comm", day: "legs", repMin: 8, repMax: 12, step: 5,   startWeight: 100, primaryMuscles: ["quads"], secondaryMuscles: ["glutes"] }
   ]
 };
+
+// Muscle groups used by the exercise editor (primary/secondary picks),
+// the weekly muscle-volume "Corps" view, and Nova's context.
+const MUSCLE_GROUPS = [
+  { id: "chest",       label: "Pectoraux" },
+  { id: "front_delts", label: "Épaules avant" },
+  { id: "side_delts",  label: "Épaules latérales" },
+  { id: "rear_delts",  label: "Épaules arrière" },
+  { id: "biceps",      label: "Biceps" },
+  { id: "triceps",     label: "Triceps" },
+  { id: "forearms",    label: "Avant-bras" },
+  { id: "abs",         label: "Abdominaux" },
+  { id: "lats",        label: "Dorsaux" },
+  { id: "traps",       label: "Trapèzes" },
+  { id: "lower_back",  label: "Lombaires" },
+  { id: "glutes",      label: "Fessiers" },
+  { id: "quads",       label: "Quadriceps" },
+  { id: "hamstrings",  label: "Ischio-jambiers" },
+  { id: "calves",      label: "Mollets" }
+];
 </script>
 
 <style>
@@ -1293,6 +1313,66 @@ img, video, canvas, svg { max-width: 100%; }
   100% { transform: translate3d(var(--dx, 12px), var(--dy, -100vh), 0); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .atmo-particles span { animation: none; } }
+
+/* ===== Muscle-group multi-select chips (exercise modal) ===== */
+.po-muscle-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.po-muscle-chip {
+  padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04); color: var(--text-2);
+  font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.po-muscle-chip:hover { color: var(--text-1); background: rgba(255,255,255,0.08); }
+.po-muscle-chip.active {
+  background: rgba(110,231,183,0.16); color: var(--good); border-color: rgba(110,231,183,0.35);
+}
+
+/* ===== Generic small heatmap cell — reused by the per-exercise weekly
+   heatmap ("Régularité") and the monthly calendar heatmap ("Résumé du mois") ===== */
+.po-heat-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-bottom: 10px; }
+.po-heat-cell { aspect-ratio: 1; border-radius: 4px; }
+
+/* ===== Reminders ===== */
+#remindersList .po-tw-row-meta { color: var(--warn); }
+
+/* ===== Corps (muscle volume) view ===== */
+.corps-meta {
+  text-align: center; font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono); margin-bottom: 14px;
+}
+.corps-body-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
+.corps-svg { width: 100%; max-width: 320px; height: auto; display: block; }
+.corps-region { cursor: pointer; transition: fill 0.25s; }
+.corps-region:hover { opacity: 0.85; }
+.corps-region-label { font-size: 7px; fill: var(--text-4); pointer-events: none; }
+
+/* ===== Month view calendar heatmap ===== */
+.mo-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+
+/* ===== Scan-to-log drop zone ===== */
+.po-scan-zone {
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px; padding: 18px; text-align: center;
+  margin-bottom: 14px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.po-scan-zone:hover, .po-scan-zone.drag-over {
+  border-color: rgba(110,231,183,0.4); background: rgba(110,231,183,0.04);
+}
+.po-scan-icon { font-size: 22px; margin-bottom: 6px; }
+.po-scan-text { font-size: 13px; color: var(--text-2); font-weight: 600; margin-bottom: 2px; }
+.po-scan-sub { font-size: 11px; color: var(--text-3); }
+.po-scan-error { color: var(--bad); font-size: 12px; }
+.scan-set-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px;
+  align-items: center; margin-bottom: 8px;
+}
+.scan-set-row input {
+  padding: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.28);
+  color: var(--text-1); border-radius: 10px; font-family: inherit; font-size: 14px;
+  text-align: center; font-variant-numeric: tabular-nums; width: 100%; box-sizing: border-box;
+  -moz-appearance: textfield;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1470,9 +1550,17 @@ img, video, canvas, svg { max-width: 100%; }
 
   <div class="po-header">
     <h1 class="po-title" id="appTitle">Coach de surcharge progressive</h1>
+    <div style="display:flex; gap:8px;">
+    <button class="po-icon-btn" id="corpsBtn" title="Volume par muscle" aria-label="Corps">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="6" r="3"/><path d="M6 21v-2a6 6 0 0 1 12 0v2"/></svg>
+    </button>
+    <button class="po-icon-btn" id="monthBtn" title="Résumé du mois" aria-label="Résumé du mois">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    </button>
     <button class="po-icon-btn" id="settingsBtn" title="Paramètres" aria-label="Paramètres">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
+    </div>
   </div>
 
   <div class="card">
@@ -1491,6 +1579,19 @@ img, video, canvas, svg { max-width: 100%; }
     <!-- Exercise -->
     <div class="po-sub-section">
       <div class="po-sub-title">Exercice</div>
+      <div class="po-scan-zone" id="scanZone">
+        <input type="file" id="scanFile" accept="image/*" style="display:none">
+        <div id="scanZoneEmpty">
+          <div class="po-scan-icon">📷</div>
+          <div class="po-scan-text">Déposez une capture d'écran ou une photo de votre séance</div>
+          <div class="po-scan-sub">l'IA lit les séries — touchez pour choisir un fichier</div>
+        </div>
+        <div id="scanZoneBusy" class="hidden">
+          <span class="nv-dots"><i></i><i></i><i></i></span>
+          <div class="po-scan-sub" style="margin-top:6px;">Lecture en cours…</div>
+        </div>
+        <div id="scanZoneError" class="hidden po-scan-error"></div>
+      </div>
       <div class="po-exercise-bar">
         <select class="po-ex-select" id="exSelect"></select>
         <button class="po-btn-icon" id="addExBtn" title="Ajouter un exercice" aria-label="Ajouter">
@@ -1588,6 +1689,22 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
+    <!-- Régularité — 12-week heatmap + flame streak for the current
+         exercise, derived from state.logs on every render (no cache). -->
+    <div class="po-sub-section">
+      <div class="po-sub-title">Régularité</div>
+      <div class="po-heat-row" id="exHeatRow"></div>
+      <div class="wt-streak hidden" id="exFlameStreak">🔥<span id="exFlameStreakNum"></span></div>
+    </div>
+
+    <!-- Reminders — exercises whose most recent logged set is older than
+         their own reminderDays (default 10), most-overdue first. Purely
+         derived from state.exercises + state.logs on every render. -->
+    <div class="po-sub-section">
+      <div class="po-sub-title">Rappels</div>
+      <div id="remindersList"><div class="po-empty">Rien en retard.</div></div>
+    </div>
+
     <!-- Today's Workout — every set logged today, grouped by exercise.
          "Mark done" stamps the day so the past-workouts list shows it
          as a completed session. The volume here also feeds the
@@ -1659,11 +1776,120 @@ img, video, canvas, svg { max-width: 100%; }
       <input type="number" id="exStep" step="0.5" value="2.5">
       <div class="po-field-hint">Le poids ajouté automatiquement à la barre quand vous dépassez les répétitions max — ex. 2.5 kg de plus la prochaine séance.</div>
     </div>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Muscles principaux</label>
+      <div class="po-muscle-grid" id="exPrimaryMuscles"></div>
+    </div>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Muscles secondaires</label>
+      <div class="po-muscle-grid" id="exSecondaryMuscles"></div>
+    </div>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Rappel après (jours)</label>
+      <input type="number" id="exReminderDays" value="10" min="1">
+      <div class="po-field-hint">S'il se passe plus de ce nombre de jours sans enregistrement, l'exercice apparaît dans « Rappels ».</div>
+    </div>
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="exModalCancel">Annuler</button>
       <button class="po-btn-primary" id="exModalSave">Enregistrer</button>
     </div>
     <span class="po-delete-link" id="exDelete" style="display:none">Supprimer cet exercice</span>
+  </div>
+</div>
+
+<!-- Scan-to-log confirm modal — appears after the AI reads a workout
+     photo/screenshot dropped into #scanZone. -->
+<div class="po-modal-bg" id="scanConfirmBg">
+  <div class="po-modal">
+    <h3>Confirmer la séance importée</h3>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Exercice</label>
+      <input type="text" id="scanExName" list="scanExList" placeholder="Nom de l'exercice">
+      <datalist id="scanExList"></datalist>
+    </div>
+    <div class="po-last-set" id="scanLastSetCompare" style="display:none">
+      <span class="po-last-label">Dernière fois</span>
+      <span class="po-last-value" id="scanLastSetValue"></span>
+    </div>
+    <div id="scanSetsList"></div>
+    <button class="po-add-row-btn" id="scanAddSetBtn">+ Ajouter une série</button>
+    <div class="po-modal-actions">
+      <button class="po-btn-secondary" id="scanDiscardBtn">Ignorer</button>
+      <button class="po-btn-primary" id="scanApplyBtn">Appliquer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Corps — weekly volume per muscle group, attributed from state.logs
+     (primary muscles at full weight×reps, secondary at half), scaled
+     against that muscle's own recent 8-week max. -->
+<div class="wt-overlay" id="corpsOverlay" aria-hidden="true">
+  <div class="wt-overlay-inner">
+    <div class="wt-overlay-h">
+      <button class="wt-back" id="corpsBack" aria-label="Retour">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="wt-overlay-title">Corps</div>
+    </div>
+    <div class="corps-meta" id="corpsWeekLabel">—</div>
+    <div class="corps-body-wrap">
+      <svg class="corps-svg" id="corpsSvg" viewBox="0 0 220 260">
+        <!-- Front figure -->
+        <circle cx="50" cy="16" r="13" fill="rgba(255,255,255,0.06)"></circle>
+        <g id="muscle-front_delts" class="corps-region" data-muscle="front_delts"><circle cx="26" cy="48" r="9"></circle><circle cx="74" cy="48" r="9"></circle></g>
+        <g id="muscle-side_delts" class="corps-region" data-muscle="side_delts"><circle cx="17" cy="50" r="6"></circle><circle cx="83" cy="50" r="6"></circle></g>
+        <g id="muscle-chest" class="corps-region" data-muscle="chest"><rect x="33" y="42" width="34" height="24" rx="9"></rect></g>
+        <g id="muscle-biceps" class="corps-region" data-muscle="biceps"><rect x="10" y="58" width="11" height="26" rx="5"></rect><rect x="79" y="58" width="11" height="26" rx="5"></rect></g>
+        <g id="muscle-forearms" class="corps-region" data-muscle="forearms"><rect x="8" y="86" width="10" height="24" rx="4"></rect><rect x="82" y="86" width="10" height="24" rx="4"></rect></g>
+        <g id="muscle-abs" class="corps-region" data-muscle="abs"><rect x="39" y="68" width="22" height="26" rx="6"></rect></g>
+        <g id="muscle-quads" class="corps-region" data-muscle="quads"><rect x="32" y="96" width="16" height="48" rx="7"></rect><rect x="52" y="96" width="16" height="48" rx="7"></rect></g>
+        <text x="50" y="158" text-anchor="middle" class="corps-region-label">AVANT</text>
+
+        <!-- Back figure -->
+        <circle cx="160" cy="16" r="13" fill="rgba(255,255,255,0.06)"></circle>
+        <g id="muscle-traps" class="corps-region" data-muscle="traps"><rect x="143" y="32" width="34" height="14" rx="6"></rect></g>
+        <g id="muscle-rear_delts" class="corps-region" data-muscle="rear_delts"><circle cx="136" cy="48" r="9"></circle><circle cx="184" cy="48" r="9"></circle></g>
+        <g id="muscle-lats" class="corps-region" data-muscle="lats"><rect x="132" y="58" width="14" height="30" rx="6"></rect><rect x="174" y="58" width="14" height="30" rx="6"></rect></g>
+        <g id="muscle-triceps" class="corps-region" data-muscle="triceps"><rect x="121" y="58" width="10" height="26" rx="5"></rect><rect x="189" y="58" width="10" height="26" rx="5"></rect></g>
+        <g id="muscle-lower_back" class="corps-region" data-muscle="lower_back"><rect x="149" y="88" width="22" height="18" rx="6"></rect></g>
+        <g id="muscle-glutes" class="corps-region" data-muscle="glutes"><rect x="140" y="106" width="17" height="20" rx="8"></rect><rect x="163" y="106" width="17" height="20" rx="8"></rect></g>
+        <g id="muscle-hamstrings" class="corps-region" data-muscle="hamstrings"><rect x="141" y="126" width="16" height="40" rx="7"></rect><rect x="163" y="126" width="16" height="40" rx="7"></rect></g>
+        <g id="muscle-calves" class="corps-region" data-muscle="calves"><rect x="141" y="168" width="13" height="32" rx="6"></rect><rect x="166" y="168" width="13" height="32" rx="6"></rect></g>
+        <text x="160" y="158" text-anchor="middle" class="corps-region-label">ARRIÈRE</text>
+      </svg>
+    </div>
+    <div id="corpsDetail" class="hidden">
+      <div class="po-sub-title" id="corpsDetailTitle">—</div>
+      <div id="corpsDetailList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Résumé du mois — reuses .po-stats-row/.po-stat-box, plus a calendar
+     heatmap for the current month, all derived from logsByDay(). -->
+<div class="wt-overlay" id="monthOverlay" aria-hidden="true">
+  <div class="wt-overlay-inner">
+    <div class="wt-overlay-h">
+      <button class="wt-back" id="monthBack" aria-label="Retour">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="wt-overlay-title">Résumé du mois</div>
+    </div>
+    <div class="po-stats-row" style="margin-bottom:8px;">
+      <div class="po-stat-box"><div class="po-stat-label">Séances</div><div class="po-stat-val" id="moStatSessions">—</div></div>
+      <div class="po-stat-box"><div class="po-stat-label">Séries</div><div class="po-stat-val" id="moStatSets">—</div></div>
+      <div class="po-stat-box"><div class="po-stat-label">Volume</div><div class="po-stat-val" id="moStatVol">—</div></div>
+    </div>
+    <div class="po-stats-row" style="margin-bottom:18px;">
+      <div class="po-stat-box"><div class="po-stat-label">Jours actifs</div><div class="po-stat-val" id="moStatActive">—</div></div>
+      <div class="po-stat-box"><div class="po-stat-label">Série actuelle</div><div class="po-stat-val" id="moStatStreak">—</div></div>
+      <div class="po-stat-box"><div class="po-stat-label">Plus longue série</div><div class="po-stat-val" id="moStatLongest">—</div></div>
+    </div>
+    <div class="po-sub-title">Exercice favori</div>
+    <div class="po-rx-card" style="margin-bottom:18px;"><div class="po-rx-headline" id="moStatFav">—</div></div>
+    <div class="po-sub-title">Calendrier</div>
+    <div class="mo-cal-grid" id="moCalGrid"></div>
+    <div class="wt-meta" id="moFoot" style="margin-top:14px;"></div>
   </div>
 </div>
 
@@ -1752,6 +1978,13 @@ img, video, canvas, svg { max-width: 100%; }
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
+    // Backfill fields added after this exercise was first saved, so old
+    // states (from before muscle groups / reminders existed) still work.
+    s.exercises.forEach(e => {
+      if (!Array.isArray(e.primaryMuscles)) e.primaryMuscles = [];
+      if (!Array.isArray(e.secondaryMuscles)) e.secondaryMuscles = [];
+      if (typeof e.reminderDays !== 'number' || !(e.reminderDays > 0)) e.reminderDays = 10;
+    });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
@@ -2094,11 +2327,260 @@ img, video, canvas, svg { max-width: 100%; }
     row.dataset.value = String(active);
   }
 
+  // ============================================================
+  // WEEKLY HEATMAP + FLAMES ("Régularité") + REMINDERS
+  // Both derived at render time from state.logs / state.exercises —
+  // no separate cache, same philosophy as logsByDay() below.
+  // ============================================================
+  // Monday-start ISO week key, e.g. "2026-W35".
+  function isoWeekKey(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+  }
+  // Interpolates rgba(255,255,255,~0) → var(--good) by t (0..1). Shared
+  // by the per-exercise weekly heatmap, the monthly calendar heatmap,
+  // and the Corps muscle-volume fills.
+  function heatFillColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    const from = [255, 255, 255], to = [110, 231, 183];
+    const r = Math.round(from[0] + (to[0] - from[0]) * t);
+    const g = Math.round(from[1] + (to[1] - from[1]) * t);
+    const b = Math.round(from[2] + (to[2] - from[2]) * t);
+    const a = 0.10 + t * 0.80;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a.toFixed(2) + ')';
+  }
+  function lastNIsoWeeks(n) {
+    const weeks = [];
+    const now = new Date();
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i * 7);
+      weeks.push(isoWeekKey(d));
+    }
+    return weeks;
+  }
+  function renderRegularity() {
+    const row = $('exHeatRow');
+    const flameWrap = $('exFlameStreak');
+    if (!row) return;
+    const ex = getCurrentEx();
+    if (!ex) { row.innerHTML = ''; flameWrap.classList.add('hidden'); return; }
+    const logs = state.logs[ex.id] || [];
+    const weeks = lastNIsoWeeks(12);
+    const counts = {};
+    logs.forEach(l => {
+      const wk = isoWeekKey(new Date(l.date));
+      counts[wk] = (counts[wk] || 0) + 1;
+    });
+    const max = Math.max.apply(null, weeks.map(w => counts[w] || 0)) || 1;
+    row.innerHTML = weeks.map(w => {
+      const c = counts[w] || 0;
+      const bg = c === 0 ? 'var(--border)' : heatFillColor(c / max);
+      return '<div class="po-heat-cell" style="background:' + bg + '" title="' + w + ' · ' + c + ' série' + (c === 1 ? '' : 's') + '"></div>';
+    }).join('');
+    let streak = 0;
+    for (let i = weeks.length - 1; i >= 0; i--) {
+      if (counts[weeks[i]] > 0) streak++; else break;
+    }
+    if (streak >= 2) {
+      $('exFlameStreakNum').textContent = streak + ' semaines de suite';
+      flameWrap.classList.remove('hidden');
+    } else {
+      flameWrap.classList.add('hidden');
+    }
+  }
+  function renderReminders() {
+    const wrap = $('remindersList');
+    if (!wrap) return;
+    const now = Date.now();
+    const items = state.exercises.map(ex => {
+      const logs = state.logs[ex.id] || [];
+      if (!logs.length) return null;
+      const last = logs[logs.length - 1];
+      const days = Math.floor((now - new Date(last.date).getTime()) / 86400000);
+      const reminderDays = ex.reminderDays || 10;
+      return days >= reminderDays ? { ex, days, reminderDays } : null;
+    }).filter(Boolean).sort((a, b) => b.days - a.days);
+    if (!items.length) {
+      wrap.innerHTML = '<div class="po-empty">Rien en retard.</div>';
+      return;
+    }
+    wrap.innerHTML = '<ul class="po-tw-list">' + items.map(x =>
+      '<li class="po-tw-row"><span class="po-tw-row-name">' + escape(x.ex.name) + '</span>'
+      + '<span class="po-tw-row-meta">' + x.days + ' j sans entraînement (rappel à ' + x.reminderDays + ' j)</span></li>'
+    ).join('') + '</ul>';
+  }
+
+  // ============================================================
+  // CORPS — weekly volume per muscle group, attributed from state.logs:
+  // primary muscles get the full weight×reps (or reps for bw exercises),
+  // secondary muscles get half. Scaled per-muscle against that muscle's
+  // own recent 8-week max so the color scale adapts to the user.
+  // ============================================================
+  function computeMuscleVolumes(weeksBack) {
+    weeksBack = weeksBack || 8;
+    const weekKeys = lastNIsoWeeks(weeksBack);
+    const currentWeek = weekKeys[weekKeys.length - 1];
+    const perWeekPerMuscle = {};
+    weekKeys.forEach(w => { perWeekPerMuscle[w] = {}; });
+    state.exercises.forEach(ex => {
+      const logs = state.logs[ex.id] || [];
+      logs.forEach(l => {
+        const wk = isoWeekKey(new Date(l.date));
+        if (!perWeekPerMuscle[wk]) return;
+        const vol = ex.bw ? (l.reps || 0) : (l.weight || 0) * (l.reps || 0);
+        (ex.primaryMuscles || []).forEach(m => {
+          perWeekPerMuscle[wk][m] = (perWeekPerMuscle[wk][m] || 0) + vol;
+        });
+        (ex.secondaryMuscles || []).forEach(m => {
+          perWeekPerMuscle[wk][m] = (perWeekPerMuscle[wk][m] || 0) + vol * 0.5;
+        });
+      });
+    });
+    const result = {};
+    MUSCLE_GROUPS.forEach(m => {
+      const weekVals = weekKeys.map(w => perWeekPerMuscle[w][m.id] || 0);
+      const max = Math.max.apply(null, weekVals);
+      const current = perWeekPerMuscle[currentWeek][m.id] || 0;
+      result[m.id] = { current: current, t: max > 0 ? current / max : 0 };
+    });
+    return { result, currentWeek };
+  }
+  function muscleContributors(muscleId) {
+    const wk = isoWeekKey(new Date());
+    const out = [];
+    state.exercises.forEach(ex => {
+      const isPrimary = (ex.primaryMuscles || []).includes(muscleId);
+      const isSecondary = (ex.secondaryMuscles || []).includes(muscleId);
+      if (!isPrimary && !isSecondary) return;
+      const logs = (state.logs[ex.id] || []).filter(l => isoWeekKey(new Date(l.date)) === wk);
+      if (!logs.length) return;
+      out.push({ ex, sets: logs.length, primary: isPrimary });
+    });
+    return out.sort((a, b) => b.sets - a.sets);
+  }
+  function renderCorps() {
+    const { result, currentWeek } = computeMuscleVolumes(8);
+    $('corpsWeekLabel').textContent = 'Semaine ' + currentWeek;
+    MUSCLE_GROUPS.forEach(m => {
+      const el = document.getElementById('muscle-' + m.id);
+      if (el) el.style.fill = heatFillColor(result[m.id].t);
+    });
+  }
+  function showMuscleDetail(muscleId) {
+    const label = (MUSCLE_GROUPS.find(m => m.id === muscleId) || {}).label || muscleId;
+    const contribs = muscleContributors(muscleId);
+    $('corpsDetailTitle').textContent = label + ' · cette semaine';
+    const list = $('corpsDetailList');
+    if (!contribs.length) {
+      list.innerHTML = '<div class="po-empty">Aucun exercice cette semaine.</div>';
+    } else {
+      list.innerHTML = contribs.map(c =>
+        '<div class="po-hist-row"><div class="po-hist-set">' + escape(c.ex.name) + '</div>'
+        + '<div class="po-hist-date">' + c.sets + ' série' + (c.sets === 1 ? '' : 's') + (c.primary ? '' : ' · secondaire') + '</div></div>'
+      ).join('');
+    }
+    $('corpsDetail').classList.remove('hidden');
+  }
+
+  // ============================================================
+  // RÉSUMÉ DU MOIS — reuses logsByDay()/summarizeDay() (defined below,
+  // but hoisted as function declarations so calling them here, before
+  // their point in the file, is safe — this only ever runs at click time).
+  // ============================================================
+  function monthStats() {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const all = logsByDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    let sessions = 0, sets = 0, vol = 0, activeDays = 0;
+    const exCounts = {};
+    const dayVolumes = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const daySets = all[dk];
+      if (daySets && daySets.length) {
+        activeDays++; sessions++;
+        const sum = summarizeDay(daySets);
+        sets += sum.totalSets; vol += sum.totalVol;
+        dayVolumes[d] = sum.totalVol;
+        daySets.forEach(({ ex }) => { exCounts[ex.id] = (exCounts[ex.id] || 0) + 1; });
+      } else {
+        dayVolumes[d] = 0;
+      }
+    }
+    let favId = null, favCount = 0;
+    Object.keys(exCounts).forEach(id => { if (exCounts[id] > favCount) { favCount = exCounts[id]; favId = id; } });
+    const favEx = favId ? state.exercises.find(e => e.id === favId) : null;
+
+    const dateSet = new Set(Object.keys(all));
+    const allDayKeys = Array.from(dateSet).sort();
+    let longest = 0, run = 0, prevDate = null;
+    allDayKeys.forEach(dk => {
+      const d = wtParseKey(dk);
+      run = (prevDate && (d - prevDate) === 86400000) ? run + 1 : 1;
+      if (run > longest) longest = run;
+      prevDate = d;
+    });
+    let current = 0;
+    let cursor = new Date();
+    if (!dateSet.has(wtDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+    while (dateSet.has(wtDateKey(cursor))) { current++; cursor.setDate(cursor.getDate() - 1); }
+
+    const lastMonthDate = new Date(y, m - 1, 1);
+    const ly = lastMonthDate.getFullYear(), lm = lastMonthDate.getMonth();
+    const lastDaysInMonth = new Date(ly, lm + 1, 0).getDate();
+    let lastVol = 0;
+    for (let d = 1; d <= lastDaysInMonth; d++) {
+      const dk = ly + '-' + String(lm + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      if (all[dk]) lastVol += summarizeDay(all[dk]).totalVol;
+    }
+    return { sessions, sets, vol, activeDays, current, longest, favEx, dayVolumes, daysInMonth, lastVol };
+  }
+  function renderMonthSummary() {
+    const s = monthStats();
+    const u = state.units;
+    $('moStatSessions').textContent = s.sessions;
+    $('moStatSets').textContent = s.sets;
+    $('moStatVol').innerHTML = Math.round(s.vol).toLocaleString() + '<span class="po-unit">' + u + '</span>';
+    $('moStatActive').textContent = s.activeDays + '/' + s.daysInMonth;
+    $('moStatStreak').textContent = s.current;
+    $('moStatLongest').textContent = s.longest;
+    $('moStatFav').textContent = s.favEx ? s.favEx.name : '—';
+
+    const maxVol = Math.max.apply(null, Object.values(s.dayVolumes)) || 1;
+    let html = '';
+    for (let d = 1; d <= s.daysInMonth; d++) {
+      const v = s.dayVolumes[d] || 0;
+      const bg = v === 0 ? 'var(--border)' : heatFillColor(v / maxVol);
+      html += '<div class="po-heat-cell" style="background:' + bg + '" title="' + d + ' · ' + Math.round(v).toLocaleString() + ' ' + u + '"></div>';
+    }
+    $('moCalGrid').innerHTML = html;
+
+    let footTxt;
+    if (s.lastVol <= 0 && s.vol <= 0) {
+      footTxt = 'Aucune donnée de volume pour l\'instant.';
+    } else if (s.lastVol <= 0) {
+      footTxt = 'Premier mois avec du volume enregistré — ' + Math.round(s.vol).toLocaleString() + ' ' + u + '.';
+    } else {
+      const pct = Math.round(((s.vol - s.lastVol) / s.lastVol) * 100);
+      footTxt = (s.vol >= s.lastVol)
+        ? 'Volume en hausse de ' + pct + '% par rapport au mois dernier.'
+        : 'Volume en baisse de ' + Math.abs(pct) + '% par rapport au mois dernier.';
+    }
+    $('moFoot').textContent = footTxt;
+  }
+
   function renderAll() {
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
     renderRepsRow();
     renderRx(); renderStats(); renderSparkline(); renderHistory();
+    renderRegularity();
+    renderReminders();
     renderTodaysWorkout();
     renderPastWorkouts();
     // Pre-fill weight input with last logged weight (or starting weight)
@@ -2266,6 +2748,34 @@ img, video, canvas, svg { max-width: 100%; }
     toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
   });
 
+  // Corps overlay open/close + click-a-muscle detail
+  $('corpsBtn').addEventListener('click', () => {
+    renderCorps();
+    $('corpsDetail').classList.add('hidden');
+    $('corpsOverlay').classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  });
+  $('corpsBack').addEventListener('click', () => {
+    $('corpsOverlay').classList.remove('is-open');
+    document.body.style.overflow = '';
+  });
+  $('corpsSvg').addEventListener('click', (e) => {
+    const g = e.target.closest('[data-muscle]');
+    if (!g) return;
+    showMuscleDetail(g.dataset.muscle);
+  });
+
+  // Résumé du mois overlay open/close
+  $('monthBtn').addEventListener('click', () => {
+    renderMonthSummary();
+    $('monthOverlay').classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  });
+  $('monthBack').addEventListener('click', () => {
+    $('monthOverlay').classList.remove('is-open');
+    document.body.style.overflow = '';
+  });
+
   // ============================================================
   // EVENT WIRING
   // ============================================================
@@ -2333,6 +2843,21 @@ img, video, canvas, svg { max-width: 100%; }
   // ============================================================
   let editingExId = null;
   let modalGym = null, modalDay = null;
+  let modalPrimary = [], modalSecondary = [];
+  function renderMuscleGrid(containerId, selectedArr) {
+    const el = $(containerId);
+    el.innerHTML = MUSCLE_GROUPS.map(m =>
+      '<button type="button" class="po-muscle-chip' + (selectedArr.includes(m.id) ? ' active' : '') + '" data-m="' + m.id + '">' + escape(m.label) + '</button>'
+    ).join('');
+    el.querySelectorAll('.po-muscle-chip').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = b.dataset.m;
+        const i = selectedArr.indexOf(id);
+        if (i === -1) selectedArr.push(id); else selectedArr.splice(i, 1);
+        b.classList.toggle('active');
+      });
+    });
+  }
   function renderModalSegs() {
     $('exGymSeg').innerHTML = state.gyms.map(g =>
       '<button data-gym="' + g.id + '" class="' + (modalGym === g.id ? 'active' : '') + '">' + escape(g.name) + '</button>'
@@ -2368,6 +2893,9 @@ img, video, canvas, svg { max-width: 100%; }
       $('exRepMin').value = ex.repMin;
       $('exRepMax').value = ex.repMax;
       $('exStep').value = ex.step;
+      modalPrimary = (ex.primaryMuscles || []).slice();
+      modalSecondary = (ex.secondaryMuscles || []).slice();
+      $('exReminderDays').value = ex.reminderDays || 10;
     } else {
       $('exName').value = '';
       modalGym = state.filterGym;
@@ -2377,8 +2905,13 @@ img, video, canvas, svg { max-width: 100%; }
       $('exRepMin').value = 6;
       $('exRepMax').value = 8;
       $('exStep').value = 2.5;
+      modalPrimary = [];
+      modalSecondary = [];
+      $('exReminderDays').value = 10;
     }
     renderModalSegs();
+    renderMuscleGrid('exPrimaryMuscles', modalPrimary);
+    renderMuscleGrid('exSecondaryMuscles', modalSecondary);
     toggleBwFields();
     $('exModalBg').classList.add('show');
     setTimeout(() => $('exName').focus(), 60);
@@ -2408,7 +2941,10 @@ img, video, canvas, svg { max-width: 100%; }
       bw: isBw,
       startWeight: isBw ? 0 : (parseFloat($('exStartWeight').value) || 0),
       repMin, repMax,
-      step: isBw ? 1 : (parseFloat($('exStep').value) || 2.5)
+      step: isBw ? 1 : (parseFloat($('exStep').value) || 2.5),
+      primaryMuscles: modalPrimary.slice(),
+      secondaryMuscles: modalSecondary.slice(),
+      reminderDays: parseInt($('exReminderDays').value, 10) || 10
     };
     if (editingExId) {
       const ex = state.exercises.find(e => e.id === editingExId);
@@ -3321,6 +3857,231 @@ img, video, canvas, svg { max-width: 100%; }
   $('wtCmpSideB').addEventListener('click', cycleCompareTarget);
 
   // ============================================================
+  // SCAN-TO-LOG — reads a workout screenshot/photo directly from the
+  // browser using the SAME Anthropic key + client-side call already
+  // used by the Nova widget below (stored in localStorage under
+  // nova_lite_api_key). No server endpoint — this app's AI calls are
+  // all client-side, unlike the dashboard's finance.html.
+  // ============================================================
+  const SCAN_TOOL = {
+    name: 'read_workout_image',
+    description: "Extract logged sets from a photo of a workout — an app screenshot, a smartwatch/tracker screen, a handwritten log, or a photo of loaded plates with a caption.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        readable: { type: 'boolean', description: 'false ONLY if no exercise/set data is visible in the image' },
+        exerciseName: { type: 'string' },
+        sets: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              reps: { type: 'number' },
+              weight: { type: 'number' },
+              failureAtRep: { type: 'number' }
+            },
+            required: ['reps']
+          }
+        },
+        date: { type: 'string', description: 'YYYY-MM-DD if visible, else empty string' }
+      },
+      required: ['readable']
+    }
+  };
+  let scanDraftSets = [];
+
+  function scanDownscale(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1568;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+            else { w = Math.round(w * (maxDim / h)); h = maxDim; }
+          }
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  function scanShowBusy() {
+    $('scanZoneEmpty').classList.add('hidden');
+    $('scanZoneError').classList.add('hidden');
+    $('scanZoneBusy').classList.remove('hidden');
+  }
+  function scanShowError(msg) {
+    $('scanZoneBusy').classList.add('hidden');
+    $('scanZoneEmpty').classList.add('hidden');
+    const el = $('scanZoneError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function scanShowIdle() {
+    $('scanZoneBusy').classList.add('hidden');
+    $('scanZoneError').classList.add('hidden');
+    $('scanZoneEmpty').classList.remove('hidden');
+  }
+  function scanReset() { scanShowIdle(); $('scanFile').value = ''; scanDraftSets = []; }
+
+  async function scanHandleFile(file) {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) return;
+    scanShowBusy();
+    let key = '';
+    try { key = localStorage.getItem('nova_lite_api_key') || ''; } catch (e) {}
+    if (!key) {
+      scanShowError("Collez d'abord votre clé API Anthropic sur la page Nova (bouton en haut à droite) pour utiliser le scan.");
+      return;
+    }
+    try {
+      const b64 = await scanDownscale(file);
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-8',
+          max_tokens: 1024,
+          system: "Tu lis des photos de séances de sport : captures d'écran d'applications de fitness, écrans de montre connectée, journaux manuscrits, ou une photo de disques chargés avec une légende. Extrait les séries loguées (poids, répétitions, série d'échec le cas échéant). L'unité de poids probable est \"" + state.units + "\". Ne refuse pas seulement parce que ce n'est pas un export propre d'application — fais de ton mieux avec ce qui est visible. Mets readable à false UNIQUEMENT si vraiment aucune donnée d'exercice/série n'est visible.",
+          tool_choice: { type: 'tool', name: 'read_workout_image' },
+          tools: [SCAN_TOOL],
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+              { type: 'text', text: 'Lis cette image et extrait les séries.' }
+            ]
+          }]
+        })
+      });
+      const json = await res.json();
+      if (json.error) { scanShowError(json.error.message || 'Erreur API.'); return; }
+      const toolBlock = (json.content || []).find(b => b.type === 'tool_use');
+      if (!toolBlock) { scanShowError("Réponse inattendue de l'IA."); return; }
+      const data = toolBlock.input || {};
+      if (!data.readable) { scanShowError('Aucune donnée de séance lisible sur cette image.'); return; }
+      scanOpenConfirm(data);
+    } catch (e) {
+      scanShowError('Échec de la lecture — vérifiez votre connexion et votre clé.');
+    }
+  }
+  function scanOpenConfirm(data) {
+    scanShowIdle();
+    scanDraftSets = (Array.isArray(data.sets) ? data.sets : []).map(s => ({
+      weight: (s.weight == null || s.weight === '') ? 0 : Number(s.weight),
+      reps: Number(s.reps) || 0,
+      failureAtRep: (s.failureAtRep == null || s.failureAtRep === '') ? null : Number(s.failureAtRep)
+    }));
+    if (!scanDraftSets.length) scanDraftSets.push({ weight: 0, reps: 0, failureAtRep: null });
+    $('scanExName').value = data.exerciseName || '';
+    $('scanExList').innerHTML = state.exercises.map(e => '<option value="' + escape(e.name) + '">').join('');
+    scanRenderSets();
+    scanUpdateLastSetCompare();
+    $('scanConfirmBg').classList.add('show');
+  }
+  function scanRenderSets() {
+    const wrap = $('scanSetsList');
+    wrap.innerHTML = scanDraftSets.map((s, i) =>
+      '<div class="scan-set-row" data-i="' + i + '">'
+      + '<input type="number" class="ss-weight" placeholder="' + state.units + '" step="0.5" value="' + (s.weight || '') + '">'
+      + '<input type="number" class="ss-reps" placeholder="reps" value="' + (s.reps || '') + '">'
+      + '<input type="number" class="ss-fail" placeholder="échec à" value="' + (s.failureAtRep == null ? '' : s.failureAtRep) + '">'
+      + '<button type="button" class="po-hist-del ss-del" aria-label="Supprimer">×</button>'
+      + '</div>'
+    ).join('');
+    wrap.querySelectorAll('.scan-set-row').forEach(row => {
+      const i = parseInt(row.dataset.i, 10);
+      row.querySelector('.ss-weight').addEventListener('input', e => { scanDraftSets[i].weight = parseFloat(e.target.value) || 0; });
+      row.querySelector('.ss-reps').addEventListener('input', e => { scanDraftSets[i].reps = parseInt(e.target.value, 10) || 0; });
+      row.querySelector('.ss-fail').addEventListener('input', e => { scanDraftSets[i].failureAtRep = e.target.value === '' ? null : (parseInt(e.target.value, 10) || null); });
+      row.querySelector('.ss-del').addEventListener('click', () => { scanDraftSets.splice(i, 1); scanRenderSets(); });
+    });
+  }
+  function scanUpdateLastSetCompare() {
+    const name = $('scanExName').value.trim().toLowerCase();
+    const match = name ? state.exercises.find(e => e.name.trim().toLowerCase() === name) : null;
+    const wrap = $('scanLastSetCompare');
+    if (!match) { wrap.style.display = 'none'; return; }
+    const logs = state.logs[match.id] || [];
+    if (!logs.length) { wrap.style.display = 'none'; return; }
+    const last = logs[logs.length - 1];
+    $('scanLastSetValue').textContent = match.bw ? (last.reps + ' répétitions') : (last.weight + state.units + ' × ' + last.reps);
+    wrap.style.display = 'flex';
+  }
+
+  const scanZoneEl = $('scanZone');
+  scanZoneEl.addEventListener('click', () => $('scanFile').click());
+  $('scanFile').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) scanHandleFile(f);
+    e.target.value = '';
+  });
+  scanZoneEl.addEventListener('dragover', (e) => { e.preventDefault(); scanZoneEl.classList.add('drag-over'); });
+  scanZoneEl.addEventListener('dragleave', () => scanZoneEl.classList.remove('drag-over'));
+  scanZoneEl.addEventListener('drop', (e) => {
+    e.preventDefault(); scanZoneEl.classList.remove('drag-over');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) scanHandleFile(f);
+  });
+  document.addEventListener('paste', (e) => {
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const item of items) {
+      if (item.type.indexOf('image/') === 0) {
+        const f = item.getAsFile();
+        if (f) scanHandleFile(f);
+        break;
+      }
+    }
+  });
+  $('scanExName').addEventListener('input', scanUpdateLastSetCompare);
+  $('scanAddSetBtn').addEventListener('click', () => { scanDraftSets.push({ weight: 0, reps: 0, failureAtRep: null }); scanRenderSets(); });
+  $('scanDiscardBtn').addEventListener('click', () => {
+    $('scanConfirmBg').classList.remove('show');
+    scanReset();
+  });
+  $('scanApplyBtn').addEventListener('click', () => {
+    const name = $('scanExName').value.trim();
+    if (!name) { alert("Le nom de l'exercice est requis."); return; }
+    let ex = state.exercises.find(e => e.name.trim().toLowerCase() === name.toLowerCase());
+    if (!ex) {
+      ex = {
+        id: uid(), name: name, gym: state.filterGym, day: state.filterDay,
+        bw: false, startWeight: (scanDraftSets[0] && scanDraftSets[0].weight) || 0,
+        repMin: 6, repMax: 8, step: 2.5,
+        primaryMuscles: [], secondaryMuscles: [], reminderDays: 10
+      };
+      state.exercises.push(ex);
+    }
+    const dateIso = new Date().toISOString();
+    const arr = state.logs[ex.id] || [];
+    scanDraftSets.forEach(s => {
+      if (!s.reps) return;
+      arr.push({ weight: ex.bw ? 0 : (s.weight || 0), reps: s.reps, date: dateIso });
+    });
+    state.logs[ex.id] = arr;
+    state.currentEx = ex.id;
+    saveState();
+    $('scanConfirmBg').classList.remove('show');
+    scanReset();
+    renderAll();
+  });
+
+  // ============================================================
   // BOOT
   // ============================================================
   renderAll();
@@ -3672,6 +4433,33 @@ img, video, canvas, svg { max-width: 100%; }
     if (v && typeof v==='object'){ const o={}; for(const k in v){ if(/img|photo|image|data|base64|url|thumb/i.test(k)) continue; o[k]=sanitize(v[k],depth+1); } return o; }
     return v;
   }
+  // Monday-start ISO week key — mirrors the main app's isoWeekKey() so
+  // Nova's neglected-muscle / overload commentary matches the Régularité
+  // heatmap the user sees on the exercise card.
+  function isoWeekKeyNv(date){
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2,'0');
+  }
+  function exerciseSummaryForNova(){
+    const raw = readLS('po_coach_v1', null);
+    if (!raw || !Array.isArray(raw.exercises)) return [];
+    const weeks = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--){ const d = new Date(now); d.setDate(d.getDate()-i*7); weeks.push(isoWeekKeyNv(d)); }
+    return raw.exercises.map(ex => {
+      const logs = (raw.logs && raw.logs[ex.id]) || [];
+      const last3 = logs.slice(-3).map(l => ({ date: (l.date||'').slice(0,10), weight: l.weight, reps: l.reps }));
+      const counts = {};
+      logs.forEach(l => { const wk = isoWeekKeyNv(new Date(l.date)); counts[wk] = (counts[wk]||0)+1; });
+      let streak = 0;
+      for (let i = weeks.length - 1; i >= 0; i--){ if (counts[weeks[i]] > 0) streak++; else break; }
+      return { name: ex.name, primaryMuscles: ex.primaryMuscles || [], last3, weeklyStreak: streak };
+    });
+  }
   function gymContext(){
     const prof = (readLS('po_water_v1', {}) || {}).profile || {};
     const photosRaw = readLS('po_coach_photos', []) || [];
@@ -3683,6 +4471,7 @@ img, video, canvas, svg { max-width: 100%; }
       progressPhotos: { count: photos.length, timeline: photos.slice(-30) },
       workouts: sanitize(readLS('po_coach_v1', null), 0),
       workoutsDone: sanitize(readLS('po_coach_workout_done', null), 0),
+      exercises: exerciseSummaryForNova(),
     };
     let s = JSON.stringify(ctx);
     if (s.length > 80000){ ctx.workouts = '[too large — summarize from weightLog + photos]'; s = JSON.stringify(ctx); }
