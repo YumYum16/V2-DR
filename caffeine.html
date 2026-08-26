@@ -150,6 +150,19 @@ body::after {
 .result-mg { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: #E7C690; font-variant-numeric: tabular-nums; }
 .result-mg small { color: var(--text-tertiary); font-weight: 600; }
 .results-empty { font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 10px 2px; }
+.repeat-yesterday { margin-bottom: 14px; }
+.repeat-yesterday.hidden { display: none; }
+.ry-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+.ry-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ry-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text-secondary); border-radius: 999px; padding: 8px 14px;
+  font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ry-chip:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.ry-chip b { font-weight: 700; color: var(--caf); }
 .custom-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
 .custom-row .gm-input { flex: 1; min-width: 0; }
 .custom-row .mg-input { width: 92px; flex: none; }
@@ -260,6 +273,10 @@ body::after {
   <div class="section">
     <div class="section-title">Ajouter une boisson</div>
     <div class="gm-card">
+      <div class="repeat-yesterday hidden" id="repeatYesterdayWrap">
+        <div class="ry-label">Répéter hier</div>
+        <div class="ry-chips" id="ryChips"></div>
+      </div>
       <input class="gm-input" id="search" type="text" placeholder="Rechercher une boisson… (café, monster, matcha…)" autocomplete="off">
       <ul class="results" id="results"></ul>
       <div class="custom-row">
@@ -443,6 +460,7 @@ body::after {
 
   function todaysLogs(){ const s=startOfToday(); return logs.filter(l=>l.ts>=s); }
   function dailyTotal(){ return Math.round(todaysLogs().reduce((a,l)=>a+l.mg,0)); }
+  function yesterdaysLogs(){ const e=startOfToday(); const s=e-86400000; return logs.filter(l=>l.ts>=s && l.ts<e); }
 
   function renderRing(){
     const t = scrubT!=null ? scrubT : nowHour();
@@ -581,7 +599,22 @@ body::after {
     });
   }
 
-  function renderAll(){ renderRing(); renderChart(); renderPlan(); renderDaily(); renderLog(); }
+  function renderRepeatYesterday(){
+    const wrap=$('repeatYesterdayWrap'), chips=$('ryChips');
+    const yl=yesterdaysLogs().slice().sort((a,b)=>b.ts-a.ts);
+    const seen=new Set(); const uniq=[];
+    yl.forEach(l=>{ if(seen.has(l.n)) return; seen.add(l.n); uniq.push(l); });
+    if(uniq.length===0){ wrap.classList.add('hidden'); chips.innerHTML=''; return; }
+    wrap.classList.remove('hidden');
+    chips.innerHTML=uniq.slice(0,8).map((l,i)=>
+      '<button type="button" class="ry-chip" data-i="'+i+'">'+(l.e||'☕')+' '+escapeHtml(l.n)+' <b>'+l.mg+' mg</b></button>'
+    ).join('');
+    chips.querySelectorAll('.ry-chip').forEach((btn,i)=>{
+      btn.addEventListener('click', ()=>{ const l=uniq[i]; logDrink({ n:l.n, mg:l.mg, e:l.e }); });
+    });
+  }
+
+  function renderAll(){ renderRing(); renderChart(); renderPlan(); renderDaily(); renderLog(); renderRepeatYesterday(); }
 
   /* ============ Logging / search / custom ============ */
   function logDrink(item){ logs.push({id:'c'+Date.now()+Math.floor(Math.random()*1000), n:item.n, mg:Math.round(item.mg), e:item.e||'☕', ts:Date.now()}); saveJSON(LOGS_KEY,logs); renderAll(); }

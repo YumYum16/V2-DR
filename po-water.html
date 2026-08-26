@@ -221,6 +221,18 @@ html, body {
 }
 .water-helper.good { color: var(--good); font-style: normal; }
 
+.repeat-yesterday-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--text-2); border-radius: 10px;
+  padding: 11px 14px; cursor: pointer; margin-top: 10px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent;
+}
+.repeat-yesterday-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-1); }
+.repeat-yesterday-btn.hidden { display: none; }
+
 /* ----- Why this target? collapsible ----- */
 .why-toggle {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
@@ -506,6 +518,10 @@ html, body {
     </div>
     <div class="water-helper" id="waterHelper">Commence la journée — le premier arrive.</div>
 
+    <button class="repeat-yesterday-btn hidden" id="repeatYesterdayBtn" type="button">
+      <span aria-hidden="true">↺</span><span id="repeatYesterdayLabel">Répéter hier</span>
+    </button>
+
     <button class="why-toggle" id="whyToggle" type="button" aria-expanded="false">
       <span>Pourquoi cet objectif ?</span>
       <span class="why-arrow">▾</span>
@@ -719,6 +735,8 @@ html, body {
   }
   function todayKey() { return dateKey(new Date()); }
   function todayCount() { return state.logs[todayKey()] || 0; }
+  function yesterdayKey() { const d = new Date(); d.setDate(d.getDate() - 1); return dateKey(d); }
+  function yesterdayCount() { return state.logs[yesterdayKey()] || 0; }
   function setTodayCount(n) {
     const k = todayKey();
     if (n <= 0) delete state.logs[k];
@@ -828,6 +846,15 @@ html, body {
     // Disable minus when at zero
     $('waterMinusBtn').disabled = count <= 0;
 
+    // "Répéter hier" — quick one-tap re-log of yesterday's total, hidden
+    // once there's nothing to repeat.
+    const yCount = yesterdayCount();
+    const repeatBtn = $('repeatYesterdayBtn');
+    repeatBtn.classList.toggle('hidden', yCount <= 0);
+    if (yCount > 0) {
+      $('repeatYesterdayLabel').textContent = 'Répéter hier (' + yCount + ' ' + (yCount === 1 ? unitLabelSingular() : unitLabelPlural()) + ')';
+    }
+
     renderWhy(calc, targetUnits);
     renderHistory();
     renderSparkline(targetUnits);
@@ -919,6 +946,12 @@ html, body {
   });
   $('waterMinusBtn').addEventListener('click', () => {
     setTodayCount(Math.max(0, todayCount() - 1));
+    renderWater();
+  });
+  $('repeatYesterdayBtn').addEventListener('click', () => {
+    const y = yesterdayCount();
+    if (y <= 0) return;
+    setTodayCount(todayCount() + y);
     renderWater();
   });
 
