@@ -330,6 +330,23 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 13px; color: var(--text-3); margin-top: 10px;
 }
 
+/* ----- One card per exercise, each with its own inline log form ----- */
+.po-ex-card {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.po-ex-card:last-child { margin-bottom: 0; }
+.po-ex-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 10px;
+}
+.po-ex-card-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.po-ex-card-edit.po-btn-icon { width: 34px; height: 34px; }
+.po-ex-card .po-bw-banner, .po-ex-card .po-last-set { margin-bottom: 10px; }
+
 /* ----- Bodyweight banner ----- */
 .po-bw-banner {
   background: rgba(255,255,255,0.04);
@@ -1395,55 +1412,19 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
-    <!-- Exercise -->
+    <!-- Exercices du jour — one card per exercise assigned to the current
+         Salle/Jour filter (via its days[] on the add/edit modal), each
+         with its own inline log form. No more picking one exercise from
+         a dropdown before you can log anything. -->
     <div class="po-sub-section">
-      <div class="po-sub-title">Exercice</div>
-      <div class="po-exercise-bar">
-        <select class="po-ex-select" id="exSelect"></select>
+      <div class="po-sub-title" style="justify-content:space-between;">
+        <span>Exercices</span>
         <button class="po-btn-icon" id="addExBtn" title="Ajouter un exercice" aria-label="Ajouter">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
-        <button class="po-btn-icon" id="editExBtn" title="Modifier / supprimer" aria-label="Modifier">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-        </button>
       </div>
       <div class="po-no-ex" id="noExMsg" style="display:none">Aucun exercice ici pour l'instant. Touchez <strong>+</strong> pour en ajouter un.</div>
-    </div>
-
-    <!-- Log a set -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Enregistrer la meilleure série du jour</div>
-      <div class="po-bw-banner" id="bwBanner">Poids du corps — enregistre uniquement les répétitions</div>
-      <div class="po-last-set" id="lastSet">
-        <span class="po-last-label">Dernière fois</span>
-        <span class="po-last-value" id="lastSetValue"></span>
-        <span class="po-last-meta" id="lastSetMeta"></span>
-      </div>
-      <div class="po-log-grid" id="logGrid">
-        <div class="po-field" id="weightField">
-          <label id="weightLabel">Poids (kg)</label>
-          <div class="po-weight-row">
-            <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
-            <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
-            <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
-          </div>
-        </div>
-        <div class="po-field">
-          <label>Répétitions</label>
-          <div class="po-reps-row" id="repsRow" data-value="8">
-            <button type="button" class="po-reps-pill" data-v="4">4</button>
-            <button type="button" class="po-reps-pill" data-v="5">5</button>
-            <button type="button" class="po-reps-pill" data-v="6">6</button>
-            <button type="button" class="po-reps-pill" data-v="7">7</button>
-            <button type="button" class="po-reps-pill active" data-v="8">8</button>
-            <button type="button" class="po-reps-pill" data-v="9">9</button>
-            <button type="button" class="po-reps-pill" data-v="10">10</button>
-            <button type="button" class="po-reps-pill" data-v="11">11</button>
-            <button type="button" class="po-reps-pill" data-v="12">12</button>
-          </div>
-        </div>
-      </div>
-      <button class="po-btn-primary" id="logBtn">Enregistrer la série</button>
+      <div id="exList"></div>
     </div>
   </div>
 </div>
@@ -1635,14 +1616,7 @@ img, video, canvas, svg { max-width: 100%; }
     return state.exercises.filter(e =>
       (e.gym === state.filterGym || e.gym === 'both') && (e.days || []).includes(state.filterDay));
   }
-  function getCurrentEx() {
-    const f = getFiltered();
-    if (!f.length) return null;
-    let ex = f.find(e => e.id === state.currentEx);
-    if (!ex) { ex = f[0]; state.currentEx = ex.id; saveState(); }
-    return ex;
-  }
-  function getLogs() { return (state.logs[state.currentEx] || []).slice(); }
+  function getLogsFor(exId) { return (state.logs[exId] || []).slice(); }
 
   // ============================================================
   // RENDER
@@ -1655,69 +1629,103 @@ img, video, canvas, svg { max-width: 100%; }
       '<button class="po-seg-btn ' + (d.id === state.filterDay ? 'active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>'
     ).join('');
     $('gymSeg').querySelectorAll('.po-seg-btn').forEach(b => {
-      b.addEventListener('click', () => { state.filterGym = b.dataset.gym; state.currentEx = null; saveState(); renderAll(); });
+      b.addEventListener('click', () => { state.filterGym = b.dataset.gym; saveState(); renderAll(); });
     });
     $('daySeg').querySelectorAll('.po-seg-btn').forEach(b => {
       b.addEventListener('click', () => {
         state.filterDay = b.dataset.day;
-        state.currentEx = null;
         // User has now manually picked a day — stop auto-overriding to today's split.
         state._userPickedDay = true;
         saveState(); renderAll();
       });
     });
   }
-  function renderSelect() {
-    const sel = $('exSelect');
-    const f = getFiltered();
+
+  const EX_EDIT_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+
+  // One card per exercise matching the current Salle/Jour filter, each
+  // with its own inline weight/reps log form — no separate "pick an
+  // exercise first" step.
+  function exCardHtml(ex) {
+    const logs = getLogsFor(ex.id);
+    const last = logs.length ? logs[logs.length - 1] : null;
+    const repMin = Math.max(1, parseInt(ex.repMin, 10) || 1);
+    const repMax = Math.max(repMin, parseInt(ex.repMax, 10) || repMin);
+    const upper = Math.max(repMax + 2, repMin + 5);
+    const end = Math.min(upper, repMin + 15);
+    const active = repMax;
+    let repsHtml = '';
+    for (let i = repMin; i <= end; i++) {
+      repsHtml += '<button type="button" class="po-reps-pill' + (i === active ? ' active' : '') + '" data-v="' + i + '">' + i + '</button>';
+    }
+    const lastStr = last ? (ex.bw ? (last.reps + ' répétitions') : (last.weight + unit() + ' × ' + last.reps)) : null;
+    const wVal = last ? last.weight : (ex.startWeight || 0);
+    return '<div class="po-ex-card" data-ex-id="' + ex.id + '" data-active-reps="' + active + '">'
+      + '<div class="po-ex-card-head">'
+      +   '<span class="po-ex-card-name">' + escape(ex.name) + '</span>'
+      +   '<button type="button" class="po-btn-icon po-ex-card-edit" data-action="edit" title="Modifier / supprimer" aria-label="Modifier">' + EX_EDIT_ICON + '</button>'
+      + '</div>'
+      + (ex.bw ? '<div class="po-bw-banner show">Poids du corps — enregistre uniquement les répétitions</div>' : '')
+      + (lastStr ? '<div class="po-last-set show"><span class="po-last-label">Dernière fois</span><span class="po-last-value">' + lastStr + '</span></div>' : '')
+      + '<div class="po-log-grid' + (ex.bw ? ' po-bw-mode' : '') + '">'
+      +   (ex.bw ? '' :
+            '<div class="po-field"><label>Poids (' + unit() + ')</label><div class="po-weight-row">'
+            + '<button class="po-w-btn" type="button" data-action="wdown">−</button>'
+            + '<input type="number" class="po-ex-weight" step="0.5" inputmode="decimal" value="' + wVal + '">'
+            + '<button class="po-w-btn" type="button" data-action="wup">+</button>'
+            + '</div></div>')
+      +   '<div class="po-field"><label>Répétitions</label><div class="po-reps-row">' + repsHtml + '</div></div>'
+      + '</div>'
+      + '<button type="button" class="po-btn-primary" data-action="log">Enregistrer la série</button>'
+      + '</div>';
+  }
+  function renderExerciseList() {
+    const wrap = $('exList');
     const noMsg = $('noExMsg');
-    const editBtn = $('editExBtn');
+    if (!wrap) return;
+    const f = getFiltered();
     if (!f.length) {
-      sel.innerHTML = '<option>—</option>';
-      sel.disabled = true; editBtn.disabled = true;
-      noMsg.style.display = 'block'; state.currentEx = null;
+      wrap.innerHTML = '';
+      noMsg.style.display = 'block';
       return;
     }
-    sel.disabled = false; editBtn.disabled = false;
     noMsg.style.display = 'none';
-    if (!f.find(e => e.id === state.currentEx)) state.currentEx = f[0].id;
-    sel.innerHTML = f.map(e => {
-      const wLbl = e.bw ? ' · PDC' : (e.startWeight ? ' · ' + e.startWeight + unit() : '');
-      const sh = e.gym === 'both' ? ' ★' : '';
-      return '<option value="' + e.id + '"' + (e.id === state.currentEx ? ' selected' : '') + '>' + escape(e.name) + wLbl + sh + '</option>';
-    }).join('');
-  }
-  function renderForm() {
-    const ex = getCurrentEx();
-    const banner = $('bwBanner');
-    const wField = $('weightField');
-    const grid = $('logGrid');
-    $('weightLabel').textContent = 'Poids (' + unit() + ')';
-    if (ex && ex.bw) {
-      banner.classList.add('show');
-      wField.style.display = 'none';
-      grid.classList.add('po-bw-mode');
-    } else {
-      banner.classList.remove('show');
-      wField.style.display = '';
-      grid.classList.remove('po-bw-mode');
-    }
-  }
-  function renderLastSet() {
-    const wrap = $('lastSet');
-    const v = $('lastSetValue');
-    const m = $('lastSetMeta');
-    const ex = getCurrentEx();
-    const logs = ex ? getLogs() : [];
-    if (!ex || !logs.length) { wrap.classList.remove('show'); return; }
-    const last = logs[logs.length - 1];
-    const setStr = ex.bw ? (last.reps + ' répétitions') : (last.weight + unit() + ' × ' + last.reps);
-    const d = new Date(last.date);
-    const da = Math.floor((Date.now() - d.getTime()) / 86400000);
-    const ago = da === 0 ? 'aujourd\'hui' : da === 1 ? 'hier' : 'il y a ' + da + ' jours';
-    v.textContent = setStr;
-    m.textContent = ago;
-    wrap.classList.add('show');
+    wrap.innerHTML = f.map(exCardHtml).join('');
+    wrap.querySelectorAll('.po-ex-card').forEach(card => {
+      const exId = card.dataset.exId;
+      const ex = state.exercises.find(e => e.id === exId);
+      if (!ex) return;
+      card.querySelectorAll('.po-reps-pill').forEach(p => {
+        p.addEventListener('click', () => {
+          card.querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          card.dataset.activeReps = p.dataset.v;
+        });
+      });
+      const wInput = card.querySelector('.po-ex-weight');
+      const wdown = card.querySelector('[data-action="wdown"]');
+      const wup = card.querySelector('[data-action="wup"]');
+      if (wdown) wdown.addEventListener('click', () => {
+        const w = parseFloat(wInput.value) || 0;
+        wInput.value = Math.max(0, w - (ex.step || 2.5));
+      });
+      if (wup) wup.addEventListener('click', () => {
+        const w = parseFloat(wInput.value) || 0;
+        wInput.value = w + (ex.step || 2.5);
+      });
+      card.querySelector('[data-action="edit"]').addEventListener('click', () => openExModal('edit', ex));
+      card.querySelector('[data-action="log"]').addEventListener('click', () => {
+        const reps = parseInt(card.dataset.activeReps, 10) || 0;
+        if (reps <= 0) { alert('Choisissez un nombre de répétitions.'); return; }
+        const w = ex.bw ? 0 : (parseFloat(wInput && wInput.value) || 0);
+        if (!ex.bw && w <= 0) { alert('Entrez un poids.'); return; }
+        const arr = state.logs[ex.id] || [];
+        arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
+        state.logs[ex.id] = arr;
+        saveState(); renderAll();
+        if (typeof wtRender === 'function') wtRender();
+      });
+    });
   }
   // Compute today's split from state.splitRotation + state.splitAnchor.
   // Returns the rotation entry name (e.g. "Push" or "Rest") AND the index.
@@ -1752,39 +1760,6 @@ img, video, canvas, svg { max-width: 100%; }
     const splitEl = $('dayPillSplit');
     splitEl.textContent = splitLabel(split.name);
     splitEl.classList.toggle('is-rest', isRestName(split.name));
-  }
-
-  // Build the rep buttons based on the current exercise's repMin/repMax.
-  // Always spans repMin → repMax + 2 (a small buffer for over-performing
-  // sets that trigger the upgrade signal), capped at 16 buttons total so
-  // wide ranges don't break the mobile layout.
-  function renderRepsRow() {
-    const row = document.getElementById('repsRow');
-    if (!row) return;
-    const ex = getCurrentEx();
-    let repMin, repMax;
-    if (ex) {
-      repMin = Math.max(1, parseInt(ex.repMin, 10) || 1);
-      repMax = Math.max(repMin, parseInt(ex.repMax, 10) || repMin);
-    } else {
-      repMin = 4; repMax = 12;
-    }
-    const upper = Math.max(repMax + 2, repMin + 5);
-    const end = Math.min(upper, repMin + 15);
-
-    // Preserve the previously-selected rep if it still fits in the new
-    // range; otherwise default to the target (repMax).
-    const prev = parseInt(row.dataset.value, 10);
-    const active = (prev >= repMin && prev <= end) ? prev : repMax;
-
-    let html = '';
-    for (let i = repMin; i <= end; i++) {
-      html += '<button type="button" class="po-reps-pill' +
-        (i === active ? ' active' : '') +
-        '" data-v="' + i + '">' + i + '</button>';
-    }
-    row.innerHTML = html;
-    row.dataset.value = String(active);
   }
 
   // ============================================================
@@ -1832,16 +1807,9 @@ img, video, canvas, svg { max-width: 100%; }
 
   function renderAll() {
     renderDayPill();
-    renderFilters(); renderSelect(); renderForm(); renderLastSet();
-    renderRepsRow();
+    renderFilters();
+    renderExerciseList();
     renderGymHeatmap();
-    // Pre-fill weight input with last logged weight (or starting weight)
-    const ex = getCurrentEx();
-    if (ex && !ex.bw) {
-      const logs = getLogs();
-      const w = logs.length ? logs[logs.length - 1].weight : (ex.startWeight || 0);
-      $('weightInput').value = w;
-    }
   }
 
   // ============================================================
@@ -1878,49 +1846,6 @@ img, video, canvas, svg { max-width: 100%; }
     const match = state.days.find(d => d.name.toLowerCase() === s.name.toLowerCase());
     if (match) state.filterDay = match.id;
   })();
-
-  $('exSelect').addEventListener('change', e => {
-    state.currentEx = e.target.value; saveState(); renderAll();
-  });
-  $('weightDownBtn').addEventListener('click', () => {
-    const ex = getCurrentEx(); if (!ex || ex.bw) return;
-    const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = Math.max(0, w - (ex.step || 2.5));
-  });
-  $('weightUpBtn').addEventListener('click', () => {
-    const ex = getCurrentEx(); if (!ex || ex.bw) return;
-    const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = w + (ex.step || 2.5);
-  });
-  // Delegated click handler — reps row is regenerated per exercise via
-  // renderRepsRow(), so we listen on the container rather than the
-  // individual buttons.
-  $('repsRow').addEventListener('click', (e) => {
-    const p = e.target.closest('.po-reps-pill');
-    if (!p) return;
-    $('repsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
-    p.classList.add('active');
-    $('repsRow').dataset.value = p.dataset.v;
-  });
-  $('logBtn').addEventListener('click', () => {
-    const ex = getCurrentEx();
-    if (!ex) return;
-    const reps = parseInt($('repsRow').dataset.value, 10) || 0;
-    if (reps <= 0) { alert('Choisissez un nombre de répétitions.'); return; }
-    const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
-    if (!ex.bw && w <= 0) { alert('Entrez un poids.'); return; }
-    const arr = state.logs[ex.id] || [];
-    arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
-    state.logs[ex.id] = arr;
-    saveState(); renderAll();
-    // Strength changed → composition estimate may shift
-    if (typeof wtRender === 'function') wtRender();
-    // Tiny pulse on the button so the user feels the save
-    const btn = $('logBtn');
-    btn.style.transition = 'transform 0.15s';
-    btn.style.transform = 'scale(0.96)';
-    setTimeout(() => { btn.style.transform = ''; }, 160);
-  });
 
   // ============================================================
   // EXERCISE MODAL (add / edit)
@@ -1990,10 +1915,6 @@ img, video, canvas, svg { max-width: 100%; }
   }
   $('exBw').addEventListener('change', toggleBwFields);
   $('addExBtn').addEventListener('click', () => openExModal('add'));
-  $('editExBtn').addEventListener('click', () => {
-    const ex = getCurrentEx();
-    if (ex) openExModal('edit', ex);
-  });
   $('exModalCancel').addEventListener('click', () => $('exModalBg').classList.remove('show'));
   $('exModalSave').addEventListener('click', () => {
     const name = $('exName').value.trim();
@@ -2016,7 +1937,6 @@ img, video, canvas, svg { max-width: 100%; }
     } else {
       const ex = Object.assign({ id: uid() }, data);
       state.exercises.push(ex);
-      state.currentEx = ex.id;
       state.filterGym = (modalGym === 'both') ? state.filterGym : modalGym;
       if (!modalDays.includes(state.filterDay)) state.filterDay = modalDays[0];
     }
@@ -2029,7 +1949,6 @@ img, video, canvas, svg { max-width: 100%; }
     if (!confirm('Supprimer cet exercice et tous ses enregistrements ?')) return;
     state.exercises = state.exercises.filter(e => e.id !== editingExId);
     delete state.logs[editingExId];
-    if (state.currentEx === editingExId) state.currentEx = null;
     editingExId = null;
     saveState();
     $('exModalBg').classList.remove('show');
