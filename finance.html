@@ -2044,6 +2044,58 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<!-- ===== INCOME ===== -->
+<div class="section" data-section="subs">
+  <div class="section-title">
+    <span class="section-title-text">REVENUS</span>
+  </div>
+  <div class="card" style="background:linear-gradient(135deg, rgba(107,227,164,0.08), rgba(125,211,252,0.05));border:1px solid rgba(107,227,164,0.20)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+      <div>
+        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.04em;font-weight:500">Revenu mensuel total</div>
+        <div id="incomeTotal" style="font-size:28px;font-weight:700;color:var(--text-primary);line-height:1.1;margin-top:2px">EUR 0 <span style="font-size:13px;color:var(--text-tertiary);font-weight:500">/ mois</span></div>
+        <div id="incomeYearly" style="font-size:11px;color:var(--text-tertiary);margin-top:2px"></div>
+      </div>
+      <div id="incomeCount" style="font-size:11px;color:var(--text-tertiary)"></div>
+    </div>
+    <div id="incomeList"></div>
+    <div class="empty-state" id="incomeEmpty">Aucun revenu enregistré pour l'instant</div>
+    <div class="quick-add" style="flex-wrap:wrap;gap:6px">
+      <input type="text" placeholder="Source (ex. Salaire)" id="incName" style="flex:1.5;min-width:120px" />
+      <input type="number" placeholder="Montant" id="incAmount" step="0.01" style="flex:1;max-width:100px" />
+      <select id="incCurrency" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);max-width:90px">
+        <option value="CHF">CHF</option>
+        <option value="USD">USD</option>
+        <option value="EUR" selected>EUR</option>
+        <option value="GBP">GBP</option>
+      </select>
+      <select id="incPeriod" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);max-width:100px">
+        <option value="monthly">Mensuel</option>
+        <option value="yearly">Annuel</option>
+        <option value="weekly">Hebdomadaire</option>
+      </select>
+      <label class="date-field" title="Prochain versement" style="min-width:150px"><span class="date-emoji" aria-hidden="true">📅</span><input type="date" id="incPayday" /></label>
+      <select id="incToCat" title="Quel compte de patrimoine net créditer" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);min-width:130px">
+        <option value="">Aucun compte pour l'instant</option>
+      </select>
+      <label class="sub-auto-toggle" title="Versement automatique sur le compte lié à chaque échéance">
+        <input type="checkbox" id="incAutoDeposit" />
+        <span class="sub-auto-track"><span class="sub-auto-thumb"></span></span>
+        <span class="sub-auto-label">Versement auto</span>
+      </label>
+      <button class="quick-add-btn" id="incAddBtn" onclick="window.__addIncome && window.__addIncome()">+ Ajouter</button>
+    </div>
+  </div>
+
+  <div class="card" id="netFlowCard" style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.04em;font-weight:500">Solde net mensuel</div>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px" id="netFlowSub">Revenus − abonnements</div>
+    </div>
+    <div id="netFlowAmount" style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums">EUR 0</div>
+  </div>
+</div>
+
 <!-- ===== ACTIVE SUBSCRIPTIONS ===== -->
 <div class="section" data-section="subs">
   <div class="section-title">
@@ -2815,6 +2867,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       subsTotal.innerHTML = fmtMoney(0) + ' <span style="font-size:13px;color:var(--text-tertiary);font-weight:500">/ mois</span>';
       subsYearly.textContent = '';
       subsCount.textContent = '';
+      if (typeof renderNetFlow === 'function') renderNetFlow();
       return;
     }
     subsEmpty.style.display = 'none';
@@ -2911,6 +2964,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     subsTotal.innerHTML = fmtMoney(monthly) + ' <span style="font-size:13px;color:var(--text-tertiary);font-weight:500">/ mois</span>';
     subsYearly.textContent = '~' + fmtMoney(monthly * 12) + ' par an';
     subsCount.textContent = items.length + (items.length === 1 ? ' abonnement' : ' abonnements');
+    if (typeof renderNetFlow === 'function') renderNetFlow();
     // Re-render the donut so the subs slice updates with the latest annualized total
     if (typeof renderAllNetWorth === 'function') renderAllNetWorth();
   }
@@ -3113,6 +3167,324 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   renderSubs();
 
   // ============================================================
+  // INCOME — recurring income sources. Mirrors the subscriptions
+  // system above (add / edit-in-place / delete, per-item currency,
+  // period normalized to monthly, optional linked NW account with
+  // idempotent auto-deposit) but credits an account instead of
+  // debiting it. Stored under 'income': [{ name, amount (CHF),
+  // period, payday, entered_amount, entered_currency, toCat,
+  // toAccount, autoDeposit, lastDepositedAt }].
+  // ============================================================
+  const incomeList  = document.getElementById('incomeList');
+  const incomeEmpty = document.getElementById('incomeEmpty');
+  const incomeTotal = document.getElementById('incomeTotal');
+  const incomeYearly = document.getElementById('incomeYearly');
+  const incomeCount = document.getElementById('incomeCount');
+  const incName   = document.getElementById('incName');
+  const incAmount = document.getElementById('incAmount');
+
+  function populateIncomeToSelect() {
+    const sel = document.getElementById('incToCat');
+    if (!sel) return;
+    const prev = sel.value;
+    const accounts = (typeof listAllNwAccounts === 'function') ? listAllNwAccounts() : [];
+    const ICONS = { bank: '🏦', stocks: '📈', crypto: '🪙', other: '💼' };
+    if (!accounts.length) {
+      sel.innerHTML = '<option value="">Aucun compte pour l\'instant</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    sel.innerHTML = accounts.map(a => {
+      const value = a.catKey + '::' + a.itemName;
+      return '<option value="' + value + '">' + ICONS[a.catKey] + ' ' + escapeHtml(a.itemName) + '</option>';
+    }).join('');
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  }
+
+  // Runs every render: for each income source with autoDeposit ON whose
+  // payday has arrived (or passed), credit the linked NW account, log the
+  // activity, and roll the payday forward. Idempotent via lastDepositedAt.
+  function processAutoDepositIncome() {
+    const items = storeGet('income') || [];
+    if (!items.length) return false;
+    const now = new Date();
+    const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    let changed = false;
+    items.forEach(it => {
+      if (!it.autoDeposit || !it.payday || !it.toCat || !it.toAccount) return;
+      const isoSafe = (typeof it.payday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.payday)) ? it.payday + 'T00:00' : it.payday;
+      let paydayDate = new Date(isoSafe);
+      if (isNaN(paydayDate)) return;
+      let safety = 0;
+      while (paydayDate.getTime() <= todayMs && safety++ < 200) {
+        const paydayMs = new Date(paydayDate.getFullYear(), paydayDate.getMonth(), paydayDate.getDate()).getTime();
+        if (!(it.lastDepositedAt && it.lastDepositedAt >= paydayMs)) {
+          const nwItems = storeGet('nw:' + it.toCat) || [];
+          const idx = nwItems.findIndex(x => String(x.name) === String(it.toAccount));
+          if (idx < 0) break;
+          const amt = Number(it.amount) || 0;
+          nwItems[idx].amount = (Number(nwItems[idx].amount) || 0) + amt;
+          storeSet('nw:' + it.toCat, nwItems);
+          logActivity(it.toCat, nwItems[idx].name, amt, 'edit');
+          it.lastDepositedAt = paydayMs;
+          changed = true;
+        }
+        if (it.period === 'weekly') paydayDate.setDate(paydayDate.getDate() + 7);
+        else if (it.period === 'yearly') paydayDate.setFullYear(paydayDate.getFullYear() + 1);
+        else paydayDate.setMonth(paydayDate.getMonth() + 1);
+      }
+      const newPayday = paydayDate.getFullYear() + '-' + String(paydayDate.getMonth() + 1).padStart(2, '0') + '-' + String(paydayDate.getDate()).padStart(2, '0');
+      if (newPayday !== it.payday) { it.payday = newPayday; changed = true; }
+    });
+    if (changed) storeSet('income', items);
+    return changed;
+  }
+
+  // Recomputed from storage every time either income or subs render, so
+  // it's always correct regardless of which one ran last.
+  function renderNetFlow() {
+    const el = document.getElementById('netFlowAmount');
+    const sub = document.getElementById('netFlowSub');
+    if (!el) return;
+    const incomeMonthly = (storeGet('income') || []).reduce((s, it) => s + monthlyEquivalent(it), 0);
+    const subsMonthly = (storeGet('subs') || []).reduce((s, it) => s + monthlyEquivalent(it), 0);
+    const net = incomeMonthly - subsMonthly;
+    el.textContent = (net >= 0 ? '+' : '') + fmtMoney(net);
+    el.style.color = net >= 0 ? 'var(--success)' : 'var(--danger)';
+    if (sub) sub.textContent = 'Revenus (' + fmtMoney(incomeMonthly) + ') − abonnements (' + fmtMoney(subsMonthly) + ')';
+  }
+
+  function renderIncome() {
+    if (!incomeList) return;
+    processAutoDepositIncome();
+    populateIncomeToSelect();
+    const items = storeGet('income') || [];
+    incomeList.innerHTML = '';
+    if (!items.length) {
+      incomeEmpty.style.display = 'flex';
+      incomeTotal.innerHTML = fmtMoney(0) + ' <span style="font-size:13px;color:var(--text-tertiary);font-weight:500">/ mois</span>';
+      incomeYearly.textContent = '';
+      incomeCount.textContent = '';
+      renderNetFlow();
+      return;
+    }
+    incomeEmpty.style.display = 'none';
+    let monthly = 0;
+    items.forEach((it, idx) => {
+      const m = monthlyEquivalent(it);
+      monthly += m;
+      let daysToPay = null;
+      if (it.payday && typeof nextRenewalDate === 'function') {
+        const next = nextRenewalDate(it.payday, it.period);
+        if (next) {
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          daysToPay = Math.round((next.getTime() - today) / 86400000);
+        }
+      }
+      const isSoon = daysToPay != null && daysToPay <= 5;
+      const row = document.createElement('div');
+      row.className = 'sub-row' + (isSoon ? ' is-urgent' : '');
+      row.style.cssText = 'display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:12px 14px;background:rgba(255,255,255,0.025);border-radius:var(--radius-md);margin-bottom:8px;gap:12px;';
+      const payLine = it.payday
+        ? '<div class="sub-renew-line" style="font-size:10px;color:#6BE3A4;margin-top:3px">↻ Prochain versement ' + formatRenewal(it.payday) + '</div>'
+        : '';
+      const pills = [];
+      if (it.toCat && it.toAccount) {
+        pills.push('<span class="sub-from-pill">vers · ' + escapeHtml(it.toAccount) + '</span>');
+      }
+      pills.push(
+        '<button class="sub-row-toggle' + (it.autoDeposit ? ' is-on' : '') + '" data-inc-toggle="' + idx + '" type="button" title="Versement automatique sur le compte lié à chaque échéance">'
+        + '<span class="sub-row-toggle-dot"></span>'
+        + (it.autoDeposit ? 'Versement auto ACTIVÉ' : 'Versement auto désactivé')
+        + '</button>'
+      );
+      const metaLine = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">' + pills.join('') + '</div>';
+
+      const periodLabelLower = ({ monthly: 'mensuel', yearly: 'annuel', weekly: 'hebdomadaire' })[it.period] || it.period;
+      const left = document.createElement('div');
+      left.style.cssText = 'min-width:0';
+      left.innerHTML = '<div style="font-weight:600;color:var(--text-primary);font-size:14px">' + escapeHtml(it.name) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;text-transform:capitalize">' + periodLabelLower + '</div>' +
+        payLine +
+        metaLine;
+      const amt = document.createElement('div');
+      amt.style.cssText = 'text-align:right;line-height:1.1';
+      const bigNum = fmtMoney(m);
+      const origHint = (it.entered_currency && it.entered_currency !== 'CHF' && it.entered_amount != null)
+        ? '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">reçu ' + it.entered_currency + ' ' + Number(it.entered_amount).toLocaleString('en-US', { minimumFractionDigits: it.entered_amount % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }) + ' / ' + periodLabelLower + '</div>'
+        : (it.period !== 'monthly'
+            ? '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">reçu ' + fmtMoney(it.amount) + ' / ' + periodLabelLower + '</div>'
+            : '');
+      amt.innerHTML = '<div style="font-size:20px;font-weight:700;color:var(--success);font-variant-numeric:tabular-nums">+' + bigNum + '</div>' +
+        '<div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">/ mois</div>' +
+        origHint;
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;flex-direction:column;gap:4px;align-items:center';
+      const editBtn = document.createElement('button');
+      editBtn.title = 'Modifier';
+      editBtn.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,0.10);color:var(--text-tertiary);cursor:pointer;font-size:12px;padding:3px 7px;border-radius:5px;font-family:inherit;line-height:1';
+      editBtn.textContent = '✏';
+      editBtn.addEventListener('click', () => editIncomeInline(idx));
+      const del = document.createElement('button');
+      del.title = 'Supprimer';
+      del.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,0.10);color:var(--text-tertiary);cursor:pointer;font-size:12px;padding:3px 7px;border-radius:5px;font-family:inherit;line-height:1';
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        if (!confirm('Supprimer « ' + it.name + ' » ?')) return;
+        items.splice(idx, 1); storeSet('income', items); renderIncome();
+      });
+      actions.appendChild(editBtn);
+      actions.appendChild(del);
+      row.appendChild(left); row.appendChild(amt); row.appendChild(actions);
+      incomeList.appendChild(row);
+    });
+    incomeList.querySelectorAll('[data-inc-toggle]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = parseInt(b.dataset.incToggle, 10);
+        const arr = storeGet('income') || [];
+        if (!arr[i]) return;
+        if (!arr[i].autoDeposit && (!arr[i].toCat || !arr[i].toAccount)) {
+          alert('Choisissez d\'abord un « compte à créditer » (via le bouton ✏ Modifier) pour que le versement sache où déposer l\'argent.');
+          return;
+        }
+        arr[i].autoDeposit = !arr[i].autoDeposit;
+        storeSet('income', arr);
+        renderIncome();
+      });
+    });
+    incomeTotal.innerHTML = fmtMoney(monthly) + ' <span style="font-size:13px;color:var(--text-tertiary);font-weight:500">/ mois</span>';
+    incomeYearly.textContent = '~' + fmtMoney(monthly * 12) + ' par an';
+    incomeCount.textContent = items.length + (items.length === 1 ? ' source' : ' sources');
+    renderNetFlow();
+    if (typeof renderAllNetWorth === 'function') renderAllNetWorth();
+  }
+
+  function editIncomeInline(idx) {
+    const items = storeGet('income') || [];
+    const it = items[idx];
+    if (!it) return;
+    const rows = incomeList.querySelectorAll('.sub-row');
+    const row = rows[idx];
+    if (!row) return;
+    const enteredCcy = it.entered_currency || 'EUR';
+    const enteredAmt = it.entered_amount != null ? it.entered_amount : it.amount;
+    const PERIOD_LABEL_FR = { monthly: 'Mensuel', yearly: 'Annuel', weekly: 'Hebdomadaire' };
+    const periodOpts = ['monthly','yearly','weekly'].map(p =>
+      '<option value="' + p + '"' + (p === it.period ? ' selected' : '') + '>' + (PERIOD_LABEL_FR[p] || p) + '</option>'
+    ).join('');
+    const ccyOpts = ['CHF','USD','EUR','GBP'].map(c =>
+      '<option value="' + c + '"' + (c === enteredCcy ? ' selected' : '') + '>' + c + '</option>'
+    ).join('');
+    const accounts = (typeof listAllNwAccounts === 'function') ? listAllNwAccounts() : [];
+    const ICONS = { bank: '🏦', stocks: '📈', crypto: '🪙', other: '💼' };
+    const currentTo = (it.toCat && it.toAccount) ? (it.toCat + '::' + it.toAccount) : '';
+    const toOpts = '<option value="">Aucun compte lié</option>' + accounts.map(a => {
+      const v = a.catKey + '::' + a.itemName;
+      return '<option value="' + v + '"' + (v === currentTo ? ' selected' : '') + '>' + ICONS[a.catKey] + ' ' + escapeHtml(a.itemName) + '</option>';
+    }).join('');
+    row.innerHTML = '';
+    row.style.gridTemplateColumns = '1fr';
+    row.style.padding = '14px';
+    const form = document.createElement('div');
+    form.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+    form.innerHTML =
+      '<input type="text" class="ie-name" value="' + escapeHtml(it.name) + '" style="flex:1.5;min-width:120px;padding:6px 10px;border:0.5px solid rgba(255,255,255,0.10);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary)" />' +
+      '<input type="number" step="0.01" class="ie-amt" value="' + Number(enteredAmt).toFixed(2) + '" style="width:90px;padding:6px 10px;border:0.5px solid rgba(255,255,255,0.10);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary)" />' +
+      '<select class="ie-ccy" style="padding:6px 10px;border:0.5px solid rgba(255,255,255,0.10);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary)">' + ccyOpts + '</select>' +
+      '<select class="ie-per" style="padding:6px 10px;border:0.5px solid rgba(255,255,255,0.10);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary)">' + periodOpts + '</select>' +
+      '<label class="date-field" style="min-width:140px"><span class="date-emoji" aria-hidden="true">📅</span><input type="date" class="ie-pay" value="' + (it.payday && /^\d{4}-\d{2}-\d{2}/.test(it.payday) ? it.payday.slice(0,10) : '') + '" /></label>' +
+      '<select class="ie-to" style="padding:6px 10px;border:0.5px solid rgba(255,255,255,0.10);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);min-width:130px">' + toOpts + '</select>' +
+      '<label class="sub-auto-toggle" style="padding:6px 10px"><input type="checkbox" class="ie-auto"' + (it.autoDeposit ? ' checked' : '') + ' /><span class="sub-auto-track"><span class="sub-auto-thumb"></span></span><span class="sub-auto-label">Versement auto</span></label>' +
+      '<button class="ie-save quick-add-btn">Enregistrer</button>' +
+      '<button class="ie-cancel" style="background:transparent;border:1px solid rgba(255,255,255,0.10);color:var(--text-tertiary);cursor:pointer;font-size:12px;padding:6px 10px;border-radius:var(--radius-md);font-family:inherit">Annuler</button>';
+    row.appendChild(form);
+    const save = () => {
+      const newName = row.querySelector('.ie-name').value.trim();
+      const newAmtRaw = parseFloat(row.querySelector('.ie-amt').value);
+      const newCcy = row.querySelector('.ie-ccy').value;
+      const newPer = row.querySelector('.ie-per').value;
+      const newPay = row.querySelector('.ie-pay').value || null;
+      const newToVal = row.querySelector('.ie-to').value;
+      const newAuto = row.querySelector('.ie-auto').checked;
+      let newToCat = null, newToAccount = null;
+      if (newToVal) {
+        const ix = newToVal.indexOf('::');
+        if (ix > 0) { newToCat = newToVal.slice(0, ix); newToAccount = newToVal.slice(ix + 2); }
+      }
+      if (newAuto && (!newToCat || !newToAccount)) {
+        alert('Choisissez un « compte à créditer » — le versement automatique a besoin de savoir où déposer l\'argent.');
+        return;
+      }
+      if (!newName || isNaN(newAmtRaw)) return;
+      const rate = exchangeRates[newCcy] || 1;
+      items[idx] = { ...it, name: newName, amount: newAmtRaw / rate, period: newPer, payday: newPay, entered_amount: newAmtRaw, entered_currency: newCcy, toCat: newToCat, toAccount: newToAccount, autoDeposit: newAuto };
+      storeSet('income', items); renderIncome();
+    };
+    const cancel = () => renderIncome();
+    row.querySelector('.ie-save').addEventListener('click', save);
+    row.querySelector('.ie-cancel').addEventListener('click', cancel);
+    row.querySelectorAll('input').forEach(i => {
+      i.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') save();
+        else if (e.key === 'Escape') cancel();
+      });
+    });
+    row.querySelector('.ie-name').focus();
+  }
+
+  function doIncomeAdd() {
+    try {
+      const nEl = document.getElementById('incName');
+      const aEl = document.getElementById('incAmount');
+      const ccEl = document.getElementById('incCurrency');
+      const pEl = document.getElementById('incPeriod');
+      const rEl = document.getElementById('incPayday');
+      const fEl = document.getElementById('incToCat');
+      const tEl = document.getElementById('incAutoDeposit');
+      if (!nEl || !aEl) return;
+      const n = (nEl.value || '').trim();
+      const aRaw = parseFloat(aEl.value);
+      if (!n || isNaN(aRaw)) { nEl.focus(); return; }
+      const enteredCcy = ccEl ? ccEl.value : 'EUR';
+      const rate = exchangeRates[enteredCcy] || 1;
+      const amountCHF = aRaw / rate;
+      let toCat = null, toAccount = null;
+      if (fEl && fEl.value) {
+        const ix = fEl.value.indexOf('::');
+        if (ix > 0) { toCat = fEl.value.slice(0, ix); toAccount = fEl.value.slice(ix + 2); }
+      }
+      const autoDeposit = !!(tEl && tEl.checked);
+      if (autoDeposit && (!toCat || !toAccount)) {
+        alert('Choisissez d\'abord un « compte à créditer » — le versement automatique a besoin de savoir où déposer l\'argent.');
+        return;
+      }
+      const items = storeGet('income') || [];
+      items.push({
+        name: n, amount: amountCHF,
+        period: pEl ? pEl.value : 'monthly',
+        payday: rEl && rEl.value ? rEl.value : null,
+        entered_amount: aRaw,
+        entered_currency: enteredCcy,
+        toCat: toCat,
+        toAccount: toAccount,
+        autoDeposit: autoDeposit,
+        lastDepositedAt: null
+      });
+      storeSet('income', items);
+      nEl.value = ''; aEl.value = '';
+      if (rEl) rEl.value = '';
+      if (tEl) tEl.checked = false;
+      renderIncome();
+    } catch (e) { console.error('incomeAdd failed', e); }
+  }
+  if (incName)   incName.addEventListener('keydown', (e) => { if (e.key === 'Enter') doIncomeAdd(); });
+  if (incAmount) incAmount.addEventListener('keydown', (e) => { if (e.key === 'Enter') doIncomeAdd(); });
+  renderIncome();
+
+  // ============================================================
   // WISHLIST — items with % of net worth.
   // Each item is { name, amountCHF, ts, ccy }. Stored in 'wishlist'.
   // Colors: <5% green, 5-25% amber, >25% red.
@@ -3241,14 +3613,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   //   3. Enter-key on the inputs (already wired above)
   // Any one working is enough — but together they're impossible to break.
   // ============================================================
-  window.__addSub  = doSubAdd;
-  window.__addWish = doWishAdd;
+  window.__addSub    = doSubAdd;
+  window.__addIncome = doIncomeAdd;
+  window.__addWish   = doWishAdd;
   document.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
     // Skip if the button already has an inline onclick (it'll fire that itself).
     if (t.hasAttribute('onclick')) return;
     if (t.id === 'subAddBtn')  { e.preventDefault(); doSubAdd();  }
+    if (t.id === 'incAddBtn')  { e.preventDefault(); doIncomeAdd(); }
     if (t.id === 'wishAddBtn') { e.preventDefault(); doWishAdd(); }
   });
 
@@ -3748,6 +4122,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         netWorthCHF: Math.round(netWorthCHF),
         accounts: breakdown,
         subscriptions: storeGet('subs') || [],
+        income: storeGet('income') || [],
         incomingOrders: storeGet('incoming_orders') || [],
         wishlist: storeGet('wishlist') || []
       };
@@ -4108,7 +4483,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'finance',
-    syncedKeys: ['subs', 'wishlist', 'incoming_orders', 'nw_currency', 'nw:activity', 'nw:history'],
+    syncedKeys: ['subs', 'income', 'wishlist', 'incoming_orders', 'nw_currency', 'nw:activity', 'nw:history'],
     syncedPrefixes: ['nw:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
