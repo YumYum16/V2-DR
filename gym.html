@@ -33,9 +33,9 @@ const CONFIG = {
   // Training split. Most people use Push/Pull/Legs but you can rename
   // these to "Upper", "Lower", "Full Body", "Day A", anything.
   days: [
-    { id: "push", name: "Poussée" },
-    { id: "pull", name: "Tirage" },
-    { id: "legs", name: "Jambes" }
+    { id: "push", name: "Push" },
+    { id: "pull", name: "Pull" },
+    { id: "legs", name: "Legs" }
   ],
 
   // Split rotation — the order your training days cycle through. Use day
@@ -2412,7 +2412,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   function openRotationModal() {
     rotDraft = (state.splitRotation || []).slice();
-    if (!rotDraft.length) rotDraft = ['Poussée', 'Tirage', 'Jambes', 'Repos'];
+    if (!rotDraft.length) rotDraft = ['Push', 'Pull', 'Legs', 'Repos'];
     rotDraftTodayIdx = todaySplit().index;
     if (rotDraftTodayIdx >= rotDraft.length) rotDraftTodayIdx = 0;
     renderRotList();
