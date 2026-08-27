@@ -345,6 +345,10 @@ img, video, canvas, svg { max-width: 100%; }
   color: var(--text-3); background: rgba(255,255,255,0.05); border: 1px solid var(--border);
   border-radius: 999px; padding: 2px 8px;
 }
+.po-ex-alt {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  font-size: 10.5px; font-weight: 600; color: #7DD3FC;
+}
 
 /* ----- Exercise image picker (add/edit modal) ----- */
 .po-ex-image-picker { display: flex; align-items: center; gap: 12px; }
@@ -1458,6 +1462,14 @@ img, video, canvas, svg { max-width: 100%; }
       <input type="checkbox" id="exBodyweight">
       Poids du corps (tractions, pompes, dips…)
     </label>
+    <label class="po-bw-toggle">
+      <input type="checkbox" id="exAlternate">
+      Alterne avec un autre exercice (1 fois sur 2)
+    </label>
+    <div class="po-field hidden" id="exAlternateField">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Alterne avec</label>
+      <select class="po-ex-select" id="exAlternateSelect"></select>
+    </div>
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="exModalCancel">Annuler</button>
       <button class="po-btn-primary" id="exModalSave">Enregistrer</button>
@@ -1709,6 +1721,8 @@ img, video, canvas, svg { max-width: 100%; }
     const last = logs.length ? logs[logs.length - 1] : null;
     const lastStr = last ? (last.weight + unit() + ' × ' + last.reps) : (ph(null, unit()) + ' × ' + ph(null));
     const badge = ex.bodyweight ? 'Poids du corps' : (ex.fixedWeight ? 'Poulie' : 'Poids libre');
+    const altEx = ex.alternateId ? state.exercises.find(e => e.id === ex.alternateId) : null;
+    const altHtml = altEx ? '<span class="po-ex-alt">🔁 ' + escape(altEx.name) + '</span>' : '';
     const perf = exercisePerfStats(ex);
     const perfHtml =
       '<div class="po-stats-row po-ex-perf-row">'
@@ -1721,7 +1735,7 @@ img, video, canvas, svg { max-width: 100%; }
       + '<div class="po-ex-card-head">'
       +   '<div class="po-ex-card-name-wrap">'
       +     (ex.image ? '<img class="po-ex-card-thumb" data-action="view-img" src="' + ex.image + '" alt="">' : '')
-      +     '<div class="po-ex-card-name-col"><span class="po-ex-card-name">' + escape(ex.name) + '</span><span class="po-ex-badge">' + badge + '</span></div>'
+      +     '<div class="po-ex-card-name-col"><span class="po-ex-card-name">' + escape(ex.name) + '</span><span class="po-ex-badge">' + badge + '</span>' + altHtml + '</div>'
       +   '</div>'
       +   '<button type="button" class="po-btn-icon po-ex-card-edit" data-action="edit" title="Modifier / supprimer" aria-label="Modifier">' + EX_EDIT_ICON + '</button>'
       + '</div>'
@@ -1921,6 +1935,13 @@ img, video, canvas, svg { max-width: 100%; }
       removeBtn.style.display = 'none';
     }
   }
+  function renderAlternateSelect(excludeId, selectedId) {
+    const sel = $('exAlternateSelect');
+    const others = state.exercises.filter(e => e.id !== excludeId);
+    sel.innerHTML = '<option value="">Choisir un exercice…</option>'
+      + others.map(e => '<option value="' + e.id + '">' + escape(e.name) + '</option>').join('');
+    sel.value = selectedId || '';
+  }
   function openExModal(mode, ex) {
     editingExId = mode === 'edit' ? ex.id : null;
     $('exModalTitle').textContent = mode === 'edit' ? 'Modifier l\'exercice' : 'Ajouter un exercice';
@@ -1932,6 +1953,8 @@ img, video, canvas, svg { max-width: 100%; }
       modalDays = (ex.days || []).slice();
       $('exFixedWeight').checked = !!ex.fixedWeight;
       $('exBodyweight').checked = !!ex.bodyweight;
+      $('exAlternate').checked = !!ex.alternateId;
+      renderAlternateSelect(editingExId, ex.alternateId);
     } else {
       $('exName').value = '';
       modalGym = state.filterGym;
@@ -1939,12 +1962,40 @@ img, video, canvas, svg { max-width: 100%; }
       modalDays = state.filterDay ? [state.filterDay] : [];
       $('exFixedWeight').checked = false;
       $('exBodyweight').checked = false;
+      $('exAlternate').checked = false;
+      renderAlternateSelect(null, null);
     }
+    $('exAlternateField').classList.toggle('hidden', !$('exAlternate').checked);
     renderModalSegs();
     renderDaysGrid();
     renderModalImage();
     $('exModalBg').classList.add('show');
     setTimeout(() => $('exName').focus(), 60);
+  }
+  $('exAlternate').addEventListener('change', () => {
+    $('exAlternateField').classList.toggle('hidden', !$('exAlternate').checked);
+  });
+  // Alternate pairing is symmetric: linking A -> B also links B -> A, and
+  // changing/removing a link cleans up whatever the old partner pointed at.
+  function setAlternatePair(exId, partnerId) {
+    const ex = state.exercises.find(e => e.id === exId);
+    if (!ex) return;
+    const oldPartnerId = ex.alternateId;
+    if (oldPartnerId && oldPartnerId !== partnerId) {
+      const oldPartner = state.exercises.find(e => e.id === oldPartnerId);
+      if (oldPartner && oldPartner.alternateId === exId) oldPartner.alternateId = null;
+    }
+    ex.alternateId = partnerId || null;
+    if (partnerId) {
+      const partner = state.exercises.find(e => e.id === partnerId);
+      if (partner) {
+        if (partner.alternateId && partner.alternateId !== exId) {
+          const other = state.exercises.find(e => e.id === partner.alternateId);
+          if (other && other.alternateId === partnerId) other.alternateId = null;
+        }
+        partner.alternateId = exId;
+      }
+    }
   }
   $('exAddSeanceBtn').addEventListener('click', () => {
     const name = (prompt('Nom de la nouvelle séance :') || '').trim();
@@ -2004,15 +2055,20 @@ img, video, canvas, svg { max-width: 100%; }
       bodyweight: $('exBodyweight').checked,
       days: modalDays.slice()
     };
+    const alternatePartnerId = $('exAlternate').checked ? ($('exAlternateSelect').value || null) : null;
+    let savedExId;
     if (editingExId) {
       const ex = state.exercises.find(e => e.id === editingExId);
       if (ex) Object.assign(ex, data);
+      savedExId = editingExId;
     } else {
       const ex = Object.assign({ id: uid() }, data);
       state.exercises.push(ex);
+      savedExId = ex.id;
       state.filterGym = (modalGym === 'both') ? state.filterGym : modalGym;
       if (modalDays.length && !modalDays.includes(state.filterDay)) state.filterDay = modalDays[0];
     }
+    setAlternatePair(savedExId, alternatePartnerId);
     saveState();
     $('exModalBg').classList.remove('show');
     renderAll();
@@ -2020,6 +2076,8 @@ img, video, canvas, svg { max-width: 100%; }
   $('exDelete').addEventListener('click', () => {
     if (!editingExId) return;
     if (!confirm('Supprimer cet exercice et tous ses enregistrements ?')) return;
+    const partner = state.exercises.find(e => e.alternateId === editingExId);
+    if (partner) partner.alternateId = null;
     state.exercises = state.exercises.filter(e => e.id !== editingExId);
     delete state.logs[editingExId];
     editingExId = null;
