@@ -105,6 +105,32 @@ body::after {
 }
 .gm-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
 
+/* ---- Session history ---- */
+.save-banner { text-align: center; font-size: 13px; color: var(--success); padding: 14px; }
+.hist-card { padding: 16px; }
+.hist-list { display: flex; flex-direction: column; gap: 8px; }
+.hist-row {
+  padding: 11px 12px; border-radius: 12px; background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.06); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.hist-row:hover { background: rgba(255,255,255,0.06); }
+.hist-row-top { display: flex; align-items: center; gap: 10px; }
+.hist-day { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.hist-date { flex: 1; font-size: 11.5px; color: var(--text-tertiary); }
+.hist-score {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; padding: 2px 8px;
+  border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-tertiary);
+}
+.hist-score.good { color: var(--success); background: rgba(107,227,164,0.14); }
+.hist-score.mid { color: var(--warning); background: rgba(242,192,99,0.14); }
+.hist-score.low { color: var(--danger); background: rgba(255,107,107,0.14); }
+.hist-row-meta { margin-top: 4px; font-size: 11.5px; color: var(--text-tertiary); }
+.hist-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); }
+.hist-set-list { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: var(--text-secondary); }
+.hist-set-list li { margin-bottom: 3px; }
+.hist-fail-tag { color: var(--danger); font-size: 10.5px; font-weight: 700; }
+.hist-critique p { margin: 0 0 4px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+
 /* ---- Day picker (shared by desktop form + mobile step 1) ---- */
 .day-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .day-btn {
@@ -310,6 +336,107 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   }
   function uid(){ return 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 
+  // ================================================================
+  // SESSION HISTORY — logs are stored per exercise, so a "session" is
+  // reconstructed by grouping every set that shares the same date +
+  // dayId. The per-session grade is a transparent rubric (not a black
+  // box): how much of the séance's planned exercises got done, whether
+  // the failure rate sits in a healthy training-intensity range, and
+  // whether volume was in line with what that séance normally calls
+  // for — each shown separately in the critique text, not just a bare
+  // number.
+  // ================================================================
+  function plannedExercisesForDay(state, dayId){
+    return (state.exercises || []).filter(e => Array.isArray(e.days) && e.days.includes(dayId));
+  }
+  function buildSessionsHistory(state){
+    const map = {};
+    (state.exercises || []).forEach(ex => {
+      ((state.logs && state.logs[ex.id]) || []).forEach(l => {
+        if (!l.dayId || !l.date) return; // older/manual entries without a séance context are skipped
+        const key = l.date + '|' + l.dayId;
+        const s = map[key] = map[key] || { date: l.date, dayId: l.dayId, lastTime: '', sets: [] };
+        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed });
+        if (l.time && l.time > s.lastTime) s.lastTime = l.time;
+      });
+    });
+    return Object.values(map).sort((a, b) => b.date === a.date ? b.lastTime.localeCompare(a.lastTime) : b.date.localeCompare(a.date));
+  }
+  function analyzeSession(state, session){
+    const planned = plannedExercisesForDay(state, session.dayId);
+    const doneIds = new Set(session.sets.map(s => s.exId));
+    const missing = planned.filter(e => !doneIds.has(e.id));
+    const totalSets = session.sets.length;
+    const failedSets = session.sets.filter(s => s.failed).length;
+    const failRate = totalSets ? failedSets / totalSets : 0;
+    const tonnage = session.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+
+    const completionScore = planned.length ? Math.min(1, doneIds.size / planned.length) : (doneIds.size ? 1 : 0);
+    // Healthy failure-rate window ~10-30%: enough sets pushed close to
+    // failure without every set grinding to failure (RPE/RIR-based
+    // programming, e.g. Helms et al.) — too low suggests unused margin,
+    // too high suggests overreaching for a single session.
+    let intensityScore;
+    if (!totalSets) intensityScore = 0;
+    else if (failRate >= 0.10 && failRate <= 0.30) intensityScore = 1;
+    else if (failRate < 0.10) intensityScore = 0.6 + (failRate / 0.10) * 0.4;
+    else intensityScore = Math.max(0, 1 - (failRate - 0.30) / 0.5);
+    // Volume relative to this séance's own exercise count (~3 sets/exercise
+    // baseline, in line with the 10-20 sets/muscle/week hypertrophy range
+    // — Schoenfeld/Grgic — spread across a handful of exercises).
+    const volumeScore = planned.length ? Math.min(1, totalSets / (planned.length * 3)) : Math.min(1, totalSets / 6);
+
+    const score = Math.round((completionScore * 0.4 + intensityScore * 0.3 + volumeScore * 0.3) * 100) / 10;
+
+    const critique = [];
+    if (missing.length) critique.push('Pas fait : ' + missing.map(e => e.name).join(', ') + '.');
+    if (failRate > 0.30) critique.push('Taux d\'échec élevé (' + Math.round(failRate * 100) + '%) — la charge était sans doute trop lourde pour cette séance.');
+    else if (failRate === 0 && totalSets >= 4) critique.push('Aucune série à l\'échec — tu as sans doute de la marge, essaie d\'augmenter la charge la prochaine fois.');
+    if (volumeScore < 0.6) critique.push('Volume un peu faible par rapport aux exercices prévus pour cette séance.');
+    if (!critique.length) critique.push('Séance complète et équilibrée.');
+
+    return { planned, missing, totalSets, failedSets, failRate, tonnage, score, critique };
+  }
+  function formatHistDate(dateStr){
+    const parts = dateStr.split('-').map(Number);
+    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    const mons = ['jan','fév','mars','avr','mai','juin','juil','août','sep','oct','nov','déc'];
+    return dt.getDate() + ' ' + mons[dt.getMonth()];
+  }
+  function renderHistoryCard(state, unit){
+    const sessions = buildSessionsHistory(state).slice(0, 8);
+    if (!sessions.length) return '';
+    const dayName = id => { const d = (state.days || []).find(x => x.id === id); return d ? d.name : id; };
+    let html = '<div class="gm-card hist-card"><div class="section-title">Historique</div><div class="hist-list">';
+    sessions.forEach((s, i) => {
+      const a = analyzeSession(state, s);
+      const scoreCls = a.score >= 7 ? 'good' : (a.score >= 4.5 ? 'mid' : 'low');
+      html +=
+        '<div class="hist-row" data-hist-idx="' + i + '">' +
+          '<div class="hist-row-top">' +
+            '<span class="hist-day">' + escapeHtml(dayName(s.dayId)) + '</span>' +
+            '<span class="hist-date">' + formatHistDate(s.date) + '</span>' +
+            '<span class="hist-score ' + scoreCls + '">' + a.score.toFixed(1) + '</span>' +
+          '</div>' +
+          '<div class="hist-row-meta">' + a.totalSets + ' série(s) · ' + Math.round(a.tonnage) + ' ' + unit + ' de tonnage · ' + Math.round(a.failRate * 100) + '% échec</div>' +
+          '<div class="hist-detail hidden" id="histDetail-' + i + '">' +
+            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + '</li>').join('') + '</ul>' +
+            '<div class="hist-critique">' + a.critique.map(c => '<p>' + escapeHtml(c) + '</p>').join('') + '</div>' +
+          '</div>' +
+        '</div>';
+    });
+    html += '</div></div>';
+    return html;
+  }
+  function wireHistoryToggles(){
+    document.querySelectorAll('.hist-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const detail = row.querySelector('.hist-detail');
+        if (detail) detail.classList.toggle('hidden');
+      });
+    });
+  }
+
   const app = document.getElementById('app');
   const state = loadGym();
   const days = (state && Array.isArray(state.days)) ? state.days : [];
@@ -334,6 +461,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   // ================================================================
   function bootDesktop(){
     let chosenDay = null;
+    let flashMsg = '';
 
     render();
 
@@ -343,12 +471,17 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     }
 
     function renderDayPick(){
+      const banner = flashMsg ? '<div class="gm-card save-banner">' + escapeHtml(flashMsg) + '</div>' : '';
+      flashMsg = '';
       app.innerHTML =
         '<h1 class="dash-title">Séance</h1>' +
+        banner +
+        renderHistoryCard(state, unit) +
         '<p class="dash-sub">Choisis la séance à remplir — aujourd\'hui ou en retard, la date reste modifiable.</p>' +
         '<div class="gm-card"><div class="section-title">Quelle séance ?</div>' +
         '<div class="day-grid">' + days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '">' + escapeHtml(d.name) + '</button>').join('') + '</div>' +
         '</div>';
+      wireHistoryToggles();
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; render(); });
       });
@@ -383,7 +516,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
             '<button type="button" class="add-set-btn" data-ex="' + ex.id + '">+ Série</button>' +
             '</div>';
         });
-        html += '<button type="button" class="gm-add" id="saveSeanceBtn">Enregistrer la séance</button><div id="saveFlash"></div>';
+        html += '<button type="button" class="gm-add" id="saveSeanceBtn">Enregistrer la séance</button>';
       }
 
       app.innerHTML = html;
@@ -442,8 +575,15 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         });
       });
       saveGym(state);
-      const flash = document.getElementById('saveFlash');
-      if (flash) flash.innerHTML = '<div class="save-flash">✓ ' + savedSets + ' série(s) enregistrée(s).</div>';
+      // Back to the day picker so the filled-in form can't be re-submitted
+      // by an accidental second click — a stale form still holding the
+      // same numbers was exactly how a duplicate save could happen.
+      const dayName = (days.find(d => d.id === chosenDay) || {}).name || '';
+      flashMsg = savedSets
+        ? ('✓ ' + savedSets + ' série(s) enregistrée(s) pour ' + dayName + '.')
+        : 'Aucune série remplie — rien n\'a été enregistré.';
+      chosenDay = null;
+      render();
     }
   }
 
@@ -464,10 +604,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     function renderDayPick(){
       app.innerHTML =
         '<h1 class="dash-title">Séance</h1>' +
+        renderHistoryCard(state, unit) +
         '<p class="dash-sub">Quelle séance veux-tu lancer ?</p>' +
         '<div class="day-grid" style="flex-direction:column">' +
         days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '" style="padding:18px;">' + escapeHtml(d.name) + '</button>').join('') +
         '</div>';
+      wireHistoryToggles();
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; startExercisePick(); });
       });
