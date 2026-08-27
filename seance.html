@@ -479,12 +479,27 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         reps = HYPERTROPHY_REP_LOW;
         note = 'Toutes les séries ont atteint ' + HYPERTROPHY_REP_HIGH + ' reps — charge augmentée (+' + step + (state.units || 'kg') + ').';
       }
-    } else if (anyFailed) {
-      reps = minReps;
-      note = 'Échec sur au moins une série — reste sur cette charge, revise ' + minReps + ' reps sur toutes les séries.';
     } else {
-      reps = Math.min(HYPERTROPHY_REP_HIGH, minReps + 1);
-      note = 'Vise ' + reps + ' reps sur TOUTES les séries (la plus faible était à ' + minReps + ') avant d\'augmenter la charge.';
+      // Floor the target on the best "weakest working set" seen across the
+      // last few sessions at this weight, not just the very last one — a
+      // single rough session (poor sleep, off day) shouldn't force the
+      // target back down when recent sessions already proved a higher rep
+      // count. Progressive overload trends upward session over session;
+      // one data point is too noisy to reset that trend on its own.
+      const recentDates = Array.from(new Set(logs.filter(l => (l.weight || 0) === maxWeight).map(l => l.date))).sort().reverse().slice(0, 3);
+      let recentBestMin = minReps;
+      recentDates.forEach(d => {
+        const daySets = logs.filter(l => l.date === d && (l.weight || 0) === maxWeight);
+        const dayMin = Math.min.apply(null, daySets.map(l => l.reps || 0));
+        if (dayMin > recentBestMin) recentBestMin = dayMin;
+      });
+      if (anyFailed) {
+        reps = Math.max(minReps, recentBestMin);
+        note = 'Échec sur au moins une série — reste sur cette charge, revise ' + reps + ' reps sur toutes les séries.';
+      } else {
+        reps = Math.min(HYPERTROPHY_REP_HIGH, recentBestMin + 1);
+        note = 'Vise ' + reps + ' reps sur TOUTES les séries (ta meilleure série récente était à ' + recentBestMin + ') avant d\'augmenter la charge.';
+      }
     }
     return { weight, reps, note };
   }
