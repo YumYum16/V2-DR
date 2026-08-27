@@ -578,6 +578,7 @@ html, body {
         <div class="field">
           <label>Poids</label>
           <input type="number" id="setWeight" step="0.5" min="20" max="300">
+          <p id="setWeightSyncNote" style="display:none;font-size:11px;color:var(--text-3);margin:4px 0 0;">Synchronisé depuis le poids enregistré dans Fitness — rien à saisir ici.</p>
         </div>
         <div class="field">
           <label>Unité de poids</label>
@@ -757,6 +758,35 @@ html, body {
   }
   let state = loadState();
   $('appTitle').textContent = CONFIG.appTitle || 'Coach Hydratation';
+
+  // ============================================================
+  // WEIGHT — synced from Fitness's own weigh-ins (po_coach_weights) so
+  // it never has to be entered twice. Falls back to the manual profile
+  // field only if Fitness has no weight logged yet.
+  // ============================================================
+  function readGymWeights() {
+    try { const arr = JSON.parse(localStorage.getItem('po_coach_weights')); return Array.isArray(arr) ? arr : []; }
+    catch (e) { return []; }
+  }
+  function readGymUnits() {
+    try { const g = JSON.parse(localStorage.getItem('po_coach_v1')); return (g && g.units) || 'kg'; }
+    catch (e) { return 'kg'; }
+  }
+  let weightSyncedFromFitness = false;
+  function syncWeightFromFitness() {
+    const entries = readGymWeights();
+    if (!entries.length) { weightSyncedFromFitness = false; return; }
+    // gym.html keeps wtEntries sorted ascending by date — last is latest.
+    const latest = entries[entries.length - 1];
+    const gymUnit = readGymUnits();
+    let val = latest.weight;
+    if (gymUnit !== state.weightUnit) {
+      // Normalize through kg to convert into whatever unit this page displays.
+      val = gymUnit === 'lb' ? val / 2.20462 : val * 2.20462;
+    }
+    state.profile.weightKg = Math.round(val * 10) / 10;
+    weightSyncedFromFitness = true;
+  }
 
   // Helpers
   function dateKey(d) {
@@ -961,7 +991,7 @@ html, body {
     svg.innerHTML = html;
   }
 
-  function renderAll() { renderDayPill(); renderWater(); }
+  function renderAll() { syncWeightFromFitness(); renderDayPill(); renderWater(); }
 
   // ============================================================
   // EVENT WIRING
@@ -996,6 +1026,8 @@ html, body {
   // ============================================================
   function renderSettings() {
     $('setWeight').value = state.profile.weightKg;
+    $('setWeight').disabled = weightSyncedFromFitness;
+    $('setWeightSyncNote').style.display = weightSyncedFromFitness ? 'block' : 'none';
     $('setAge').value = state.profile.age;
     $('setActivity').value = state.profile.activityHrsPerWeek;
     $('setCaffeine').value = state.caffeineMgPerDay;
@@ -1166,6 +1198,12 @@ html, body {
 
   // BOOT
   renderAll();
+
+  // Re-sync the weight from Fitness whenever a new one might have been
+  // logged elsewhere (another tab, or the app coming back to foreground).
+  window.addEventListener('storage', (e) => { if (!e.key || e.key === 'po_coach_weights') renderAll(); });
+  window.addEventListener('focus', renderAll);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) renderAll(); });
 })();
 </script>
 <style>

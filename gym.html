@@ -911,6 +911,13 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .wt-progress-link:hover { border-color: rgba(110,231,183,0.25); }
 .wt-progress-link:active { transform: scale(0.99); }
+.wt-backfill-link {
+  display: block; width: 100%; margin-top: 10px; padding: 4px;
+  border: 0; background: none; color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 600; text-align: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.wt-backfill-link:hover { color: var(--text-1); }
 .wt-progress-label {
   font-size: 11px; letter-spacing: 0.20em; font-weight: 600;
   color: var(--text-3); margin-bottom: 4px;
@@ -1320,6 +1327,8 @@ img, video, canvas, svg { max-width: 100%; }
           <button class="wt-save-btn" id="wtSaveBtn">Enregistrer</button>
         </div>
       </div>
+
+      <button type="button" class="wt-backfill-link" id="wtBackfillBtn">+ Ajouter un poids d'une date antérieure</button>
     </div>
 
     <button class="wt-progress-link" id="wtProgressLink" type="button" aria-label="Ouvrir les photos de progression">
@@ -1519,6 +1528,29 @@ img, video, canvas, svg { max-width: 100%; }
       <button class="po-btn-primary" id="exModalSave">Enregistrer</button>
     </div>
     <span class="po-delete-link" id="exDelete" style="display:none">Supprimer cet exercice</span>
+  </div>
+</div>
+
+<!-- Backfill a past weight entry -->
+<div class="po-modal-bg" id="wtBackfillModalBg">
+  <div class="po-modal" style="max-width: 400px;">
+    <h3>Ajouter un poids antérieur</h3>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Date</label>
+      <input type="date" id="wtBackfillDate">
+    </div>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Poids</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" step="0.1" inputmode="decimal" id="wtBackfillWeight" placeholder="Poids" style="flex:1;">
+        <span id="wtBackfillUnit" style="color:var(--text-2);font-size:13px;">kg</span>
+      </div>
+    </div>
+    <p id="wtBackfillExisting" class="hidden" style="font-size:11.5px;color:var(--text-3);margin:-4px 0 12px;">Une entrée existe déjà pour cette date — elle sera remplacée.</p>
+    <div class="po-modal-actions">
+      <button class="po-btn-secondary" id="wtBackfillCancel">Annuler</button>
+      <button class="po-btn-primary" id="wtBackfillSave">Enregistrer</button>
+    </div>
   </div>
 </div>
 
@@ -1807,7 +1839,7 @@ img, video, canvas, svg { max-width: 100%; }
   // is judged off the TOP set of the last session actually logged, not
   // just the last row entered.
   // ============================================================
-  const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 12;
+  const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 10;
   function suggestNextTarget(ex) {
     const logs = getLogsFor(ex.id);
     const last = mostRecentLog(logs);
@@ -2473,7 +2505,15 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (e) { return []; }
   }
   function wtSave(arr) {
-    try { localStorage.setItem(WT_KEY, JSON.stringify(arr)); } catch (e) {}
+    try { localStorage.setItem(WT_KEY, JSON.stringify(arr)); return true; }
+    catch (e) {
+      console.error('wtSave failed', e);
+      if (!window.__lastSaveFailAlert || Date.now() - window.__lastSaveFailAlert > 60000) {
+        window.__lastSaveFailAlert = Date.now();
+        alert('⚠️ Échec de la sauvegarde (stockage plein ?). Essaie de libérer de la place — par exemple en supprimant d\'anciennes photos de progression — puis réessaie.');
+      }
+      return false;
+    }
   }
   function wtDateKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -2497,13 +2537,14 @@ img, video, canvas, svg { max-width: 100%; }
 
   let wtEntries = wtLoad();
 
-  function wtSaveEntry(weight) {
-    const key = wtDateKey(new Date());
+  function wtSaveEntry(weight, dateKey) {
+    const key = dateKey || wtDateKey(new Date());
     const existing = wtEntries.find(e => e.dateKey === key);
     if (existing) existing.weight = weight;
     else { wtEntries.push({ dateKey: key, weight }); wtEntries.sort((a,b) => a.dateKey.localeCompare(b.dateKey)); }
-    wtSave(wtEntries);
+    if (!wtSave(wtEntries)) return false;
     wtRender();
+    return true;
   }
 
   function wtRender() {
@@ -2789,6 +2830,32 @@ img, video, canvas, svg { max-width: 100%; }
     const todayEntry = wtEntries.find(e => e.dateKey === wtDateKey(new Date()));
     if (todayEntry) $('wtInput').value = todayEntry.weight.toFixed(1);
     $('wtInput').focus(); $('wtInput').select();
+  });
+
+  // Backfill a past weight entry — for catching up on weigh-ins that
+  // predate using this app (or that were just never logged same-day).
+  function wtRenderBackfillExisting() {
+    const key = $('wtBackfillDate').value;
+    const existing = wtEntries.find(e => e.dateKey === key);
+    $('wtBackfillExisting').classList.toggle('hidden', !existing);
+    if (existing && !$('wtBackfillWeight').value) $('wtBackfillWeight').value = existing.weight;
+  }
+  $('wtBackfillBtn').addEventListener('click', () => {
+    $('wtBackfillUnit').textContent = state.units;
+    $('wtBackfillDate').value = wtDateKey(new Date());
+    $('wtBackfillDate').max = wtDateKey(new Date());
+    $('wtBackfillWeight').value = '';
+    wtRenderBackfillExisting();
+    $('wtBackfillModalBg').classList.add('show');
+    setTimeout(() => $('wtBackfillDate').focus(), 60);
+  });
+  $('wtBackfillDate').addEventListener('change', wtRenderBackfillExisting);
+  $('wtBackfillCancel').addEventListener('click', () => $('wtBackfillModalBg').classList.remove('show'));
+  $('wtBackfillSave').addEventListener('click', () => {
+    const key = $('wtBackfillDate').value;
+    const v = parseFloat($('wtBackfillWeight').value);
+    if (!key || isNaN(v) || v <= 0) { alert('Entrez une date et un poids valides.'); return; }
+    if (wtSaveEntry(v, key)) $('wtBackfillModalBg').classList.remove('show');
   });
 
   // ============================================================

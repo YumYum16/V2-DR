@@ -405,7 +405,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   // to failure (Schoenfeld et al.'s load-comparison meta-analyses; Refalo
   // et al. 2021's re-examination of the "repetition continuum").
   // ================================================================
-  const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 12;
+  const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 10;
   function suggestNextTarget(state, ex){
     const logs = (state.logs && state.logs[ex.id]) || [];
     const last = lastLogFor(state, ex.id);
