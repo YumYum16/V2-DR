@@ -480,9 +480,11 @@ details.info strong { color: var(--text-primary); }
         const t = mealT + dt, eff = entryEffectAt(entry, t);
         if (eff < worstV) { worstV = eff; worstT = t; }
       }
-      if (worstT != null && -worstV >= FOOD_DIP_MARKER_THRESHOLD) marks.push({ t: worstT, name: entry.foodName });
+      // Label sits partway down the slope into the trough, not at the flat
+      // bottom — that's the point actually on the diagonal descent.
+      if (worstT != null && -worstV >= FOOD_DIP_MARKER_THRESHOLD) marks.push({ t: Math.max(mealT+0.1, worstT-0.4), name: entry.foodName });
     });
-    return marks;
+    return marks.sort((a,b) => a.t - b.t);
   }
   function sleepPressure(awakeH){ return clamp(awakeH,0,24)*1.7; }
   function morningBump(t){ const d=t-wakeHour; return (d<0||d>4)?0:10*gauss(d,1.2,0.9); }
@@ -619,16 +621,30 @@ details.info strong { color: var(--text-primary); }
       parts.push('<path d="'+line+'" fill="none" stroke="#6BE3A4" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(107,227,164,0.55))"/>');
     }
 
-    // markers: food-driven dips — only shown when a meal's own effect is
-    // big enough to matter (see FOOD_DIP_MARKER_THRESHOLD), so this stays
-    // an answer to "why did it drop" rather than a label on every entry.
+    // markers: food-driven dips, labeled right on the diagonal descent
+    // (rotated to match the local slope) and staggered vertically so two
+    // labels close together in time never overlap. Only shown when a
+    // meal's own effect is big enough to matter (see
+    // FOOD_DIP_MARKER_THRESHOLD), so this stays an answer to "why did it
+    // drop" rather than a label on every entry.
+    let lastLabelX = -Infinity, lastLabelLevel = 0;
+    const MIN_LABEL_GAP = 90;
     foodDipMarkers().forEach(mk => {
-      const x=X(mk.t), yPoint=Y(energyAt(mk.t,true)), yLabel=Math.max(12, yPoint-26);
-      const label = mk.name.length>16 ? mk.name.slice(0,15)+'…' : mk.name;
-      parts.push('<g><title>'+escapeHtml(mk.name)+' — baisse d\'énergie liée à ce repas</title>'
-        +'<line x1="'+x.toFixed(1)+'" y1="'+(yLabel+8).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+(yPoint-4).toFixed(1)+'" stroke="rgba(255,138,138,0.55)" stroke-width="1.3"/>'
-        +'<path d="M '+x.toFixed(1)+' '+(yPoint-4).toFixed(1)+' l -3 -6 l 6 0 z" fill="#FF8A8A"/>'
-        +'<text x="'+x.toFixed(1)+'" y="'+yLabel.toFixed(1)+'" text-anchor="middle" font-size="10" font-family="ui-monospace, monospace" fill="#FF8A8A">'+escapeHtml(label)+'</text></g>');
+      const dt = 0.12;
+      const x = X(mk.t), x1 = X(mk.t-dt), x2 = X(mk.t+dt);
+      const y1 = Y(energyAt(mk.t-dt,true)), y2 = Y(energyAt(mk.t+dt,true));
+      const yMid = Y(energyAt(mk.t,true));
+      const angle = clamp(Math.atan2(y2-y1, x2-x1)*180/Math.PI, -30, 30);
+      const level = (x - lastLabelX < MIN_LABEL_GAP) ? lastLabelLevel + 1 : 0;
+      lastLabelX = x; lastLabelLevel = level;
+      const labelY = yMid + 16 + level*15;
+      const label = '↘ ' + (mk.name.length>15 ? mk.name.slice(0,14)+'…' : mk.name);
+      const boxW = label.length*5.6 + 8;
+      parts.push('<g transform="translate('+x.toFixed(1)+','+labelY.toFixed(1)+') rotate('+angle.toFixed(1)+')">'
+        +'<title>'+escapeHtml(mk.name)+' — baisse d\'énergie liée à ce repas</title>'
+        +'<rect x="'+(-boxW/2).toFixed(1)+'" y="-9" width="'+boxW.toFixed(1)+'" height="13" rx="4" fill="rgba(10,8,6,0.72)" stroke="rgba(255,138,138,0.35)" stroke-width="1"/>'
+        +'<text x="0" y="1" text-anchor="middle" font-size="10" font-family="ui-monospace, monospace" fill="#FF9E9E">'+escapeHtml(label)+'</text>'
+        +'</g>');
     });
 
     // markers: now + scrub
