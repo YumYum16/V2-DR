@@ -170,7 +170,19 @@ main {
   box-shadow: 0 12px 40px rgba(0,0,0,0.45);
 }
 
-.stack-head { margin-bottom: 12px; }
+.stack-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.stack-confirm-all {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(29,158,117,0.12); border: 1px solid rgba(29,158,117,0.35); color: var(--accent);
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 8px 13px; border-radius: 10px;
+  cursor: pointer; white-space: nowrap; transition: background 0.15s, border-color 0.15s;
+}
+.stack-confirm-all:hover { background: rgba(29,158,117,0.2); }
+.stack-confirm-all:disabled { opacity: 0.4; cursor: default; background: rgba(255,255,255,0.04); border-color: var(--border-strong); color: var(--text-tertiary); }
+@media (max-width: 600px) {
+  .stack-head { flex-direction: column; align-items: stretch; }
+  .stack-confirm-all { align-self: flex-start; }
+}
 .sf-eyebrow {
   font-family: var(--font-mono);
   font-size: 11px; font-weight: 600;
@@ -945,9 +957,12 @@ main {
     </div>
 
     <div class="stack-head">
-      <div class="sf-eyebrow">Stack quotidien</div>
-      <div class="sf-title">Cochez chaque élément une fois pris</div>
-      <div class="stack-progress-text" id="stackProgressText">— / — pris aujourd'hui · réinitialisation à 6 h</div>
+      <div>
+        <div class="sf-eyebrow">Stack quotidien</div>
+        <div class="sf-title">Cochez chaque élément une fois pris</div>
+        <div class="stack-progress-text" id="stackProgressText">— / — pris aujourd'hui · réinitialisation à 6 h</div>
+      </div>
+      <button type="button" class="stack-confirm-all" id="stackConfirmAllBtn">✓ Tout confirmer</button>
     </div>
 
     <div class="stack-progress-track">
@@ -1156,6 +1171,12 @@ main {
     }
     storeSet(flagKey, true);
   }
+  function confirmAllTaken() {
+    const taken = getTaken();
+    getItems().forEach(i => { if (!taken[i.id]) taken[i.id] = Date.now(); });
+    setTaken(taken);
+    render();
+  }
   function deleteItem(id) {
     setItems(getItems().filter(i => i.id !== id));
     const taken = getTaken();
@@ -1197,6 +1218,10 @@ main {
       `${takenCount} / ${totalCount} pris aujourd'hui · réinitialisation à 6 h`;
     const pct = totalCount === 0 ? 0 : (takenCount / totalCount) * 100;
     document.getElementById('stackProgressBar').style.width = pct + '%';
+    const confirmAllBtn = document.getElementById('stackConfirmAllBtn');
+    const allDone = totalCount > 0 && takenCount === totalCount;
+    confirmAllBtn.disabled = allDone;
+    confirmAllBtn.textContent = allDone ? '✓ Tout pris' : '✓ Tout confirmer';
 
     const groupsEl = document.getElementById('stackGroups');
     groupsEl.innerHTML = '';
@@ -1524,6 +1549,8 @@ main {
     if (newKey !== todayKey) { todayKey = newKey; applyAutoTaken(); }
     render();
   }, 60 * 1000);
+
+  document.getElementById('stackConfirmAllBtn').addEventListener('click', confirmAllTaken);
 
   applyAutoTaken();
   render();
