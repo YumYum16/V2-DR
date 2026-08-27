@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Calendrier · Tableau de bord</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --indigo: #818CF8;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(129,140,248,0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+.atmo-wash {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(60% 50% at 50% 20%, rgba(129,140,248,0.14) 0%, rgba(129,140,248,0.05) 35%, transparent 65%),
+    radial-gradient(50% 40% at 80% 85%, rgba(76,46,201,0.10) 0%, transparent 60%),
+    radial-gradient(120% 80% at 50% 100%, rgba(16,14,38,0.5) 0%, rgba(4,6,10,0.95) 75%);
+  background-repeat: no-repeat; background-size: 100% 100%;
+}
+.atmo-particles { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.atmo-particles span {
+  position: absolute; width: 1.5px; height: 1.5px; border-radius: 50%;
+  background: rgba(200,200,255,0.7);
+  animation: atmo-drift linear infinite;
+  box-shadow: 0 0 6px rgba(129,140,248,0.55);
+}
+@keyframes atmo-drift {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  10%  { opacity: 0.7; } 90%  { opacity: 0.5; }
+  100% { transform: translate3d(var(--dx, 12px), var(--dy, -100vh), 0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .atmo-particles span { animation: none; } }
+
+.page { max-width: 640px; margin: 0 auto; position: relative; z-index: 5; }
+.dash-title {
+  margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.dash-sub { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
+.gm-card {
+  position: relative; background: rgba(255, 255, 255, 0.04); border-radius: 16px;
+  padding: 20px; margin-bottom: 14px;
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+details.info {
+  margin: 0 0 18px; padding: 2px 18px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.55;
+}
+details.info summary { cursor: pointer; padding: 12px 0; color: var(--text-primary); font-weight: 600; list-style: none; }
+details.info summary::-webkit-details-marker { display: none; }
+details.info p { margin: 8px 0; } details.info strong { color: var(--text-primary); }
+
+/* ---- month calendar ---- */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-month { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
+.cal-weekday { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.06em; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-cell {
+  aspect-ratio: 0.82; border-radius: 9px; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 3px 2px;
+}
+.cal-cell.train { border-left-color: var(--indigo); }
+.cal-cell.rest { border-left-color: rgba(255,255,255,0.18); }
+.cal-cell.today { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.4); }
+.cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
+.cal-split { font-size: 7.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary); text-align: center; line-height: 1.15; }
+.cal-cell.train .cal-split { color: var(--indigo); }
+.cal-kcal { font-size: 8.5px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+.cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-tertiary); }
+.cal-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.cal-legend-dot.train { background: var(--indigo); }
+.cal-legend-dot.rest { background: rgba(255,255,255,0.25); }
+
+/* ---- today summary ---- */
+.today-row { display: flex; align-items: center; gap: 14px; }
+.today-badge {
+  width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+  background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3);
+}
+.today-info { flex: 1; min-width: 0; }
+.today-split { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+.today-kcal { font-size: 12.5px; color: var(--text-tertiary); margin-top: 2px; }
+.today-links { display: flex; gap: 8px; margin-top: 14px; }
+.today-link {
+  flex: 1; text-align: center; padding: 11px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary); text-decoration: none;
+  font-size: 12.5px; font-weight: 700; transition: background 0.15s;
+}
+.today-link:hover { background: rgba(255,255,255,0.08); }
+
+.cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.cross-nav a {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+  color: var(--text-secondary); text-decoration: none; font-size: 12.5px; font-weight: 600;
+}
+.cross-nav a:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .dash-title { font-size: 22px; }
+  .cal-split { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="atmo-backdrop" aria-hidden="true">
+  <div class="atmo-wash"></div>
+  <div class="atmo-particles" id="atmoParticles"></div>
+</div>
+
+<div class="page" id="app"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  const WATER_KEY = 'po_water_v1';
+  const GYM_KEY = 'po_coach_v1';
+  const WEIGHTS_KEY = 'po_coach_weights';
+  const PROGRAM_KEY = 'po_nutrition_program_v1';
+
+  // Read-only page — no cloud sync of its own, same as Caféine reading
+  // po_water_v1. Whatever Fitness/Eau/Alimentation already synced to this
+  // device's localStorage is what gets read here.
+  function loadJSON(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } }
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // ================================================================
+  // SPLIT ROTATION — identical math to gym.html's todaySplit(), just
+  // generalized to any date instead of only "now". Same source of truth:
+  // state.splitRotation + state.splitAnchor.
+  // ================================================================
+  function splitForDate(gym, date) {
+    try {
+      const rot = gym.splitRotation;
+      if (!rot || !rot.length || !gym.splitAnchor) return null;
+      const a = new Date(gym.splitAnchor.date);
+      const t = new Date(date);
+      a.setHours(0,0,0,0); t.setHours(0,0,0,0);
+      const diffDays = Math.round((t - a) / 86400000);
+      const idx = ((gym.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
+      return rot[idx];
+    } catch (e) { return null; }
+  }
+  function isRestLabel(label) { return /repos|rest/i.test(label || ''); }
+
+  // ================================================================
+  // TDEE — same Mifflin-St Jeor + activity-tier + rest-day-drop formula
+  // as Alimentation (see that page's "D'où viennent ces chiffres" for the
+  // citations: Mifflin-St Jeor 1990, Frankenfield et al. 2005). This page
+  // only needs two numbers (train-day kcal, rest-day kcal), not the full
+  // adaptive weekly recompute — it reads the program's current deficit
+  // rather than re-running that logic, since Alimentation already owns it.
+  // ================================================================
+  function readProfile() {
+    const w = loadJSON(WATER_KEY, null);
+    return (w && w.profile) || { weightKg: 75, age: 25, sex: 'm', activityHrsPerWeek: 5, heightCm: 175 };
+  }
+  function readLiveWeightKg() {
+    const entries = loadJSON(WEIGHTS_KEY, []);
+    if (!entries.length) return null;
+    const gym = loadJSON(GYM_KEY, {});
+    const unit = (gym && gym.units) || 'kg';
+    const latest = entries[entries.length - 1];
+    return unit === 'lb' ? latest.weight / 2.20462 : latest.weight;
+  }
+  function computeBMR(profile, weightKg) {
+    const s = profile.sex === 'f' ? -161 : (profile.sex === 'm' ? 5 : -78);
+    return 10 * weightKg + 6.25 * (profile.heightCm || 175) - 5 * (profile.age || 25) + s;
+  }
+  function activityMultiplier(hrsPerWeek) {
+    const h = hrsPerWeek || 0;
+    if (h < 2) return 1.2; if (h < 4) return 1.375; if (h < 7) return 1.55; if (h < 10) return 1.725; return 1.9;
+  }
+  function computeTDEE(profile, weightKg, restDay) {
+    const tiers = [1.2, 1.375, 1.55, 1.725, 1.9];
+    let mult = activityMultiplier(profile.activityHrsPerWeek);
+    if (restDay) { const idx = Math.max(0, tiers.indexOf(mult) - 1); mult = tiers[idx]; }
+    return computeBMR(profile, weightKg) * mult;
+  }
+  function readDeficitPct() {
+    const p = loadJSON(PROGRAM_KEY, null);
+    return (p && typeof p.deficitPct === 'number') ? p.deficitPct : 20;
+  }
+
+  function dayKcalTargets() {
+    const profile = readProfile();
+    const weightKg = readLiveWeightKg() || profile.weightKg || 75;
+    const deficitPct = readDeficitPct();
+    const train = Math.round(computeTDEE(profile, weightKg, false) * (1 - deficitPct/100));
+    const rest = Math.round(computeTDEE(profile, weightKg, true) * (1 - deficitPct/100));
+    return { train, rest };
+  }
+
+  // ================================================================
+  // RENDER
+  // ================================================================
+  const MONTH_NAMES = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const WEEKDAY_LABELS = ['L','M','M','J','V','S','D'];
+  const CROSS_NAV =
+    '<div class="cross-nav">' +
+    '<a href="gym.html">💪 Fitness</a>' +
+    '<a href="seance.html">🏋️ Séance</a>' +
+    '<a href="alimentation.html">🍎 Alimentation</a>' +
+    '</div>';
+
+  function render() {
+    const app = document.getElementById('app');
+    const gym = loadJSON(GYM_KEY, {});
+    const kcal = dayKcalTargets();
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const todayKey = y + '-' + (m+1) + '-' + now.getDate();
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7; // Monday-first
+
+    let html = '<h1 class="dash-title">Calendrier</h1>' +
+      '<p class="dash-sub">Tes jours de séance (Push/Pull/Legs) et de repos, lus directement depuis la répartition de Fitness, avec la cible de calories qui va avec chaque type de jour.</p>' +
+      '<details class="info"><summary>D\'où viennent ces chiffres</summary>' +
+      '<p>Le type de jour (entraînement ou repos) vient de ta répartition dans <strong>Fitness</strong> (Réglages → Répartition) — pas d\'une case à cocher séparée ici, c\'est la même rotation que celle affichée là-bas.</p>' +
+      '<p>Les calories utilisent la même formule que <strong>Alimentation</strong> : <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base, un facteur d\'activité selon tes heures d\'entraînement/semaine, et un cran d\'activité en moins les jours de repos (même logique de "carb cycling" qu\'Alimentation). Le déficit actuel de ton programme adaptatif est appliqué tel quel.</p>' +
+      '<p>Ces chiffres sont une <strong>référence figée pour le mois</strong>, pas recalculée jour par jour sur ton poids réel de ce jour précis — pour le chiffre du jour exact, ajusté à ton poids et ton statut repos/entraînement d\'aujourd\'hui, c\'est toujours <strong>Alimentation</strong> qui fait foi.</p>' +
+      '</details>';
+
+    // month grid
+    html += '<div class="gm-card"><div class="cal-head"><span class="cal-month">' + MONTH_NAMES[m] + ' ' + y + '</span></div>' +
+      '<div class="cal-weekdays">' + WEEKDAY_LABELS.map(d => '<div class="cal-weekday">' + d + '</div>').join('') + '</div>' +
+      '<div class="cal-grid">';
+    for (let i = 0; i < firstWeekday; i++) html += '<div></div>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(y, m, d);
+      const split = splitForDate(gym, date);
+      const rest = split == null ? null : isRestLabel(split);
+      const dayKey = y + '-' + (m+1) + '-' + d;
+      const isToday = dayKey === todayKey;
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (rest == null ? '' : rest ? ' rest' : ' train');
+      html += '<div class="' + cls + '" title="' + escapeHtml(split || '—') + '">' +
+        '<span class="cal-day">' + d + '</span>' +
+        (split ? '<span class="cal-split">' + escapeHtml(split) + '</span>' : '') +
+        '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' +
+        '</div>';
+    }
+    html += '</div>' +
+      '<div class="cal-legend">' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot train"></span>Entraînement · ~' + kcal.train + ' kcal</span>' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot rest"></span>Repos · ~' + kcal.rest + ' kcal</span>' +
+      '</div></div>';
+
+    // today summary
+    const todaySplit = splitForDate(gym, now) || '—';
+    const todayRest = isRestLabel(todaySplit);
+    html += '<div class="gm-card"><div class="section-title">Aujourd\'hui</div>' +
+      '<div class="today-row">' +
+      '<div class="today-badge">' + (todayRest ? '😴' : '💪') + '</div>' +
+      '<div class="today-info">' +
+      '<div class="today-split">' + escapeHtml(todaySplit) + '</div>' +
+      '<div class="today-kcal">Vise ~' + (todayRest ? kcal.rest : kcal.train) + ' kcal aujourd\'hui</div>' +
+      '</div></div>' +
+      '<div class="today-links">' +
+      '<a class="today-link" href="seance.html">Lancer la séance →</a>' +
+      '<a class="today-link" href="alimentation.html">Voir Alimentation →</a>' +
+      '</div></div>';
+
+    html += CROSS_NAV;
+    app.innerHTML = html;
+  }
+
+  render();
+})();
+</script>
+<script id="atmo-backdrop-js">
+(function () {
+  function spawnParticles() {
+    var root = document.getElementById('atmoParticles');
+    if (!root) return;
+    root.innerHTML = '';
+    var N = window.innerWidth < 640 ? 12 : 20;
+    for (var i = 0; i < N; i++) {
+      var s = document.createElement('span');
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.top = (55 + Math.random() * 45) + '%';
+      var size = 1.1 + Math.random() * 1.2;
+      s.style.width = s.style.height = size + 'px';
+      var dur = 24 + Math.random() * 30;
+      s.style.animationDuration = dur + 's';
+      s.style.animationDelay = (-Math.random() * dur) + 's';
+      s.style.setProperty('--dx', (Math.random() * 28 - 14) + 'px');
+      s.style.setProperty('--dy', -(55 + Math.random() * 45) + 'vh');
+      root.appendChild(s);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', spawnParticles);
+  else spawnParticles();
+})();
+</script>
+</body>
+</html>

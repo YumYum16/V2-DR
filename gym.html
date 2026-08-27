@@ -1191,14 +1191,6 @@ img, video, canvas, svg { max-width: 100%; }
 .gym-heat-month { font-size: 12px; color: var(--text-2); font-weight: 600; }
 .gym-heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .gym-heat-cell { aspect-ratio: 1; border-radius: 5px; background: var(--border); }
-.wt-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
-.wt-cal-cell {
-  aspect-ratio: 1; border-radius: 7px; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-}
-.wt-cal-cell.has-entry { background: rgba(110,231,183,0.08); border-color: rgba(110,231,183,0.22); }
-.wt-cal-day { font-size: 8.5px; color: var(--text-3); }
-.wt-cal-val { font-size: 9.5px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
 
 /* ===== Muscle preview card (iframes muscle-tracker.html) ===== */
 .po-muscle-preview-head {
@@ -1358,16 +1350,6 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
     <div class="gym-heat-grid" id="gymHeatGrid"></div>
   </div>
-  </div>
-
-  <!-- Monthly weight calendar — same grid as Assiduité above, but shows
-       the logged weight under each date instead of a set-count color. -->
-  <div class="card">
-    <div class="gym-heat-head">
-      <span class="gym-heat-title">Poids — Calendrier</span>
-      <span class="gym-heat-month" id="wtCalMonth">—</span>
-    </div>
-    <div class="wt-cal-grid" id="wtCalGrid"></div>
   </div>
 
   <!-- Progress photos overlay -->
@@ -2619,30 +2601,7 @@ img, video, canvas, svg { max-width: 100%; }
     return true;
   }
 
-  function renderWeightCalendar() {
-    const grid = $('wtCalGrid');
-    if (!grid) return;
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-    $('wtCalMonth').textContent = monthNames[m] + ' ' + y;
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const byDate = {};
-    wtEntries.forEach(e => { byDate[e.dateKey] = e.weight; });
-    let html = '';
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dk = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      const w = byDate[dk];
-      html += '<div class="wt-cal-cell' + (w != null ? ' has-entry' : '') + '" title="' + dk + (w != null ? (' — ' + w.toFixed(1) + ' ' + state.units) : '') + '">' +
-        '<span class="wt-cal-day">' + d + '</span>' +
-        (w != null ? '<span class="wt-cal-val">' + w.toFixed(1) + '</span>' : '') +
-        '</div>';
-    }
-    grid.innerHTML = html;
-  }
-
   function wtRender() {
-    renderWeightCalendar();
     const last = wtEntries[wtEntries.length - 1] || null;
     const todayKey = wtDateKey(new Date());
     const todayEntry = wtEntries.find(e => e.dateKey === todayKey);
