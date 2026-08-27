@@ -246,12 +246,26 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
   const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
   const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_motivation_v1', 'po_day_overrides_v1'];
+  // Marks "the last push to the cloud didn't confirm" (offline, request
+  // failed, etc). Never itself synced — purely a local flag. Without this,
+  // a save made while offline would sit correctly in localStorage but
+  // never reach the cloud, and the NEXT load's pcPullOnce() would blindly
+  // overwrite localStorage with the (now stale) cloud copy — silently
+  // erasing the offline write on this same device. See pcPullOnce().
+  const PC_PENDING_KEY = 'po_coach_pc_pending_v1';
   let pcSupa = null;
   if (window.supabase && PC_SUPABASE_URL.indexOf('PASTE-') !== 0 && PC_SUPABASE_KEY.indexOf('PASTE-') !== 0) {
     try { pcSupa = window.supabase.createClient(PC_SUPABASE_URL, PC_SUPABASE_KEY); } catch (e) {}
   }
   async function pcPullOnce() {
     if (!pcSupa) return;
+    // Retry any push that failed to confirm before pulling — otherwise
+    // this pull would overwrite the newer local data (from that failed
+    // push) with the older cloud copy it never reached.
+    if (localStorage.getItem(PC_PENDING_KEY)) {
+      await pcPushNow();
+      if (localStorage.getItem(PC_PENDING_KEY)) return; // still failing (offline?) — don't pull stale data over newer local data
+    }
     try {
       const result = await Promise.race([
         pcSupa.from('app_state').select('data').eq('key', PC_APP_KEY).maybeSingle(),
@@ -276,11 +290,18 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       try { out[k] = JSON.parse(v); } catch (e) { out[k] = v; }
     });
     try {
-      await pcSupa.from('app_state').upsert(
+      const { error } = await pcSupa.from('app_state').upsert(
         { key: PC_APP_KEY, data: out, updated_at: new Date().toISOString() }, { onConflict: 'key' }
       );
-    } catch (e) {}
+      if (error) throw error;
+      try { localStorage.removeItem(PC_PENDING_KEY); } catch (e) {}
+    } catch (e) {
+      try { localStorage.setItem(PC_PENDING_KEY, '1'); } catch (e2) {}
+    }
   }
+  // Retry as soon as connectivity comes back, instead of waiting for the
+  // next save or the next full page load.
+  window.addEventListener('online', () => { if (localStorage.getItem(PC_PENDING_KEY)) pcPushNow(); });
   function saveJSON(k, v) {
     try { localStorage.setItem(k, JSON.stringify(v)); pcPushNow(); return true; }
     catch (e) { console.error('save failed', k, e); return false; }

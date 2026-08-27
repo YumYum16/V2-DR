@@ -3294,6 +3294,16 @@ img, video, canvas, svg { max-width: 100%; }
   // strips any base64 dataUrl entries before push so the payload stays
   // tiny and we never blow iOS Safari's ~5MB localStorage quota.
   const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_motivation_v1', 'po_day_overrides_v1'];
+  // Marks "the last push to the cloud didn't confirm" (offline, request
+  // failed, unload flush that couldn't be verified, etc). Never itself
+  // synced — purely a local flag, and shared by name with Calendrier/
+  // Fatigue/Séance since they all write the same "po-coach" row. Without
+  // this, a save made while offline would sit correctly in localStorage
+  // but never reach the cloud, and the NEXT load's initial pull would
+  // blindly overwrite localStorage with the (now stale) cloud copy —
+  // silently erasing the offline write on this same device. See
+  // pcInitCloudSync() below.
+  const PC_PENDING_KEY = 'po_coach_pc_pending_v1';
 
   let pcSupa = null;
   let pcPushTimer = null;
@@ -3424,8 +3434,12 @@ img, video, canvas, svg { max-width: 100%; }
           { key: APP_KEY, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-      if (!error) pcLastSyncedJson = json;
-    } catch (_) {}
+      if (error) throw error;
+      pcLastSyncedJson = json;
+      try { localStorage.removeItem(PC_PENDING_KEY); } catch (e) {}
+    } catch (_) {
+      try { localStorage.setItem(PC_PENDING_KEY, '1'); } catch (e2) {}
+    }
   }
 
   function pcSchedulePush() {
@@ -3441,6 +3455,10 @@ img, video, canvas, svg { max-width: 100%; }
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
+    // A keepalive fetch fired on unload can't be awaited/confirmed — mark
+    // pending optimistically so the next load retries it for real before
+    // trusting a pull. Cleared on the next confirmed pcPushNow() success.
+    try { localStorage.setItem(PC_PENDING_KEY, '1'); } catch (e) {}
     try {
       fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
         method: 'POST',
@@ -3464,16 +3482,25 @@ img, video, canvas, svg { max-width: 100%; }
     // Skip if the placeholder values are still in place (local-only mode)
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
     pcSupa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    try {
-      const { data, error } = await pcSupa
-        .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
-      if (!error && data && data.data && Object.keys(data.data).length > 0) {
-        pcLastSyncedJson = JSON.stringify(data.data);
-        pcMaybeApplyRemote(data.data);
-      } else if (Object.keys(pcCollectState()).length > 0) {
-        pcSchedulePush();
-      }
-    } catch (_) {}
+    // Retry any push that failed to confirm (offline, or an unload flush
+    // that couldn't be verified) before pulling — otherwise the pull below
+    // would overwrite newer local data with the stale cloud copy that
+    // failed/unconfirmed push never reached.
+    if (localStorage.getItem(PC_PENDING_KEY)) {
+      await pcPushNow();
+    }
+    if (!localStorage.getItem(PC_PENDING_KEY)) {
+      try {
+        const { data, error } = await pcSupa
+          .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
+        if (!error && data && data.data && Object.keys(data.data).length > 0) {
+          pcLastSyncedJson = JSON.stringify(data.data);
+          pcMaybeApplyRemote(data.data);
+        } else if (Object.keys(pcCollectState()).length > 0) {
+          pcSchedulePush();
+        }
+      } catch (_) {}
+    } // else: still failing (offline?) — skip the pull, keep local as-is
     pcSupa.channel('app_state_' + APP_KEY)
       .on('postgres_changes', {
         event: '*',
@@ -3498,6 +3525,9 @@ img, video, canvas, svg { max-width: 100%; }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pcFlushPushOnUnload();
   });
+  // Retry as soon as connectivity comes back, instead of waiting for the
+  // next edit or the next full page load.
+  window.addEventListener('online', () => { if (localStorage.getItem(PC_PENDING_KEY)) pcPushNow(); });
 })();
 </script>
 
