@@ -281,29 +281,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     catch (e) { console.error('save failed', k, e); return false; }
   }
 
-  // ================================================================
-  // SPLIT ROTATION — identical math to gym.html's todaySplit(), just
-  // generalized to any date instead of only "now". Same source of truth:
-  // state.splitRotation + state.splitAnchor. A manual override placed on
-  // this page wins over the formula — that's the whole point of letting
-  // you place your own days here.
-  // ================================================================
-  function splitForDate(gym, date) {
-    try {
-      const rot = gym.splitRotation;
-      if (!rot || !rot.length || !gym.splitAnchor) return null;
-      const a = new Date(gym.splitAnchor.date);
-      const t = new Date(date);
-      a.setHours(0,0,0,0); t.setHours(0,0,0,0);
-      const diffDays = Math.round((t - a) / 86400000);
-      const idx = ((gym.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
-      return rot[idx];
-    } catch (e) { return null; }
-  }
-  function splitForDateResolved(gym, overrides, date) {
-    const o = overrides[dateKey(date)];
-    return o || splitForDate(gym, date);
-  }
   function isRestLabel(label) { return /repos|rest/i.test(label || ''); }
 
   // ================================================================
@@ -381,9 +358,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7; // Monday-first
 
     let html = '<h1 class="dash-title">Calendrier</h1>' +
-      '<p class="dash-sub">Tes jours de séance (Push/Pull/Legs) et de repos — Fitness propose une rotation automatique, mais touche n\'importe quel jour (passé ou futur) pour le placer toi-même. Les calories s\'ajustent seules selon ce que tu choisis.</p>' +
+      '<p class="dash-sub">Rien n\'est placé tout seul — touche un jour (passé ou futur, n\'importe quel mois) pour lui donner un type toi-même. Les calories s\'ajustent seules selon ton choix.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres</summary>' +
-      '<p>Le type de jour vient d\'abord de ce que tu as placé toi-même ici (touche un jour). Sans placement manuel, c\'est ta répartition automatique dans <strong>Fitness</strong> (Réglages → Répartition) qui décide, comme sur cette page-là.</p>' +
+      '<p>Le type de jour vient uniquement de ce que tu places toi-même ici (touche un jour) — rien n\'est deviné à partir de la répartition automatique de <strong>Fitness</strong>, même si tu l\'as configurée là-bas. Un jour vide reste vide tant que tu n\'y touches pas.</p>' +
       '<p>Les calories utilisent la même formule que <strong>Alimentation</strong> : <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base, un facteur d\'activité selon tes heures d\'entraînement/semaine, et un cran d\'activité en moins les jours de repos (même logique de "carb cycling" qu\'Alimentation). Le déficit actuel de ton programme adaptatif est appliqué tel quel.</p>' +
       '<p>Ces chiffres sont une <strong>référence figée pour le mois</strong>, pas recalculée jour par jour sur ton poids réel de ce jour précis — pour le chiffre du jour exact, ajusté à ton poids et ton statut repos/entraînement d\'aujourd\'hui, c\'est toujours <strong>Alimentation</strong> qui fait foi. Un jour placé manuellement ici compte aussi pour Alimentation (et la pastille kcal en haut de chaque page), pas seulement pour cette page.</p>' +
       '</details>';
@@ -400,33 +377,36 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(y, m, d);
       const dk = dateKey(date);
-      const split = splitForDateResolved(gym, overrides, date);
+      // Only a day YOU placed shows a split/kcal — nothing gets guessed or
+      // pre-filled onto the calendar without you touching it first.
+      const split = overrides[dk] || null;
       const rest = split == null ? null : isRestLabel(split);
       const isToday = dk === todayKey;
-      const isManual = !!overrides[dk];
-      const cls = 'cal-cell' + (isToday ? ' today' : '') + (isManual ? ' manual' : '') + (rest == null ? '' : rest ? ' rest' : ' train');
-      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split || '—') + (isManual ? ' (placé manuellement)' : '') + '">' +
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (split ? ' manual' : '') + (rest == null ? '' : rest ? ' rest' : ' train');
+      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + (split ? escapeHtml(split) + ' (placé par toi)' : 'Pas encore défini — touche pour choisir') + '">' +
         '<span class="cal-day">' + d + '</span>' +
         (split ? '<span class="cal-split">' + escapeHtml(split) + '</span>' : '') +
-        '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' +
+        (split ? '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' : '') +
         '</button>';
     }
     html += '</div>' +
       '<div class="cal-legend">' +
       '<span class="cal-legend-item"><span class="cal-legend-dot train"></span>Entraînement · ~' + kcal.train + ' kcal</span>' +
       '<span class="cal-legend-item"><span class="cal-legend-dot rest"></span>Repos · ~' + kcal.rest + ' kcal</span>' +
-      '</div></div>';
+      '</div><div class="program-note">Un jour vide n\'est pas défini — rien n\'est deviné ni ajouté tout seul, ni ici ni dans l\'abonnement téléphone. Touche un jour pour le placer.</div></div>';
 
-    // today summary
-    const todaySplit = splitForDateResolved(gym, overrides, now) || '—';
-    const todayRest = isRestLabel(todaySplit);
+    // today summary — only reflects what YOU placed for today, nothing guessed
+    const todaySplit = overrides[todayKey] || null;
+    const todayRest = todaySplit ? isRestLabel(todaySplit) : false;
     html += '<div class="gm-card"><div class="section-title">Aujourd\'hui</div>' +
-      '<div class="today-row">' +
-      '<div class="today-badge">' + (todayRest ? '😴' : '💪') + '</div>' +
-      '<div class="today-info">' +
-      '<div class="today-split">' + escapeHtml(todaySplit) + '</div>' +
-      '<div class="today-kcal">Vise ~' + (todayRest ? kcal.rest : kcal.train) + ' kcal aujourd\'hui</div>' +
-      '</div></div>' +
+      (todaySplit ?
+        '<div class="today-row">' +
+        '<div class="today-badge">' + (todayRest ? '😴' : '💪') + '</div>' +
+        '<div class="today-info">' +
+        '<div class="today-split">' + escapeHtml(todaySplit) + '</div>' +
+        '<div class="today-kcal">Vise ~' + (todayRest ? kcal.rest : kcal.train) + ' kcal aujourd\'hui</div>' +
+        '</div></div>' :
+        '<p class="empty-note">Pas encore placé — touche la case d\'aujourd\'hui dans le calendrier ci-dessus pour choisir.</p>') +
       '<div class="today-links">' +
       '<a class="today-link" href="seance.html">Lancer la séance →</a>' +
       '<a class="today-link" href="alimentation.html">Voir Alimentation →</a>' +

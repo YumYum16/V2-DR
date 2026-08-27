@@ -54,18 +54,6 @@ export default async function handler(req, res) {
     const latest = weights[weights.length - 1];
     return unit === 'lb' ? latest.weight / 2.20462 : latest.weight;
   }
-  function splitForDate(date) {
-    try {
-      const rot = gym.splitRotation;
-      if (!rot || !rot.length || !gym.splitAnchor) return null;
-      const a = new Date(gym.splitAnchor.date);
-      const t = new Date(date);
-      a.setHours(0, 0, 0, 0); t.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((t - a) / 86400000);
-      const idx = ((gym.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
-      return rot[idx];
-    } catch (e) { return null; }
-  }
   const isRest = (label) => /repos|rest/i.test(label || '');
   function computeBMR(weightKg) {
     const s = profile.sex === 'f' ? -161 : (profile.sex === 'm' ? 5 : -78);
@@ -89,12 +77,6 @@ export default async function handler(req, res) {
   const icsDate = (d) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
   const dateKey = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const escapeText = (s) => String(s).replace(/[\\,;]/g, (c) => '\\' + c);
-  // A manual override placed in Calendrier wins over the rotation formula
-  // — same priority as everywhere else this logic is duplicated.
-  function splitForDateWithOverride(date) {
-    const o = overrides[dateKey(date)];
-    return o || splitForDate(date);
-  }
 
   const now = new Date();
   const lines = [
@@ -108,9 +90,12 @@ export default async function handler(req, res) {
     'REFRESH-INTERVAL;VALUE=DURATION:PT6H',
     'X-PUBLISHED-TTL:PT6H',
   ];
+  // Only days you actually placed in Calendrier get an event — nothing is
+  // guessed from the Fitness rotation formula and pushed to your phone
+  // without you choosing it first.
   for (let i = -3; i <= 60; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    const split = splitForDateWithOverride(d);
+    const split = overrides[dateKey(d)];
     if (!split) continue;
     const rest = isRest(split);
     const kcal = rest ? kcalRest : kcalTrain;
