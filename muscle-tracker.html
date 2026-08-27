@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <script src="lock.js"></script>
+<script src="/api/config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
@@ -12,6 +13,7 @@
   // flash of the full page before it collapses.
   try { if (window.self !== window.top) document.documentElement.classList.add('mt-embedded'); } catch (e) {}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="topbar.js" defer></script>
 
 <style>
@@ -499,6 +501,36 @@ const DAY_MS = 86400000;
   // été sollicités. history[key] = { 'YYYY-MM-DD': intensité 0-1 } — la
   // vérité vient de tes séances, pas d'un clic à reset.
   const GYM_KEY = 'po_coach_v1';
+
+  // Read-only page: pull once (below, in parallel with the body-image
+  // loads) from the same Supabase row Fitness syncs (appKey "po-coach")
+  // so this reflects sessions logged on other devices — never pushes.
+  const PC_APP_KEY = 'po-coach';
+  const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
+  const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_motivation_v1'];
+  let pcSupa = null;
+  if (window.supabase && PC_SUPABASE_URL.indexOf('PASTE-') !== 0 && PC_SUPABASE_KEY.indexOf('PASTE-') !== 0) {
+    try { pcSupa = window.supabase.createClient(PC_SUPABASE_URL, PC_SUPABASE_KEY); } catch (e) {}
+  }
+  async function pcPullOnce() {
+    if (!pcSupa) return;
+    try {
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', PC_APP_KEY).maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (!result) return;
+      const { data, error } = result;
+      if (!error && data && data.data) {
+        Object.keys(data.data).forEach(k => {
+          if (PC_SYNCED_KEYS.indexOf(k) === -1) return;
+          try { localStorage.setItem(k, JSON.stringify(data.data[k])); } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }
+
   const history = {};
   const contrib = {}; // key -> [{ date, name, weight }] pour le détail au clic
   const pieceIndex = { front: [], back: [] };
@@ -830,7 +862,7 @@ const DAY_MS = 86400000;
   buildLegend();
 
   const allLoads = [...pieceIndex.front, ...pieceIndex.back].map(loadPieceCanvas);
-  Promise.all(allLoads).then(() => { rebuildHistory(); render(); });
+  Promise.all([pcPullOnce()].concat(allLoads)).then(() => { rebuildHistory(); render(); });
 
   // Musculation (gym.html) is the source of truth — re-derive whenever its
   // logs might have changed: another tab wrote to localStorage, or this

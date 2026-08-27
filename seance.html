@@ -323,11 +323,59 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 <div class="page" id="app"></div>
 
 <script>
-(function(){
+(async function(){
   'use strict';
 
   const LS_KEY = 'po_coach_v1';
   const IS_MOBILE = window.matchMedia('(max-width: 720px)').matches;
+
+  // ================================================================
+  // CLOUD SYNC — same Supabase row Fitness (gym.html) already syncs
+  // (appKey "po-coach"), so a session logged here shows up there and on
+  // any other device, and vice versa. Pulled once before this page reads
+  // its own state (below); pushed after every successful local save.
+  // ================================================================
+  const PC_APP_KEY = 'po-coach';
+  const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
+  const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_motivation_v1'];
+  let pcSupa = null;
+  if (window.supabase && PC_SUPABASE_URL.indexOf('PASTE-') !== 0 && PC_SUPABASE_KEY.indexOf('PASTE-') !== 0) {
+    try { pcSupa = window.supabase.createClient(PC_SUPABASE_URL, PC_SUPABASE_KEY); } catch (e) {}
+  }
+  async function pcPullOnce() {
+    if (!pcSupa) return;
+    try {
+      // Never let a slow/dead connection block this page from opening —
+      // it works local-only same as before if the pull doesn't land in time.
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', PC_APP_KEY).maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (!result) return;
+      const { data, error } = result;
+      if (!error && data && data.data) {
+        Object.keys(data.data).forEach(k => {
+          if (PC_SYNCED_KEYS.indexOf(k) === -1) return;
+          try { localStorage.setItem(k, JSON.stringify(data.data[k])); } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }
+  async function pcPushNow() {
+    if (!pcSupa) return;
+    const out = {};
+    PC_SYNCED_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v == null) return;
+      try { out[k] = JSON.parse(v); } catch (e) { out[k] = v; }
+    });
+    try {
+      await pcSupa.from('app_state').upsert(
+        { key: PC_APP_KEY, data: out, updated_at: new Date().toISOString() }, { onConflict: 'key' }
+      );
+    } catch (e) {}
+  }
 
   function loadGym(){
     try { const raw = JSON.parse(localStorage.getItem(LS_KEY)); return (raw && typeof raw === 'object') ? raw : null; }
@@ -354,6 +402,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       });
       localStorage.setItem(LS_KEY, JSON.stringify(fresh));
       state.logs = fresh.logs;
+      pcPushNow(); // fire-and-forget — don't block the UI on the network
       return true;
     } catch(e){
       // Most likely a full localStorage quota (progress photos + exercise
@@ -542,6 +591,9 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     '</div>';
 
   const app = document.getElementById('app');
+  app.innerHTML = '<h1 class="dash-title">Séance</h1><p class="dash-sub">Chargement…</p>';
+  await pcPullOnce();
+
   const state = loadGym();
   const days = (state && Array.isArray(state.days)) ? state.days : [];
   const unit = (state && state.units) || 'kg';
