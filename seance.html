@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Séance · Tableau de bord</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255, 138, 101, 0.16), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180, 180, 200, 0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift {
+  0%   { transform: translate3d(0,0,0); }
+  100% { transform: translate3d(-22px, 14px, 0); }
+}
+.page { max-width: 640px; margin: 0 auto; }
+.dash-title {
+  margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.gm-card {
+  position: relative; background: rgba(255, 255, 255, 0.04); border-radius: 16px;
+  padding: 28px 22px; margin-bottom: 14px; text-align: center;
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.gm-emoji { font-size: 40px; margin-bottom: 10px; }
+.gm-card h2 { margin: 0 0 8px; font-size: 17px; color: var(--text-primary); }
+.gm-card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-tertiary); }
+.gm-ghost {
+  display: inline-block; margin-top: 18px;
+  padding: 11px 18px; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
+  background: rgba(255,255,255,0.04); color: var(--text-primary);
+  font-family: inherit; font-size: 13px; font-weight: 600; text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gm-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .dash-title { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="dash-title">Séance</h1>
+  <div class="gm-card">
+    <div class="gm-emoji">▶️</div>
+    <h2>Bientôt disponible</h2>
+    <p>Cet écran servira à lancer une séance : choisir le split du jour, enregistrer tes séries au fil de l'entraînement, et alimenter automatiquement l'historique de performance et le suivi musculaire.</p>
+    <a class="gm-ghost" href="gym.html">← Retour à Fitness</a>
+  </div>
+</div>
+</body>
+</html>
