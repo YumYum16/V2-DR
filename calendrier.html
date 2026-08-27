@@ -145,6 +145,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   font-size: 12.5px; font-weight: 700; transition: background 0.15s;
 }
 .today-link:hover { background: rgba(255,255,255,0.08); }
+.program-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12.5px; }
+.program-row:last-child { border-bottom: 0; }
+.program-row span:first-child { color: var(--text-tertiary); }
+.program-row span:last-child { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.program-note { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
 
 /* ---- calendar subscription ---- */
 .sub-row { display: flex; gap: 8px; align-items: stretch; }
@@ -322,13 +327,29 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     return (p && typeof p.deficitPct === 'number') ? p.deficitPct : 20;
   }
 
+  // Same protein/fat/carb split as Alimentation's computeTargets() — kcal
+  // alone isn't the target, it's protein first (2.2 g/kg), fat floored for
+  // hormonal health, carbs take the rest. A day's calories were never a
+  // single arbitrary number, so neither is this.
+  function macrosForKcal(weightKg, targetKcal) {
+    const proteinG = Math.round(weightKg * 2.2);
+    const proteinKcal = proteinG * 4;
+    const fatKcal = Math.max(targetKcal * 0.25, weightKg * 0.6 * 9);
+    const fatG = Math.round(fatKcal / 9);
+    const carbsKcal = Math.max(0, targetKcal - proteinKcal - fatG * 9);
+    const carbsG = Math.round(carbsKcal / 4);
+    return { proteinG, fatG, carbsG };
+  }
   function dayKcalTargets() {
     const profile = readProfile();
     const weightKg = readLiveWeightKg() || profile.weightKg || 75;
     const deficitPct = readDeficitPct();
-    const train = Math.round(computeTDEE(profile, weightKg, false) * (1 - deficitPct/100));
-    const rest = Math.round(computeTDEE(profile, weightKg, true) * (1 - deficitPct/100));
-    return { train, rest };
+    const trainKcal = Math.round(computeTDEE(profile, weightKg, false) * (1 - deficitPct/100));
+    const restKcal = Math.round(computeTDEE(profile, weightKg, true) * (1 - deficitPct/100));
+    return {
+      train: Object.assign({ kcal: trainKcal }, macrosForKcal(weightKg, trainKcal)),
+      rest: Object.assign({ kcal: restKcal }, macrosForKcal(weightKg, restKcal))
+    };
   }
 
   // ================================================================
@@ -387,29 +408,34 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const rest = isRestLabel(split);
       const isToday = dk === todayKey;
       const cls = 'cal-cell' + (isToday ? ' today' : '') + (isManual ? ' manual' : '') + (rest ? ' rest' : ' train');
-      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split) + (isManual ? ' (placé par toi)' : ' (par défaut — touche pour changer)') + '">' +
+      const dayTarget = rest ? kcal.rest : kcal.train;
+      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split) + (isManual ? ' (placé par toi)' : ' (par défaut — touche pour changer)') + ' · ' + dayTarget.kcal + ' kcal (P' + dayTarget.proteinG + ' G' + dayTarget.carbsG + ' L' + dayTarget.fatG + ')' + '">' +
         '<span class="cal-day">' + d + '</span>' +
         '<span class="cal-split">' + escapeHtml(split) + '</span>' +
-        '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' +
+        '<span class="cal-kcal">' + dayTarget.kcal + '</span>' +
         '</button>';
     }
     html += '</div>' +
       '<div class="cal-legend">' +
-      '<span class="cal-legend-item"><span class="cal-legend-dot train"></span>Entraînement · ~' + kcal.train + ' kcal</span>' +
-      '<span class="cal-legend-item"><span class="cal-legend-dot rest"></span>Repos · ~' + kcal.rest + ' kcal</span>' +
-      '</div><div class="program-note">Un jour non placé compte comme repos par défaut (kcal adaptée) — touche-le pour dire qu\'il s\'agit d\'un jour d\'entraînement. Seuls les jours que tu places réellement apparaissent dans l\'abonnement téléphone.</div></div>';
+      '<span class="cal-legend-item"><span class="cal-legend-dot train"></span>Entraînement · ~' + kcal.train.kcal + ' kcal · P' + kcal.train.proteinG + ' G' + kcal.train.carbsG + ' L' + kcal.train.fatG + '</span>' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot rest"></span>Repos · ~' + kcal.rest.kcal + ' kcal · P' + kcal.rest.proteinG + ' G' + kcal.rest.carbsG + ' L' + kcal.rest.fatG + '</span>' +
+      '</div><div class="program-note">Un jour non placé compte comme repos par défaut (kcal et macros adaptées) — touche-le pour dire qu\'il s\'agit d\'un jour d\'entraînement. Mêmes chiffres que dans Alimentation (protéines 2.2g/kg, lipides plancher 25%, glucides le reste) — pas deux calculs différents. Seuls les jours que tu places réellement apparaissent dans l\'abonnement téléphone.</div></div>';
 
     // today summary — placed day if there is one, Repos by default otherwise
     const todayManual = !!overrides[todayKey];
     const todaySplit = overrides[todayKey] || REST_DEFAULT_LABEL;
     const todayRest = isRestLabel(todaySplit);
+    const todayTarget = todayRest ? kcal.rest : kcal.train;
     html += '<div class="gm-card"><div class="section-title">Aujourd\'hui</div>' +
       '<div class="today-row">' +
       '<div class="today-badge">' + (todayRest ? '😴' : '💪') + '</div>' +
       '<div class="today-info">' +
       '<div class="today-split">' + escapeHtml(todaySplit) + (todayManual ? '' : ' <span style="color:var(--text-tertiary);font-size:12px;font-weight:600;">(par défaut)</span>') + '</div>' +
-      '<div class="today-kcal">Vise ~' + (todayRest ? kcal.rest : kcal.train) + ' kcal aujourd\'hui</div>' +
+      '<div class="today-kcal">Vise ~' + todayTarget.kcal + ' kcal aujourd\'hui</div>' +
       '</div></div>' +
+      '<div class="program-row"><span>Protéines</span><span>' + todayTarget.proteinG + ' g</span></div>' +
+      '<div class="program-row"><span>Glucides</span><span>' + todayTarget.carbsG + ' g</span></div>' +
+      '<div class="program-row"><span>Lipides</span><span>' + todayTarget.fatG + ' g</span></div>' +
       '<div class="today-links">' +
       '<a class="today-link" href="seance.html">Lancer la séance →</a>' +
       '<a class="today-link" href="alimentation.html">Voir Alimentation →</a>' +
