@@ -454,9 +454,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
   // Same rotation math as gym.html's todaySplit() — reads the actual
   // Push/Pull/Legs/Repos calendar instead of guessing, so "rest day" here
-  // means the same thing it means in Fitness.
+  // means the same thing it means in Fitness. A manual override set in
+  // Calendrier (po_day_overrides_v1) wins over the rotation formula —
+  // that's the point of letting you place your own days there.
   function isRestDayToday(gym) {
     try {
+      const overrides = loadJSON('po_day_overrides_v1', {});
+      const override = overrides[todayStr()];
+      if (override) return /repos|rest/i.test(override);
       const rot = gym.splitRotation;
       if (!rot || !rot.length) return false;
       const a = new Date(gym.splitAnchor.date);

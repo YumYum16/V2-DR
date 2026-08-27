@@ -43,6 +43,7 @@ export default async function handler(req, res) {
 
   const gym = (coach && coach.po_coach_v1) || {};
   const weights = (coach && coach.po_coach_weights) || [];
+  const overrides = (coach && coach.po_day_overrides_v1) || {};
   const profile = (health && health.po_water_v1 && health.po_water_v1.profile) ||
     { weightKg: 75, age: 25, sex: 'm', activityHrsPerWeek: 5, heightCm: 175 };
   const program = (nutrition && nutrition.po_nutrition_program_v1) || { deficitPct: 20 };
@@ -86,7 +87,14 @@ export default async function handler(req, res) {
   const kcalRest = Math.round(tdee(weightKg, true) * (1 - deficitPct / 100));
 
   const icsDate = (d) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  const dateKey = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const escapeText = (s) => String(s).replace(/[\\,;]/g, (c) => '\\' + c);
+  // A manual override placed in Calendrier wins over the rotation formula
+  // — same priority as everywhere else this logic is duplicated.
+  function splitForDateWithOverride(date) {
+    const o = overrides[dateKey(date)];
+    return o || splitForDate(date);
+  }
 
   const now = new Date();
   const lines = [
@@ -102,7 +110,7 @@ export default async function handler(req, res) {
   ];
   for (let i = -3; i <= 60; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    const split = splitForDate(d);
+    const split = splitForDateWithOverride(d);
     if (!split) continue;
     const rest = isRest(split);
     const kcal = rest ? kcalRest : kcalTrain;

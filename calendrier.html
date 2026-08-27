@@ -96,6 +96,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
 /* ---- month calendar ---- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-nav-btn {
+  width: 32px; height: 32px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary); font-size: 16px; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.cal-nav-btn:hover { background: rgba(255,255,255,0.08); }
 .cal-month { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
 .cal-weekday { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.06em; }
@@ -104,11 +110,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   aspect-ratio: 0.82; border-radius: 9px; background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  padding: 3px 2px;
+  padding: 3px 2px; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
 }
+.cal-cell:hover { background: rgba(255,255,255,0.06); }
 .cal-cell.train { border-left-color: var(--indigo); }
 .cal-cell.rest { border-left-color: rgba(255,255,255,0.18); }
 .cal-cell.today { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.4); }
+.cal-cell.manual { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); }
 .cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
 .cal-split { font-size: 7.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary); text-align: center; line-height: 1.15; }
 .cal-cell.train .cal-split { color: var(--indigo); }
@@ -154,6 +163,36 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .sub-steps b { color: var(--text-primary); }
 .sub-steps ol { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-tertiary); line-height: 1.7; }
 
+/* ---- day picker modal ---- */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  align-items: flex-end; justify-content: center; padding: 0;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: #14140f; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 0 0;
+  padding: 22px 18px max(22px, env(safe-area-inset-bottom)); width: 100%; max-width: 420px;
+}
+@media (min-width: 820px) {
+  .modal-bg { align-items: center; padding: 24px; }
+  .modal { border-radius: 20px; }
+}
+.modal h3 { margin: 0 0 14px; font-size: 16px; color: var(--text-primary); text-transform: capitalize; }
+.empty-note { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 10px 4px; line-height: 1.6; }
+.day-pick-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.day-pick-btn {
+  padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.day-pick-btn:hover { background: rgba(255,255,255,0.08); }
+.day-pick-btn.current { border-color: rgba(129,140,248,0.5); background: rgba(129,140,248,0.14); }
+.modal-actions { display: flex; gap: 8px; margin-top: 6px; }
+.modal-actions button { flex: 1; padding: 12px; border-radius: 12px; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.btn-secondary { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-primary); }
+.btn-secondary:hover { background: rgba(255,255,255,0.08); }
+
 .cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .cross-nav a {
   display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
@@ -179,24 +218,75 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 <div class="page" id="app"></div>
 
 <script>
-(function(){
+(async function(){
   'use strict';
 
   const WATER_KEY = 'po_water_v1';
   const GYM_KEY = 'po_coach_v1';
   const WEIGHTS_KEY = 'po_coach_weights';
   const PROGRAM_KEY = 'po_nutrition_program_v1';
+  const OVERRIDES_KEY = 'po_day_overrides_v1';
 
-  // Read-only page — no cloud sync of its own, same as Caféine reading
-  // po_water_v1. Whatever Fitness/Eau/Alimentation already synced to this
-  // device's localStorage is what gets read here.
   function loadJSON(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } }
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function dateKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+  // ================================================================
+  // CLOUD SYNC — same Supabase row Fitness (gym.html) already syncs
+  // (appKey "po-coach"), so a manual day placed here reaches every
+  // device and shows up consistently in Alimentation/Caféine's rest-day
+  // detection and the /api/calendar.ics feed too.
+  // ================================================================
+  const PC_APP_KEY = 'po-coach';
+  const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
+  const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_motivation_v1', 'po_day_overrides_v1'];
+  let pcSupa = null;
+  if (window.supabase && PC_SUPABASE_URL.indexOf('PASTE-') !== 0 && PC_SUPABASE_KEY.indexOf('PASTE-') !== 0) {
+    try { pcSupa = window.supabase.createClient(PC_SUPABASE_URL, PC_SUPABASE_KEY); } catch (e) {}
+  }
+  async function pcPullOnce() {
+    if (!pcSupa) return;
+    try {
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', PC_APP_KEY).maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (!result) return;
+      const { data, error } = result;
+      if (!error && data && data.data) {
+        Object.keys(data.data).forEach(k => {
+          if (PC_SYNCED_KEYS.indexOf(k) === -1) return;
+          try { localStorage.setItem(k, JSON.stringify(data.data[k])); } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }
+  async function pcPushNow() {
+    if (!pcSupa) return;
+    const out = {};
+    PC_SYNCED_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v == null) return;
+      try { out[k] = JSON.parse(v); } catch (e) { out[k] = v; }
+    });
+    try {
+      await pcSupa.from('app_state').upsert(
+        { key: PC_APP_KEY, data: out, updated_at: new Date().toISOString() }, { onConflict: 'key' }
+      );
+    } catch (e) {}
+  }
+  function saveJSON(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); pcPushNow(); return true; }
+    catch (e) { console.error('save failed', k, e); return false; }
+  }
 
   // ================================================================
   // SPLIT ROTATION — identical math to gym.html's todaySplit(), just
   // generalized to any date instead of only "now". Same source of truth:
-  // state.splitRotation + state.splitAnchor.
+  // state.splitRotation + state.splitAnchor. A manual override placed on
+  // this page wins over the formula — that's the whole point of letting
+  // you place your own days here.
   // ================================================================
   function splitForDate(gym, date) {
     try {
@@ -209,6 +299,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const idx = ((gym.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
       return rot[idx];
     } catch (e) { return null; }
+  }
+  function splitForDateResolved(gym, overrides, date) {
+    const o = overrides[dateKey(date)];
+    return o || splitForDate(gym, date);
   }
   function isRestLabel(label) { return /repos|rest/i.test(label || ''); }
 
@@ -272,41 +366,50 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     '<a href="alimentation.html">🍎 Alimentation</a>' +
     '</div>';
 
+  let monthOffset = 0;
+
   function render() {
     const app = document.getElementById('app');
     const gym = loadJSON(GYM_KEY, {});
+    const overrides = loadJSON(OVERRIDES_KEY, {});
     const kcal = dayKcalTargets();
     const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    const todayKey = y + '-' + (m+1) + '-' + now.getDate();
+    const todayKey = dateKey(now);
+    const base = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+    const y = base.getFullYear(), m = base.getMonth();
     const daysInMonth = new Date(y, m+1, 0).getDate();
     const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7; // Monday-first
 
     let html = '<h1 class="dash-title">Calendrier</h1>' +
-      '<p class="dash-sub">Tes jours de séance (Push/Pull/Legs) et de repos, lus directement depuis la répartition de Fitness, avec la cible de calories qui va avec chaque type de jour.</p>' +
+      '<p class="dash-sub">Tes jours de séance (Push/Pull/Legs) et de repos — Fitness propose une rotation automatique, mais touche n\'importe quel jour (passé ou futur) pour le placer toi-même. Les calories s\'ajustent seules selon ce que tu choisis.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres</summary>' +
-      '<p>Le type de jour (entraînement ou repos) vient de ta répartition dans <strong>Fitness</strong> (Réglages → Répartition) — pas d\'une case à cocher séparée ici, c\'est la même rotation que celle affichée là-bas.</p>' +
+      '<p>Le type de jour vient d\'abord de ce que tu as placé toi-même ici (touche un jour). Sans placement manuel, c\'est ta répartition automatique dans <strong>Fitness</strong> (Réglages → Répartition) qui décide, comme sur cette page-là.</p>' +
       '<p>Les calories utilisent la même formule que <strong>Alimentation</strong> : <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base, un facteur d\'activité selon tes heures d\'entraînement/semaine, et un cran d\'activité en moins les jours de repos (même logique de "carb cycling" qu\'Alimentation). Le déficit actuel de ton programme adaptatif est appliqué tel quel.</p>' +
-      '<p>Ces chiffres sont une <strong>référence figée pour le mois</strong>, pas recalculée jour par jour sur ton poids réel de ce jour précis — pour le chiffre du jour exact, ajusté à ton poids et ton statut repos/entraînement d\'aujourd\'hui, c\'est toujours <strong>Alimentation</strong> qui fait foi.</p>' +
+      '<p>Ces chiffres sont une <strong>référence figée pour le mois</strong>, pas recalculée jour par jour sur ton poids réel de ce jour précis — pour le chiffre du jour exact, ajusté à ton poids et ton statut repos/entraînement d\'aujourd\'hui, c\'est toujours <strong>Alimentation</strong> qui fait foi. Un jour placé manuellement ici compte aussi pour Alimentation (et la pastille kcal en haut de chaque page), pas seulement pour cette page.</p>' +
       '</details>';
 
     // month grid
-    html += '<div class="gm-card"><div class="cal-head"><span class="cal-month">' + MONTH_NAMES[m] + ' ' + y + '</span></div>' +
+    html += '<div class="gm-card"><div class="cal-head">' +
+      '<button type="button" class="cal-nav-btn" id="calPrev" aria-label="Mois précédent">‹</button>' +
+      '<span class="cal-month">' + MONTH_NAMES[m] + ' ' + y + '</span>' +
+      '<button type="button" class="cal-nav-btn" id="calNext" aria-label="Mois suivant">›</button>' +
+      '</div>' +
       '<div class="cal-weekdays">' + WEEKDAY_LABELS.map(d => '<div class="cal-weekday">' + d + '</div>').join('') + '</div>' +
       '<div class="cal-grid">';
     for (let i = 0; i < firstWeekday; i++) html += '<div></div>';
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(y, m, d);
-      const split = splitForDate(gym, date);
+      const dk = dateKey(date);
+      const split = splitForDateResolved(gym, overrides, date);
       const rest = split == null ? null : isRestLabel(split);
-      const dayKey = y + '-' + (m+1) + '-' + d;
-      const isToday = dayKey === todayKey;
-      const cls = 'cal-cell' + (isToday ? ' today' : '') + (rest == null ? '' : rest ? ' rest' : ' train');
-      html += '<div class="' + cls + '" title="' + escapeHtml(split || '—') + '">' +
+      const isToday = dk === todayKey;
+      const isManual = !!overrides[dk];
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (isManual ? ' manual' : '') + (rest == null ? '' : rest ? ' rest' : ' train');
+      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split || '—') + (isManual ? ' (placé manuellement)' : '') + '">' +
         '<span class="cal-day">' + d + '</span>' +
         (split ? '<span class="cal-split">' + escapeHtml(split) + '</span>' : '') +
         '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' +
-        '</div>';
+        '</button>';
     }
     html += '</div>' +
       '<div class="cal-legend">' +
@@ -315,7 +418,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '</div></div>';
 
     // today summary
-    const todaySplit = splitForDate(gym, now) || '—';
+    const todaySplit = splitForDateResolved(gym, overrides, now) || '—';
     const todayRest = isRestLabel(todaySplit);
     html += '<div class="gm-card"><div class="section-title">Aujourd\'hui</div>' +
       '<div class="today-row">' +
@@ -342,7 +445,16 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '</div>';
 
     html += CROSS_NAV;
+    html += '<div class="modal-bg" id="dayModalBg"><div class="modal" id="dayModalInner"></div></div>';
     app.innerHTML = html;
+
+    document.getElementById('calPrev').addEventListener('click', () => { monthOffset--; render(); });
+    document.getElementById('calNext').addEventListener('click', () => { monthOffset++; render(); });
+    app.querySelectorAll('.cal-cell[data-date]').forEach(btn => {
+      btn.addEventListener('click', () => openDayModal(btn.dataset.date, gym, overrides));
+    });
+    const dayModalBg = document.getElementById('dayModalBg');
+    dayModalBg.addEventListener('click', (e) => { if (e.target === dayModalBg) closeDayModal(); });
 
     const copyBtn = document.getElementById('icsCopyBtn');
     if (copyBtn) copyBtn.addEventListener('click', async () => {
@@ -357,6 +469,48 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     });
   }
 
+  // ================================================================
+  // DAY PICKER — assign (or clear) a manual split for one date. Options
+  // are whatever's actually in your Fitness rotation (deduped), so this
+  // never invents or translates a label of its own.
+  // ================================================================
+  function setOverride(dk, label) {
+    const overrides = loadJSON(OVERRIDES_KEY, {});
+    if (label) overrides[dk] = label; else delete overrides[dk];
+    saveJSON(OVERRIDES_KEY, overrides);
+  }
+  function closeDayModal() {
+    const bg = document.getElementById('dayModalBg');
+    if (bg) bg.classList.remove('show');
+  }
+  function openDayModal(dk, gym, overrides) {
+    const bg = document.getElementById('dayModalBg');
+    const inner = document.getElementById('dayModalInner');
+    if (!bg || !inner) return;
+    const labels = Array.from(new Set((gym.splitRotation || []).map(s => (s||'').trim()).filter(Boolean)));
+    const current = overrides[dk];
+    const [yy, mm, dd] = dk.split('-').map(Number);
+    const dateLabel = new Date(yy, mm-1, dd).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    inner.innerHTML = '<h3>' + escapeHtml(dateLabel) + '</h3>' +
+      (labels.length ?
+        '<div class="day-pick-row">' + labels.map(l =>
+          '<button type="button" class="day-pick-btn' + (current === l ? ' current' : '') + '" data-l="' + escapeHtml(l) + '">' + escapeHtml(l) + '</button>'
+        ).join('') + '</div>' :
+        '<p class="empty-note">Configure ta répartition dans Fitness d\'abord (Réglages → Répartition) pour pouvoir choisir un type de jour ici.</p>') +
+      '<div class="modal-actions">' +
+      (current ? '<button type="button" class="btn-secondary" id="dayReset">Réinitialiser (auto)</button>' : '') +
+      '<button type="button" class="btn-secondary" id="dayCancel">Fermer</button>' +
+      '</div>';
+    inner.querySelectorAll('[data-l]').forEach(btn => {
+      btn.addEventListener('click', () => { setOverride(dk, btn.dataset.l); closeDayModal(); render(); });
+    });
+    const resetBtn = document.getElementById('dayReset');
+    if (resetBtn) resetBtn.addEventListener('click', () => { setOverride(dk, null); closeDayModal(); render(); });
+    document.getElementById('dayCancel').addEventListener('click', closeDayModal);
+    bg.classList.add('show');
+  }
+
+  await pcPullOnce();
   render();
 })();
 </script>
