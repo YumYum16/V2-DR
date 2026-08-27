@@ -1817,8 +1817,8 @@ img, video, canvas, svg { max-width: 100%; }
     { match: /soulev[ée].*terre|deadlift/i, novice: 1.0, intermediate: 1.75, advanced: 2.25 },
     { match: /d[ée]velopp[ée].*militaire|overhead|\bohp\b/i, novice: 0.35, intermediate: 0.6, advanced: 0.9 }
   ];
-  function capacityScoreFor(ex, maxWeight) {
-    if (!maxWeight) return null;
+  function capacityScoreFor(ex, oneRM) {
+    if (!oneRM) return null;
     const std = STRENGTH_STANDARDS.find(s => s.match.test(ex.name));
     if (!std) return null;
     const bw = currentBodyweightKg();
@@ -1827,7 +1827,7 @@ img, video, canvas, svg { max-width: 100%; }
     const age = prof.age || 30;
     const sexFactor = /^f/i.test(prof.sex || '') ? 0.75 : 1;
     const ageBoost = 1 + Math.max(0, Math.min(age - 30, 30)) * 0.005; // up to +15% by 60
-    const ratio = (maxWeight / bw) / (sexFactor * ageBoost);
+    const ratio = (oneRM / bw) / (sexFactor * ageBoost);
     let score;
     if (ratio <= std.novice) score = (ratio / std.novice) * 3;
     else if (ratio <= std.intermediate) score = 3 + ((ratio - std.novice) / (std.intermediate - std.novice)) * 4;
@@ -1837,12 +1837,21 @@ img, video, canvas, svg { max-width: 100%; }
   function exercisePerfStats(ex) {
     const logs = getLogsFor(ex.id);
     if (!logs.length) return null;
+    // Raw heaviest weight ever logged, and how many reps came WITH it —
+    // "80kg" alone hides whether that was a single or a set of 8, and
+    // those mean very different things.
     const maxWeight = Math.max.apply(null, logs.map(l => l.weight || 0));
+    const maxWeightReps = Math.max.apply(null, logs.filter(l => (l.weight || 0) === maxWeight).map(l => l.reps || 0));
     const setsAtMax = logs.filter(l => (l.weight || 0) === maxWeight).length;
+    // Best ESTIMATED 1RM across every logged set (Epley), not just the
+    // heaviest raw weight — 100kg x 8 implies more true strength than
+    // 100kg x 1, so scoring off raw weight alone punishes higher-rep
+    // work the app's own hypertrophy target (6-10 reps) encourages.
+    const best1RM = logs.reduce((best, l) => Math.max(best, estimate1RM(l.weight || 0, l.reps || 0)), 0);
     const cutoff = Date.now() - 30 * 86400000;
     const recentDays = new Set(logs.filter(l => new Date(l.date).getTime() >= cutoff).map(l => l.date.slice(0, 10)));
-    const score = capacityScoreFor(ex, maxWeight);
-    return { maxWeight, setsAtMax, recentSessions: recentDays.size, score };
+    const score = capacityScoreFor(ex, best1RM);
+    return { maxWeight, maxWeightReps, setsAtMax, recentSessions: recentDays.size, score };
   }
 
   // ============================================================
@@ -1921,7 +1930,7 @@ img, video, canvas, svg { max-width: 100%; }
       : '';
     const perfHtml =
       '<div class="po-stats-row po-ex-perf-row">'
-      + '<div class="po-stat-box"><div class="po-stat-label">Record</div><div class="po-stat-val">' + ph(perf && perf.maxWeight, unit()) + '</div></div>'
+      + '<div class="po-stat-box"><div class="po-stat-label">Record</div><div class="po-stat-val">' + ph(perf && perf.maxWeight, unit()) + (perf && perf.maxWeightReps ? ' × ' + perf.maxWeightReps : '') + '</div></div>'
       + '<div class="po-stat-box"><div class="po-stat-label">Séries au record</div><div class="po-stat-val">' + ph(perf && perf.setsAtMax) + '</div></div>'
       + '<div class="po-stat-box"><div class="po-stat-label">Régularité</div><div class="po-stat-val">' + ph(perf && perf.recentSessions, '/30j') + '</div></div>'
       + '</div>'
