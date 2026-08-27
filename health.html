@@ -215,7 +215,7 @@ main {
 
 .stack-item {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto;
+  grid-template-columns: 32px 1fr auto auto auto;
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -316,6 +316,21 @@ main {
   border-color: rgba(163,45,45,0.4);
   color: var(--warning);
 }
+.stack-auto-btn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  padding: 5px 9px; border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-weight: 600; letter-spacing: 0.04em;
+  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all 0.15s;
+}
+.stack-auto-btn:hover { border-color: rgba(110,231,183,0.4); color: var(--accent); }
+.stack-auto-btn.is-auto { background: var(--accent-bg, rgba(110,231,183,0.12)); border-color: rgba(110,231,183,0.4); color: var(--accent); }
 
 .stack-item-del {
   background: transparent;
@@ -515,6 +530,7 @@ main {
   main { padding: 40px 16px 60px; }
   .stack-card { padding: 18px 16px 14px; }
   .stack-item { grid-template-columns: 28px 1fr auto; gap: 8px; }
+  .stack-item .stack-auto-btn { grid-column: 2 / 4; margin-top: 4px; justify-self: start; }
   .stack-item .stack-low-btn { grid-column: 2 / 4; margin-top: 4px; justify-self: start; }
   .stack-add-row { grid-template-columns: 1fr 1fr; }
   .stack-add-row .stack-add-btn { grid-column: 1 / -1; }
@@ -1111,6 +1127,35 @@ main {
     else { low.push(id); setLow(low); }
     render();
   }
+  // "Auto" items get marked taken by themselves each day (below), for
+  // the ones you take every single day without fail — no reason to tap
+  // a checkbox for something that's never actually a choice. Marking it
+  // manually as NOT taken on a given day (e.g. you skipped it) still
+  // sticks for that day, since the auto-fill only runs once per day.
+  function toggleAuto(id) {
+    const items = getItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    item.auto = !item.auto;
+    setItems(items);
+    if (item.auto) {
+      const taken = getTaken();
+      if (!taken[id]) { taken[id] = Date.now(); setTaken(taken); }
+    }
+    render();
+  }
+  function applyAutoTaken() {
+    const flagKey = 'stack:auto-applied:' + getActiveDate();
+    if (storeGet(flagKey)) return; // already handled today
+    const autoItems = getItems().filter(i => i.auto);
+    if (autoItems.length) {
+      const taken = getTaken();
+      let changed = false;
+      autoItems.forEach(i => { if (!taken[i.id]) { taken[i.id] = Date.now(); changed = true; } });
+      if (changed) setTaken(taken);
+    }
+    storeSet(flagKey, true);
+  }
   function deleteItem(id) {
     setItems(getItems().filter(i => i.id !== id));
     const taken = getTaken();
@@ -1194,6 +1239,7 @@ main {
             </div>
             <div class="stack-item-meta" data-edit="meta" data-id="${item.id}">${escapeHtml(metaText(item))}</div>
           </div>
+          <button class="stack-auto-btn ${item.auto ? 'is-auto' : ''}" data-action="auto" data-id="${item.id}" title="Marquer automatiquement comme pris chaque jour">${item.auto ? '🔁 Auto' : '🔁'}</button>
           <button class="stack-low-btn ${isLow ? 'is-low' : ''}" data-action="low" data-id="${item.id}">↓ Stock faible</button>
           <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Supprimer">×</button>`;
 
@@ -1310,6 +1356,7 @@ main {
     if (btn.dataset.action === 'toggle') toggleTaken(id);
     else if (btn.dataset.action === 'low') toggleLow(id);
     else if (btn.dataset.action === 'del') deleteItem(id);
+    else if (btn.dataset.action === 'auto') toggleAuto(id);
   });
   document.getElementById('stackGroups').addEventListener('pointerdown', (e) => {
     const btn = e.target.closest('[data-action="del"]');
@@ -1474,10 +1521,11 @@ main {
 
   setInterval(() => {
     const newKey = `stack:taken:${getActiveDate()}`;
-    if (newKey !== todayKey) todayKey = newKey;
+    if (newKey !== todayKey) { todayKey = newKey; applyAutoTaken(); }
     render();
   }, 60 * 1000);
 
+  applyAutoTaken();
   render();
   startTicker();
 })();
