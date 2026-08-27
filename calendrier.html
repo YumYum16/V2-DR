@@ -137,6 +137,23 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 }
 .today-link:hover { background: rgba(255,255,255,0.08); }
 
+/* ---- calendar subscription ---- */
+.sub-row { display: flex; gap: 8px; align-items: stretch; }
+.sub-url {
+  flex: 1; min-width: 0; padding: 11px 13px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.28); color: var(--text-secondary); font-family: var(--font-mono); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center;
+}
+.sub-copy {
+  flex-shrink: 0; padding: 0 16px; border: 0; border-radius: 11px; cursor: pointer;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+}
+.sub-copy.done { background: linear-gradient(180deg, #A7F3D0 0%, #6BE3A4 100%); }
+.sub-steps { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+.sub-steps b { color: var(--text-primary); }
+.sub-steps ol { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-tertiary); line-height: 1.7; }
+
 .cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .cross-nav a {
   display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
@@ -312,8 +329,32 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<a class="today-link" href="alimentation.html">Voir Alimentation →</a>' +
       '</div></div>';
 
+    // calendar subscription (ICS feed, server-side, see /api/calendar.ics.js)
+    const icsUrl = window.location.origin + '/api/calendar.ics';
+    html += '<div class="gm-card"><div class="section-title">Abonnement calendrier téléphone</div>' +
+      '<div class="sub-row"><span class="sub-url" id="icsUrl">' + escapeHtml(icsUrl) + '</span>' +
+      '<button type="button" class="sub-copy" id="icsCopyBtn">Copier</button></div>' +
+      '<div class="sub-steps"><b>iPhone (Apple Calendrier)</b>' +
+      '<ol><li>Réglages → Calendrier → Comptes → Ajouter un compte</li><li>Autre → Ajouter un abonnement calendrier</li><li>Colle le lien ci-dessus</li></ol></div>' +
+      '<div class="sub-steps"><b>Android / Google Agenda</b>' +
+      '<ol><li>calendar.google.com sur un ordinateur (pas possible depuis l\'appli mobile)</li><li>Autres agendas → + → À partir de l\'URL</li><li>Colle le lien ci-dessus — il apparaît ensuite aussi dans l\'appli Google Agenda du téléphone</li></ol></div>' +
+      '<div class="program-note">Un jour par événement (toute la journée) : le type de séance et la cible de calories. L\'appli calendrier gère son propre rythme de rafraîchissement (souvent toutes les quelques heures, pas instantané) — ce lien ne pousse rien tout seul, il est juste interrogé périodiquement.</div>' +
+      '</div>';
+
     html += CROSS_NAV;
     app.innerHTML = html;
+
+    const copyBtn = document.getElementById('icsCopyBtn');
+    if (copyBtn) copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(icsUrl);
+        copyBtn.textContent = 'Copié ✓';
+        copyBtn.classList.add('done');
+        setTimeout(() => { copyBtn.textContent = 'Copier'; copyBtn.classList.remove('done'); }, 2000);
+      } catch (e) {
+        alert('Copie impossible automatiquement — sélectionne le lien manuellement :\n' + icsUrl);
+      }
+    });
   }
 
   render();
