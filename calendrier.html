@@ -285,6 +285,23 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     try { localStorage.setItem(k, JSON.stringify(v)); pcPushNow(); return true; }
     catch (e) { console.error('save failed', k, e); return false; }
   }
+  // The deficit % is owned by Alimentation, stored in its own "nutrition"
+  // row — pull that one key read-only so a device that only ever opens
+  // Calendrier still shows the real target kcal instead of the 20% default.
+  async function pcPullDeficitOnce() {
+    if (!pcSupa) return;
+    try {
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', 'nutrition').maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (!result) return;
+      const { data, error } = result;
+      if (!error && data && data.data && data.data[PROGRAM_KEY] !== undefined) {
+        try { localStorage.setItem(PROGRAM_KEY, JSON.stringify(data.data[PROGRAM_KEY])); } catch (e) {}
+      }
+    } catch (e) {}
+  }
 
   function isRestLabel(label) { return /repos|rest/i.test(label || ''); }
 
@@ -525,7 +542,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     bg.classList.add('show');
   }
 
-  await pcPullOnce();
+  await Promise.all([pcPullOnce(), pcPullDeficitOnce()]);
   render();
 })();
 </script>

@@ -291,6 +291,24 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       );
     } catch (e) {}
   }
+  // Day placements (repos/entraînement) are owned by Calendrier/Fitness,
+  // stored in their own "po-coach" row — pull that one key read-only so a
+  // device that only ever opens Alimentation still sees the real placement
+  // instead of falling back to "untouched day" logic on stale/empty local data.
+  async function pcPullOverridesOnce() {
+    if (!pcSupa) return;
+    try {
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', 'po-coach').maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (!result) return;
+      const { data, error } = result;
+      if (!error && data && data.data && data.data.po_day_overrides_v1 !== undefined) {
+        try { localStorage.setItem('po_day_overrides_v1', JSON.stringify(data.data.po_day_overrides_v1)); } catch (e) {}
+      }
+    } catch (e) {}
+  }
 
   // ---- storage helpers ----
   function loadJSON(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } }
@@ -319,7 +337,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     return t.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
   }
 
-  await pcPullOnce();
+  await Promise.all([pcPullOnce(), pcPullOverridesOnce()]);
 
   // ================================================================
   // STARTER FOODS — one-time import of foods you'd already catalogued
