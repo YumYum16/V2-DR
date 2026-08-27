@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Fatigue et Motivation · Tableau de bord</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --teal: #2DD4BF;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(45,212,191,0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(167,139,250,0.07), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift {
+  0%   { transform: translate3d(0,0,0); }
+  100% { transform: translate3d(-22px, 14px, 0); }
+}
+/* ===== Fond atmosphérique "Restauration" (sarcelle/violet + particules) ===== */
+.atmo-wash {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(60% 50% at 50% 20%, rgba(45,212,191,0.13) 0%, rgba(45,212,191,0.05) 35%, transparent 65%),
+    radial-gradient(50% 40% at 80% 85%, rgba(129,90,220,0.10) 0%, transparent 60%),
+    radial-gradient(120% 80% at 50% 100%, rgba(8,18,20,0.5) 0%, rgba(4,6,10,0.95) 75%);
+  background-repeat: no-repeat; background-size: 100% 100%;
+}
+.atmo-particles { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.atmo-particles span {
+  position: absolute; width: 1.5px; height: 1.5px; border-radius: 50%;
+  background: rgba(190,240,235,0.7);
+  animation: atmo-drift linear infinite;
+  box-shadow: 0 0 6px rgba(45,212,191,0.55);
+}
+@keyframes atmo-drift {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.5; }
+  100% { transform: translate3d(var(--dx, 12px), var(--dy, -100vh), 0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .atmo-particles span { animation: none; } }
+
+.page { max-width: 640px; margin: 0 auto; position: relative; z-index: 5; }
+.dash-title {
+  margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.dash-sub { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
+.gm-card {
+  position: relative; background: rgba(255, 255, 255, 0.04); border-radius: 16px;
+  padding: 20px; margin-bottom: 14px;
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 12px;
+}
+
+/* ---- Science info panel ---- */
+details.info {
+  margin: 0 0 18px; padding: 2px 18px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.55;
+}
+details.info summary { cursor: pointer; padding: 12px 0; color: var(--text-primary); font-weight: 600; list-style: none; }
+details.info summary::-webkit-details-marker { display: none; }
+details.info p { margin: 8px 0; }
+details.info ul { margin: 8px 0; padding-left: 18px; }
+details.info li { margin-bottom: 6px; }
+details.info strong { color: var(--text-primary); }
+
+/* ---- Fatigue (ACWR) ---- */
+.acwr-head { display: flex; align-items: baseline; gap: 10px; justify-content: center; margin-bottom: 6px; }
+.acwr-num { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: var(--text-primary); font-variant-numeric: tabular-nums; text-align: center; }
+.acwr-label { font-size: 11px; color: var(--text-tertiary); text-align: center; margin-bottom: 14px; }
+.acwr-badge {
+  display: block; width: fit-content; margin: 0 auto 16px; padding: 6px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; text-align: center;
+}
+.acwr-badge.good { background: rgba(107,227,164,0.14); color: var(--success); }
+.acwr-badge.warn { background: rgba(242,192,99,0.14); color: var(--warning); }
+.acwr-badge.bad  { background: rgba(255,107,107,0.14); color: var(--danger); }
+.acwr-badge.low  { background: rgba(125,211,252,0.14); color: #7DD3FC; }
+.acwr-bar-wrap { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; margin-bottom: 4px; position: relative; }
+.acwr-bar-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
+.acwr-bar-zone { position: absolute; top: 0; bottom: 0; background: rgba(107,227,164,0.18); }
+.acwr-scale { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-bottom: 16px; }
+.acwr-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.acwr-stat { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; text-align: center; }
+.acwr-stat-num { font-size: 18px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.acwr-stat-label { font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 3px; }
+.fatigue-note { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12.5px; color: var(--text-tertiary); line-height: 1.5; }
+.empty-note { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 10px 4px; line-height: 1.6; }
+
+/* ---- Motivation ---- */
+.mood-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 6px; }
+.mood-btn {
+  flex: 1; max-width: 68px; padding: 12px 0; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.035); font-size: 24px; cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.mood-btn:hover { background: rgba(255,255,255,0.07); }
+.mood-btn.active { background: rgba(45,212,191,0.16); border-color: rgba(45,212,191,0.4); transform: translateY(-2px); }
+.mood-today-note { text-align: center; font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 18px; }
+.mood-trend { display: flex; gap: 4px; justify-content: center; margin-bottom: 4px; flex-wrap: wrap; }
+.mood-dot {
+  width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+}
+.mood-trend-label { text-align: center; font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 18px; }
+
+.competence-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.competence-row:last-child { border-bottom: 0; }
+.competence-icon { font-size: 18px; flex-shrink: 0; }
+.competence-text { flex: 1; font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.competence-text strong { color: var(--text-primary); }
+
+.cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.cross-nav a {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+  color: var(--text-secondary); text-decoration: none; font-size: 12.5px; font-weight: 600;
+  transition: background .15s, color .15s;
+}
+.cross-nav a:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .dash-title { font-size: 22px; }
+  .acwr-num { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+
+<div id="atmo-backdrop" aria-hidden="true">
+  <div class="atmo-wash"></div>
+  <div class="atmo-particles" id="atmoParticles"></div>
+</div>
+
+<div class="page" id="app"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  const GYM_KEY = 'po_coach_v1';
+  const MOOD_KEY = 'po_motivation_v1';
+  const DAY_MS = 86400000;
+
+  function loadGym(){
+    try { const raw = JSON.parse(localStorage.getItem(GYM_KEY)); return (raw && typeof raw === 'object') ? raw : null; }
+    catch(e){ return null; }
+  }
+  function loadMood(){
+    try { return JSON.parse(localStorage.getItem(MOOD_KEY)) || {}; } catch(e){ return {}; }
+  }
+  function saveMood(m){
+    try { localStorage.setItem(MOOD_KEY, JSON.stringify(m)); } catch(e){}
+  }
+  function dateStr(d){
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function todayStr(){ return dateStr(new Date()); }
+  function daysAgoStr(n){ const d = new Date(); d.setDate(d.getDate() - n); return dateStr(d); }
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  const app = document.getElementById('app');
+  const gym = loadGym();
+  const CROSS_NAV =
+    '<div class="cross-nav">' +
+    '<a href="gym.html">💪 Fitness</a>' +
+    '<a href="seance.html">🏋️ Séance</a>' +
+    '<a href="muscle-tracker.html">🩻 Muscle</a>' +
+    '</div>';
+
+  // ================================================================
+  // FATIGUE — Acute:Chronic Workload Ratio (ACWR), the sports-science
+  // metric built on Banister et al.'s (1975) fitness-fatigue model:
+  // training produces a "fitness" and a "fatigue" response that both
+  // decay over time. Gabbett popularised ACWR = (avg daily load, last
+  // 7 days) / (avg daily load, last 28 days) as a practical proxy —
+  // ~0.8-1.3 is the "sweet spot", >=1.5 is associated with a sharp rise
+  // in injury/overreaching risk in the sports-science literature.
+  // Load here = volume-load (kg lifted x reps, summed per day) since
+  // that's what's actually logged — not heart-rate or session-RPE
+  // (Foster et al. 2001), which this app doesn't collect.
+  // ================================================================
+  function dailyLoads(gym){
+    const loads = {};
+    (gym.exercises || []).forEach(ex => {
+      ((gym.logs && gym.logs[ex.id]) || []).forEach(l => {
+        if (!l.date) return;
+        loads[l.date] = (loads[l.date] || 0) + (l.weight || 0) * (l.reps || 0);
+      });
+    });
+    return loads;
+  }
+  function windowStats(loads, days){
+    let sum = 0, activeDays = 0;
+    for (let i = 0; i < days; i++){
+      const v = loads[daysAgoStr(i)] || 0;
+      sum += v;
+      if (v > 0) activeDays++;
+    }
+    return { avg: sum / days, total: sum, activeDays };
+  }
+  function failRateWindow(gym, startAgo, endAgo){
+    let total = 0, failed = 0;
+    (gym.exercises || []).forEach(ex => {
+      ((gym.logs && gym.logs[ex.id]) || []).forEach(l => {
+        if (!l.date) return;
+        const days = (Date.now() - new Date(l.date).getTime()) / DAY_MS;
+        if (days >= startAgo && days < endAgo) { total++; if (l.failed) failed++; }
+      });
+    });
+    return total ? failed / total : null;
+  }
+
+  function renderFatigueCard(gym){
+    const loads = dailyLoads(gym);
+    const acute = windowStats(loads, 7);
+    const chronic = windowStats(loads, 28);
+
+    if (chronic.activeDays < 4) {
+      return '<div class="gm-card"><div class="section-title">Fatigue (charge d\'entraînement)</div>' +
+        '<p class="empty-note">Pas encore assez d\'historique pour un ratio fiable (il faut au moins quelques séances loguées sur les 4 dernières semaines). Continue à enregistrer tes séances dans Séance et reviens ici.</p></div>';
+    }
+
+    const ratio = chronic.avg > 0 ? acute.avg / chronic.avg : (acute.avg > 0 ? 2 : 0);
+    let cls, label;
+    if (chronic.avg === 0) { cls = 'low'; label = 'Reprise — pas de charge chronique établie'; }
+    else if (ratio < 0.8) { cls = 'low'; label = 'En dessous de ta charge habituelle'; }
+    else if (ratio <= 1.3) { cls = 'good'; label = 'Zone d\'entraînement optimale'; }
+    else if (ratio < 1.5) { cls = 'warn'; label = 'Charge élevée — surveille ta récupération'; }
+    else { cls = 'bad'; label = 'Risque de surcharge (littérature ACWR ≥ 1.5)'; }
+
+    const barPct = Math.min(100, (ratio / 2) * 100);
+
+    const failRecent = failRateWindow(gym, 0, 7);
+    const failPrior = failRateWindow(gym, 7, 21);
+    let failNote = '';
+    if (failRecent != null && failPrior != null && failRecent - failPrior >= 0.15) {
+      failNote = 'Ton taux d\'échec a augmenté cette semaine (' + Math.round(failRecent*100) + '% vs ' + Math.round(failPrior*100) + '% avant) — signe possible de fatigue qui s\'accumule.';
+    } else if (failRecent === 0 && acute.activeDays >= 2) {
+      failNote = 'Aucune série à l\'échec cette semaine — la marge de progression est probablement encore là.';
+    }
+
+    return '<div class="gm-card">' +
+      '<div class="section-title">Fatigue (charge d\'entraînement)</div>' +
+      '<div class="acwr-head"><span class="acwr-num">' + ratio.toFixed(2) + '</span></div>' +
+      '<div class="acwr-label">ACWR — charge aiguë (7j) ÷ charge chronique (28j)</div>' +
+      '<div class="acwr-badge ' + cls + '">' + label + '</div>' +
+      '<div class="acwr-bar-wrap"><div class="acwr-bar-zone" style="left:40%;width:25%;"></div><div class="acwr-bar-fill" style="width:' + barPct + '%; background:' + (cls==='bad'?'var(--danger)':cls==='warn'?'var(--warning)':cls==='low'?'#7DD3FC':'var(--success)') + ';"></div></div>' +
+      '<div class="acwr-scale"><span>0</span><span>0.8-1.3</span><span>2.0+</span></div>' +
+      '<div class="acwr-stats">' +
+      '<div class="acwr-stat"><div class="acwr-stat-num">' + Math.round(acute.avg) + '</div><div class="acwr-stat-label">Charge/jour · 7j</div></div>' +
+      '<div class="acwr-stat"><div class="acwr-stat-num">' + Math.round(chronic.avg) + '</div><div class="acwr-stat-label">Charge/jour · 28j</div></div>' +
+      '</div>' +
+      (failNote ? '<div class="fatigue-note">' + escapeHtml(failNote) + '</div>' : '') +
+      '</div>';
+  }
+
+  // ================================================================
+  // MOTIVATION — psychological motivation isn't something workout logs
+  // can honestly compute, so it isn't invented from the data. Two real
+  // sources instead: (1) your own self-report, saved as-is; (2) objective
+  // "competence" signals (recent PRs, consistency) pulled straight from
+  // your logs — Self-Determination Theory (Teixeira et al. 2012 review)
+  // finds competence satisfaction and autonomous motivation are what
+  // actually predict long-term exercise adherence, so that's what's
+  // surfaced here instead of a made-up score.
+  // ================================================================
+  const MOODS = [
+    { v: 1, e: '😞' }, { v: 2, e: '😕' }, { v: 3, e: '😐' }, { v: 4, e: '🙂' }, { v: 5, e: '🔥' }
+  ];
+  function renderMotivationCard(gym, mood){
+    const today = todayStr();
+    const todayVal = mood[today] ? mood[today].mood : null;
+
+    let trend = '';
+    for (let i = 13; i >= 0; i--){
+      const k = daysAgoStr(i);
+      const m = mood[k];
+      trend += '<div class="mood-dot" title="' + k + '">' + (m ? MOODS.find(x => x.v === m.mood).e : '') + '</div>';
+    }
+
+    const comp = competenceSignals(gym);
+    let compHtml = '';
+    if (!comp.newPRs.length && !comp.sessionsThisWeek) {
+      compHtml = '<p class="empty-note">Pas encore de données de progression — reviens ici après quelques séances.</p>';
+    } else {
+      compHtml += '<div class="competence-row"><span class="competence-icon">📅</span><div class="competence-text"><strong>' + comp.sessionsThisWeek + '</strong> séance(s) enregistrée(s) cette semaine.</div></div>';
+      comp.newPRs.slice(0, 4).forEach(pr => {
+        compHtml += '<div class="competence-row"><span class="competence-icon">🏆</span><div class="competence-text">Nouveau record sur <strong>' + escapeHtml(pr.name) + '</strong> (' + pr.weight + ').</div></div>';
+      });
+      if (!comp.newPRs.length) {
+        compHtml += '<div class="competence-row"><span class="competence-icon">📈</span><div class="competence-text">Pas de nouveau record ce mois-ci — la régularité compte aussi.</div></div>';
+      }
+    }
+
+    return '<div class="gm-card">' +
+      '<div class="section-title">Motivation</div>' +
+      '<div class="mood-row">' + MOODS.map(m => '<button type="button" class="mood-btn' + (todayVal === m.v ? ' active' : '') + '" data-mood="' + m.v + '">' + m.e + '</button>').join('') + '</div>' +
+      '<div class="mood-today-note">' + (todayVal ? 'Ressenti d\'aujourd\'hui enregistré — touche une autre humeur pour changer.' : 'Comment te sens-tu par rapport à l\'entraînement aujourd\'hui ?') + '</div>' +
+      '<div class="mood-trend">' + trend + '</div>' +
+      '<div class="mood-trend-label">14 derniers jours</div>' +
+      '<div class="section-title" style="margin-top:4px;">Signaux de compétence (réels, pas inventés)</div>' +
+      compHtml +
+      '</div>';
+  }
+  function competenceSignals(gym){
+    const cutoff = Date.now() - 30 * DAY_MS;
+    const newPRs = [];
+    (gym.exercises || []).forEach(ex => {
+      const logs = ((gym.logs && gym.logs[ex.id]) || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      if (!logs.length) return;
+      let bestBefore = -Infinity, bestRecent = -Infinity;
+      logs.forEach(l => {
+        const t = new Date(l.date).getTime();
+        const w = l.weight || 0;
+        if (t < cutoff) { if (w > bestBefore) bestBefore = w; }
+        else if (w > bestRecent) bestRecent = w;
+      });
+      if (bestRecent > -Infinity && bestRecent > bestBefore) newPRs.push({ name: ex.name, weight: bestRecent });
+    });
+    const sessions = new Set();
+    (gym.exercises || []).forEach(ex => {
+      ((gym.logs && gym.logs[ex.id]) || []).forEach(l => {
+        if (!l.date) return;
+        const days = (Date.now() - new Date(l.date).getTime()) / DAY_MS;
+        if (days >= 0 && days < 7) sessions.add(l.date + '|' + l.dayId);
+      });
+    });
+    return { newPRs, sessionsThisWeek: sessions.size };
+  }
+
+  function render(){
+    const mood = loadMood();
+    app.innerHTML =
+      '<h1 class="dash-title">Fatigue et Motivation</h1>' +
+      '<p class="dash-sub">Calculé à partir de tes vraies séances (Fitness / Séance / Muscle partagent la même donnée) — rien d\'inventé.</p>' +
+      '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
+      '<p><strong>Fatigue</strong> : ratio charge aiguë/chronique (ACWR), construit sur le modèle fitness-fatigue de <strong>Banister et al. (1975)</strong> — l\'entraînement produit une réponse "fitness" et une réponse "fatigue", chacune se dissipant avec le temps. Popularisé par les travaux de <strong>Gabbett</strong> en sciences du sport : une charge aiguë (7 jours) entre <strong>0.8 et 1.3</strong> fois la charge chronique (28 jours) est associée au risque de blessure/surcharge le plus faible ; un ratio <strong>≥ 1.5</strong> est associé à un risque nettement accru.</p>' +
+      '<p>La "charge" utilisée ici est le <strong>volume-charge</strong> (poids × répétitions, cumulé par jour) — pas la fréquence cardiaque ni le RPE de séance (méthode de <strong>Foster et al., 2001</strong>), que cette app ne collecte pas. C\'est une simplification assumée, pas une mesure de laboratoire.</p>' +
+      '<p><strong>Motivation</strong> : la théorie de l\'autodétermination (<strong>Teixeira et al., 2012</strong>, revue systématique) montre que la motivation autonome et la satisfaction de compétence prédisent l\'adhésion à long terme à l\'exercice — pas un score inventé. Donc : ton ressenti est auto-rapporté (c\'est toi qui le sais), et les seuls "indicateurs" affichés sont des faits tirés de tes séances (records, régularité).</p>' +
+      '<p>Volume d\'entraînement et hypertrophie : voir aussi le panneau du <strong>suivi musculaire</strong> (Schoenfeld, Grgic, Krieger).</p>' +
+      '</details>' +
+      renderFatigueCard(gym) +
+      renderMotivationCard(gym, mood) +
+      CROSS_NAV;
+
+    document.querySelectorAll('.mood-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = loadMood();
+        m[todayStr()] = { mood: parseInt(btn.dataset.mood, 10) };
+        saveMood(m);
+        render();
+      });
+    });
+  }
+
+  if (!gym || !Array.isArray(gym.exercises) || !gym.exercises.length) {
+    app.innerHTML =
+      '<h1 class="dash-title">Fatigue et Motivation</h1>' +
+      '<div class="gm-card"><p class="empty-note">Pas encore d\'exercices ni de séances enregistrées. Va dans Fitness puis Séance pour commencer à logger — cette page se remplit automatiquement à partir de ces données.</p></div>' +
+      CROSS_NAV;
+  } else {
+    render();
+  }
+})();
+</script>
+<script id="atmo-backdrop-js">
+(function () {
+  function spawnParticles() {
+    var root = document.getElementById('atmoParticles');
+    if (!root) return;
+    root.innerHTML = '';
+    var N = window.innerWidth < 640 ? 12 : 20;
+    for (var i = 0; i < N; i++) {
+      var s = document.createElement('span');
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.top = (55 + Math.random() * 45) + '%';
+      var size = 1.1 + Math.random() * 1.2;
+      s.style.width = s.style.height = size + 'px';
+      var dur = 24 + Math.random() * 30;
+      s.style.animationDuration = dur + 's';
+      s.style.animationDelay = (-Math.random() * dur) + 's';
+      s.style.setProperty('--dx', (Math.random() * 28 - 14) + 'px');
+      s.style.setProperty('--dy', -(55 + Math.random() * 45) + 'vh');
+      root.appendChild(s);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', spawnParticles);
+  else spawnParticles();
+})();
+</script>
+</body>
+</html>

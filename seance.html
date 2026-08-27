@@ -286,6 +286,15 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 
 .empty-note { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 20px 10px; }
 
+.cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.cross-nav a {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+  color: var(--text-secondary); text-decoration: none; font-size: 12.5px; font-weight: 600;
+  transition: background .15s, color .15s;
+}
+.cross-nav a:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
   .dash-title { font-size: 22px; }
@@ -437,6 +446,13 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     });
   }
 
+  const CROSS_NAV =
+    '<div class="cross-nav">' +
+    '<a href="gym.html">💪 Fitness</a>' +
+    '<a href="muscle-tracker.html">🩻 Muscle</a>' +
+    '<a href="fatigue.html">🔋 Fatigue</a>' +
+    '</div>';
+
   const app = document.getElementById('app');
   const state = loadGym();
   const days = (state && Array.isArray(state.days)) ? state.days : [];
@@ -480,7 +496,8 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<p class="dash-sub">Choisis la séance à remplir — aujourd\'hui ou en retard, la date reste modifiable.</p>' +
         '<div class="gm-card"><div class="section-title">Quelle séance ?</div>' +
         '<div class="day-grid">' + days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '">' + escapeHtml(d.name) + '</button>').join('') + '</div>' +
-        '</div>';
+        '</div>' +
+        CROSS_NAV;
       wireHistoryToggles();
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; render(); });
@@ -608,7 +625,8 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<p class="dash-sub">Quelle séance veux-tu lancer ?</p>' +
         '<div class="day-grid" style="flex-direction:column">' +
         days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '" style="padding:18px;">' + escapeHtml(d.name) + '</button>').join('') +
-        '</div>';
+        '</div>' +
+        CROSS_NAV;
       wireHistoryToggles();
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; startExercisePick(); });
