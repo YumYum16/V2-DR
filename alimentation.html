@@ -158,6 +158,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
 }
 .food-pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 10px; }
+.food-cat-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-tertiary); margin: 12px 0 2px; padding: 0 2px;
+}
+.food-cat-label:first-child { margin-top: 2px; }
 .food-pick-item {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
   background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06);
@@ -357,6 +362,19 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     if (changed) saveJSON(FOOD_DB_KEY, db);
     saveJSON(STARTER_FOODS_POTASSIUM_PATCHED_KEY, true);
   }
+  // Second one-time import batch — added after the first (own guard so
+  // it doesn't wait on/repeat the first one).
+  const STARTER_FOODS_2_SEEDED_KEY = 'po_food_seeded_batch2_v1';
+  const STARTER_FOODS_2 = [
+    { name: 'Cancoillotte IGP nature (Reflets de France)', kcalPer100g: 138, proteinPer100g: 16, carbsPer100g: 0.5, fatPer100g: 8, saltPer100g: 1.8, potassiumPer100g: 90 }
+  ];
+  if (!loadJSON(STARTER_FOODS_2_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const existingNames = new Set(db.map(f => f.name));
+    const toAdd = STARTER_FOODS_2.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
+    if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
+    saveJSON(STARTER_FOODS_2_SEEDED_KEY, true);
+  }
 
   // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
@@ -527,6 +545,41 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     // red -> green as pct goes 0 -> 1
     const r = Math.round(255 - (255-107)*pct), g = Math.round(107 + (227-107)*pct), b = Math.round(107 + (164-107)*pct);
     return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  // ---- food picker: group by whichever nutrient dominates per 100g ----
+  // Compares raw grams (potassium mg converted to g for a fair fight) —
+  // "the biggest thing wins", exactly as asked. In practice potassium
+  // rarely wins against macros by weight, so that category ends up
+  // reserved for genuinely potassium-forward, low-macro foods (coconut
+  // water-style), which is the useful case for the débloat card anyway.
+  const CATEGORY_ORDER = ['Protéines', 'Glucides', 'Lipides', 'Potassium', 'Autre'];
+  const CATEGORY_ICON = { 'Protéines': '🥩', 'Glucides': '🍞', 'Lipides': '🧈', 'Potassium': '🍌', 'Autre': '🍽️' };
+  function dominantCategory(f) {
+    const p = f.proteinPer100g || 0, c = f.carbsPer100g || 0, fat = f.fatPer100g || 0, k = (f.potassiumPer100g || 0) / 1000;
+    const max = Math.max(p, c, fat, k);
+    if (max <= 0) return 'Autre';
+    if (max === p) return 'Protéines';
+    if (max === c) return 'Glucides';
+    if (max === fat) return 'Lipides';
+    return 'Potassium';
+  }
+  function groupFoodsByCategory(db) {
+    const groups = {};
+    db.forEach(f => { const cat = dominantCategory(f); (groups[cat] = groups[cat] || []).push(f); });
+    CATEGORY_ORDER.forEach(cat => { if (groups[cat]) groups[cat].sort((a, b) => a.name.localeCompare(b.name)); });
+    return groups;
+  }
+  function foodListHtml(db, rowFn) {
+    const groups = groupFoodsByCategory(db);
+    let html = '';
+    CATEGORY_ORDER.forEach(cat => {
+      const items = groups[cat];
+      if (!items || !items.length) return;
+      html += '<div class="food-cat-label">' + CATEGORY_ICON[cat] + ' ' + escapeHtml(cat) + '</div>';
+      html += items.map(rowFn).join('');
+    });
+    return html;
   }
 
   // ================================================================
@@ -715,12 +768,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           return;
         }
         body.innerHTML =
-          '<div class="food-pick-list">' + db.map(f =>
+          '<div class="food-pick-list">' + foodListHtml(db, f =>
             '<div class="food-pick-item' + (selectedFood && selectedFood.id===f.id ? ' active':'') + '" data-id="' + f.id + '">' +
             '<div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
             '</div>'
-          ).join('') + '</div>' +
+          ) + '</div>' +
           (selectedFood ? renderQuantityForm(selectedFood) : '');
         body.querySelectorAll('.food-pick-item').forEach(el => {
           el.addEventListener('click', (e) => {
@@ -836,11 +889,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const db = loadJSON(FOOD_DB_KEY, []);
       inner.innerHTML = '<h3>Mes aliments</h3>' +
         (db.length ?
-          '<div class="food-pick-list">' + db.map(f =>
+          '<div class="food-pick-list">' + foodListHtml(db, f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
             '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
-          ).join('') + '</div>' :
+          ) + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeManage">Fermer</button></div>';
       document.getElementById('closeManage').addEventListener('click', closeModal);

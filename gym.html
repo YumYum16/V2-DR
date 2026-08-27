@@ -1191,6 +1191,14 @@ img, video, canvas, svg { max-width: 100%; }
 .gym-heat-month { font-size: 12px; color: var(--text-2); font-weight: 600; }
 .gym-heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .gym-heat-cell { aspect-ratio: 1; border-radius: 5px; background: var(--border); }
+.wt-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.wt-cal-cell {
+  aspect-ratio: 1; border-radius: 7px; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+}
+.wt-cal-cell.has-entry { background: rgba(110,231,183,0.08); border-color: rgba(110,231,183,0.22); }
+.wt-cal-day { font-size: 8.5px; color: var(--text-3); }
+.wt-cal-val { font-size: 9.5px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
 
 /* ===== Muscle preview card (iframes muscle-tracker.html) ===== */
 .po-muscle-preview-head {
@@ -1350,6 +1358,16 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
     <div class="gym-heat-grid" id="gymHeatGrid"></div>
   </div>
+  </div>
+
+  <!-- Monthly weight calendar — same grid as Assiduité above, but shows
+       the logged weight under each date instead of a set-count color. -->
+  <div class="card">
+    <div class="gym-heat-head">
+      <span class="gym-heat-title">Poids — Calendrier</span>
+      <span class="gym-heat-month" id="wtCalMonth">—</span>
+    </div>
+    <div class="wt-cal-grid" id="wtCalGrid"></div>
   </div>
 
   <!-- Progress photos overlay -->
@@ -2537,6 +2555,27 @@ img, video, canvas, svg { max-width: 100%; }
 
   let wtEntries = wtLoad();
 
+  // One-time import of weigh-ins from before this app tracked them
+  // (screenshot of an earlier log). Guarded so it only ever runs once —
+  // deleting an imported entry later won't bring it back.
+  (function importJulyWeights() {
+    const FLAG = 'po_coach_weights_imported_july2026';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) { return; }
+    const importList = [
+      ['2026-07-08', 74.0], ['2026-07-09', 71.5], ['2026-07-11', 70.9],
+      ['2026-07-12', 70.4], ['2026-07-13', 69.0], ['2026-07-14', 69.9],
+      ['2026-07-15', 70.0], ['2026-07-16', 70.4], ['2026-07-17', 69.7],
+      ['2026-07-18', 70.3], ['2026-07-19', 70.2]
+    ];
+    const existingKeys = new Set(wtEntries.map(e => e.dateKey));
+    let added = false;
+    importList.forEach(([dateKey, weight]) => {
+      if (!existingKeys.has(dateKey)) { wtEntries.push({ dateKey, weight }); added = true; }
+    });
+    if (added) { wtEntries.sort((a, b) => a.dateKey.localeCompare(b.dateKey)); wtSave(wtEntries); }
+    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+  })();
+
   function wtSaveEntry(weight, dateKey) {
     const key = dateKey || wtDateKey(new Date());
     const existing = wtEntries.find(e => e.dateKey === key);
@@ -2547,7 +2586,30 @@ img, video, canvas, svg { max-width: 100%; }
     return true;
   }
 
+  function renderWeightCalendar() {
+    const grid = $('wtCalGrid');
+    if (!grid) return;
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    $('wtCalMonth').textContent = monthNames[m] + ' ' + y;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const byDate = {};
+    wtEntries.forEach(e => { byDate[e.dateKey] = e.weight; });
+    let html = '';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const w = byDate[dk];
+      html += '<div class="wt-cal-cell' + (w != null ? ' has-entry' : '') + '" title="' + dk + (w != null ? (' — ' + w.toFixed(1) + ' ' + state.units) : '') + '">' +
+        '<span class="wt-cal-day">' + d + '</span>' +
+        (w != null ? '<span class="wt-cal-val">' + w.toFixed(1) + '</span>' : '') +
+        '</div>';
+    }
+    grid.innerHTML = html;
+  }
+
   function wtRender() {
+    renderWeightCalendar();
     const last = wtEntries[wtEntries.length - 1] || null;
     const todayKey = wtDateKey(new Date());
     const todayEntry = wtEntries.find(e => e.dateKey === todayKey);
