@@ -117,11 +117,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .ring-track { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 8; }
 .ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease, stroke 0.3s; }
 .ring-label-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.ring-num { font-size: 15px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.ring-target { font-size: 9px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; margin-top: -1px; }
-.ring-name { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 1px; }
+.ring-num { font-size: 16px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ring-target { font-size: 10px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; margin-top: -1px; }
+.ring-name { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 1px; }
 .kcal-total { text-align: center; font-size: 13px; color: var(--text-secondary); }
-.kcal-total strong { color: var(--text-primary); font-size: 20px; font-variant-numeric: tabular-nums; }
+.kcal-total strong { color: var(--text-primary); font-size: 22px; font-variant-numeric: tabular-nums; }
+.kcal-remaining { font-size: 12px; margin-top: 2px; font-weight: 600; }
 .salt-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
 .salt-row-head { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 6px; }
 .salt-row-head strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
@@ -211,13 +212,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .btn-secondary { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-primary); }
 .btn-primary { border: 0; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; }
 
-/* ---- micronutrients ---- */
-.microlist { display: flex; flex-wrap: wrap; gap: 6px; }
-.microlist span {
-  padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary);
-}
-
 .cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .cross-nav a {
   display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
@@ -251,7 +245,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const FOOD_DB_KEY = 'po_food_db_v1';
   const FOOD_LOG_KEY = 'po_food_log_v1';
   const PROGRAM_KEY = 'po_nutrition_program_v1';
-  const STACK_KEY = 'stack:items';
   const DAY_MS = 86400000;
 
   // ================================================================
@@ -340,21 +333,24 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // the "(estimation)" foods: a reasonable default, swap in the real
   // packaging value if it matters for a precise débloat ratio.
   const STARTER_FOODS_SEEDED_KEY = 'po_food_seeded_recap_v1';
+  // fiberPer100g: null means "not on the label / not communicated" — kept
+  // distinct from 0 (a genuine, verifiable zero for meat/dairy/liquids)
+  // so an unknown value is never silently counted as "no fiber".
   const STARTER_FOODS = [
-    { name: 'Spaghetti complet bio (Lidl)', kcalPer100g: 336, proteinPer100g: 12, carbsPer100g: 62, fatPer100g: 2, saltPer100g: 0.03, potassiumPer100g: 260 },
-    { name: 'Pain "Pétrie" (estimation)', kcalPer100g: 265, proteinPer100g: 8.5, carbsPer100g: 51, fatPer100g: 1.25, saltPer100g: 0, potassiumPer100g: 120 },
-    { name: 'Patate (Roseval / Amandine)', kcalPer100g: 80, proteinPer100g: 2, carbsPer100g: 17, fatPer100g: 0.1, saltPer100g: 0, potassiumPer100g: 420 },
-    { name: 'Galette de blé noir bio (Bernard Jarnoux)', kcalPer100g: 170, proteinPer100g: 6, carbsPer100g: 31.5, fatPer100g: 1.5, saltPer100g: 1.30, potassiumPer100g: 220, servingGrams: 35, servingLabel: 'galette' },
-    { name: 'Steak haché 5% MG (estimation)', kcalPer100g: 132, proteinPer100g: 20.8, carbsPer100g: 0, fatPer100g: 5.2, saltPer100g: 0, potassiumPer100g: 360, servingGrams: 125, servingLabel: 'steak' },
-    { name: 'Œuf moyen', kcalPer100g: 140, proteinPer100g: 12, carbsPer100g: 0.5, fatPer100g: 10, saltPer100g: 0, potassiumPer100g: 130, servingGrams: 50, servingLabel: 'œuf' },
-    { name: 'Crevettes cuites (estimation)', kcalPer100g: 99, proteinPer100g: 20, carbsPer100g: 0.5, fatPer100g: 1, saltPer100g: 0, potassiumPer100g: 240 },
-    { name: 'Whey isolate Nutrimuscle (vanille)', kcalPer100g: 385, proteinPer100g: 75, carbsPer100g: 10.95, fatPer100g: 3.69, saltPer100g: 1.21, potassiumPer100g: 200, servingGrams: 30, servingLabel: 'scoop' },
-    { name: 'Skyr 0%', kcalPer100g: 52, proteinPer100g: 8.8, carbsPer100g: 3.9, fatPer100g: 0, saltPer100g: 0.10, potassiumPer100g: 150 },
-    { name: 'Emmental (tranches)', kcalPer100g: 380, proteinPer100g: 27, carbsPer100g: 0.5, fatPer100g: 30, saltPer100g: 0.80, potassiumPer100g: 95, servingGrams: 20, servingLabel: 'tranche' },
-    { name: 'Sauce bolognaise Panzani (100% bœuf français)', kcalPer100g: 83, proteinPer100g: 5, carbsPer100g: 7, fatPer100g: 3.6, saltPer100g: 0.96, potassiumPer100g: 260 },
-    { name: 'Eau de coco (Carrefour Bio / Lidl Bio)', kcalPer100g: 15, proteinPer100g: 0, carbsPer100g: 2.9, fatPer100g: 0, saltPer100g: 0, potassiumPer100g: 250 },
-    { name: 'Épinards cuits (estimation)', kcalPer100g: 25, proteinPer100g: 1.3, carbsPer100g: 0.7, fatPer100g: 0, saltPer100g: 0, potassiumPer100g: 466 },
-    { name: 'Biscuits boudoirs', kcalPer100g: 487, proteinPer100g: 5.7, carbsPer100g: 74, fatPer100g: 18, saltPer100g: 0.83, potassiumPer100g: 105 }
+    { name: 'Spaghetti complet bio (Lidl)', kcalPer100g: 336, proteinPer100g: 12, carbsPer100g: 62, fatPer100g: 2, saltPer100g: 0.03, potassiumPer100g: 260, fiberPer100g: 11 },
+    { name: 'Pain "Pétrie" (estimation)', kcalPer100g: 265, proteinPer100g: 8.5, carbsPer100g: 51, fatPer100g: 1.25, saltPer100g: 0, potassiumPer100g: 120, fiberPer100g: null },
+    { name: 'Patate (Roseval / Amandine)', kcalPer100g: 80, proteinPer100g: 2, carbsPer100g: 17, fatPer100g: 0.1, saltPer100g: 0, potassiumPer100g: 420, fiberPer100g: null },
+    { name: 'Galette de blé noir bio (Bernard Jarnoux)', kcalPer100g: 170, proteinPer100g: 6, carbsPer100g: 31.5, fatPer100g: 1.5, saltPer100g: 1.30, potassiumPer100g: 220, servingGrams: 35, servingLabel: 'galette', fiberPer100g: 3.3 },
+    { name: 'Steak haché 5% MG (estimation)', kcalPer100g: 132, proteinPer100g: 20.8, carbsPer100g: 0, fatPer100g: 5.2, saltPer100g: 0, potassiumPer100g: 360, servingGrams: 125, servingLabel: 'steak', fiberPer100g: 0 },
+    { name: 'Œuf moyen', kcalPer100g: 140, proteinPer100g: 12, carbsPer100g: 0.5, fatPer100g: 10, saltPer100g: 0, potassiumPer100g: 130, servingGrams: 50, servingLabel: 'œuf', fiberPer100g: 0 },
+    { name: 'Crevettes cuites (estimation)', kcalPer100g: 99, proteinPer100g: 20, carbsPer100g: 0.5, fatPer100g: 1, saltPer100g: 0, potassiumPer100g: 240, fiberPer100g: 0 },
+    { name: 'Whey isolate Nutrimuscle (vanille)', kcalPer100g: 385, proteinPer100g: 75, carbsPer100g: 10.95, fatPer100g: 3.69, saltPer100g: 1.21, potassiumPer100g: 200, servingGrams: 30, servingLabel: 'scoop', fiberPer100g: null },
+    { name: 'Skyr 0%', kcalPer100g: 52, proteinPer100g: 8.8, carbsPer100g: 3.9, fatPer100g: 0, saltPer100g: 0.10, potassiumPer100g: 150, fiberPer100g: 0 },
+    { name: 'Emmental (tranches)', kcalPer100g: 380, proteinPer100g: 27, carbsPer100g: 0.5, fatPer100g: 30, saltPer100g: 0.80, potassiumPer100g: 95, servingGrams: 20, servingLabel: 'tranche', fiberPer100g: 0 },
+    { name: 'Sauce bolognaise Panzani (100% bœuf français)', kcalPer100g: 83, proteinPer100g: 5, carbsPer100g: 7, fatPer100g: 3.6, saltPer100g: 0.96, potassiumPer100g: 260, fiberPer100g: 1.2 },
+    { name: 'Eau de coco (Carrefour Bio / Lidl Bio)', kcalPer100g: 15, proteinPer100g: 0, carbsPer100g: 2.9, fatPer100g: 0, saltPer100g: 0, potassiumPer100g: 250, fiberPer100g: 0 },
+    { name: 'Épinards cuits (estimation)', kcalPer100g: 25, proteinPer100g: 1.3, carbsPer100g: 0.7, fatPer100g: 0, saltPer100g: 0, potassiumPer100g: 466, fiberPer100g: null },
+    { name: 'Biscuits boudoirs', kcalPer100g: 487, proteinPer100g: 5.7, carbsPer100g: 74, fatPer100g: 18, saltPer100g: 0.83, potassiumPer100g: 105, fiberPer100g: 1.4 }
   ];
   if (!loadJSON(STARTER_FOODS_SEEDED_KEY, false)) {
     const db = loadJSON(FOOD_DB_KEY, []);
@@ -382,7 +378,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // it doesn't wait on/repeat the first one).
   const STARTER_FOODS_2_SEEDED_KEY = 'po_food_seeded_batch2_v1';
   const STARTER_FOODS_2 = [
-    { name: 'Cancoillotte IGP nature (Reflets de France)', kcalPer100g: 138, proteinPer100g: 16, carbsPer100g: 0.5, fatPer100g: 8, saltPer100g: 1.8, potassiumPer100g: 90 }
+    { name: 'Cancoillotte IGP nature (Reflets de France)', kcalPer100g: 138, proteinPer100g: 16, carbsPer100g: 0.5, fatPer100g: 8, saltPer100g: 1.8, potassiumPer100g: 90, fiberPer100g: null }
   ];
   if (!loadJSON(STARTER_FOODS_2_SEEDED_KEY, false)) {
     const db = loadJSON(FOOD_DB_KEY, []);
@@ -390,6 +386,21 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const toAdd = STARTER_FOODS_2.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
     if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
     saveJSON(STARTER_FOODS_2_SEEDED_KEY, true);
+  }
+  // Same idea, for fiber — patched in after fiber tracking was added.
+  // undefined (field never existed) is patched to the starter value;
+  // an explicit null (genuinely "not on the label") is left alone.
+  const STARTER_FOODS_FIBER_PATCHED_KEY = 'po_food_fiber_patched_v1';
+  if (!loadJSON(STARTER_FOODS_FIBER_PATCHED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const byName = {};
+    STARTER_FOODS.concat(STARTER_FOODS_2).forEach(f => { byName[f.name] = f.fiberPer100g; });
+    let changed = false;
+    db.forEach(f => {
+      if (f.fiberPer100g === undefined && byName[f.name] !== undefined) { f.fiberPer100g = byName[f.name]; changed = true; }
+    });
+    if (changed) saveJSON(FOOD_DB_KEY, db);
+    saveJSON(STARTER_FOODS_FIBER_PATCHED_KEY, true);
   }
 
   // ================================================================
@@ -522,7 +533,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, program };
+    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, program, profile };
   }
 
   // ================================================================
@@ -550,8 +561,20 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
       carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0),
       salt: acc.salt + (e.salt||0), potassium: acc.potassium + (e.potassium||0),
-      sugar: acc.sugar + (e.sugar||0)
-    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0 });
+      sugar: acc.sugar + (e.sugar||0), fiber: acc.fiber + (e.fiber||0)
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0, fiber: 0 });
+  }
+  // Institute of Medicine (2005), Dietary Reference Intakes for Energy,
+  // Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino
+  // Acids — Adequate Intake for fiber, by age/sex (not a per-kcal rule of
+  // thumb; these are the actual reference values). Kept flat rather than
+  // scaled down with the cut's calorie deficit: fiber's satiety benefit
+  // (Slavin, 2005, Nutrition review) matters more, not less, on fewer
+  // calories.
+  function fiberTargetG(profile) {
+    const age = profile.age || 25;
+    if (profile.sex === 'f') return age > 50 ? 21 : 25;
+    return age > 50 ? 30 : 38;
   }
   // WHO: under 5g salt/day (~2000mg sodium), at least 3510mg potassium/day
   // — together these give a sodium:potassium molar ratio of ~1.0, which
@@ -713,7 +736,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const totals = todayTotals();
     const db = loadJSON(FOOD_DB_KEY, []);
     const entries = todaysEntries();
-    const stack = loadJSON(STACK_KEY, []);
 
     const pP = targets.proteinG ? totals.protein / targets.proteinG : 0;
     const pC = targets.carbsG ? totals.carbs / targets.carbsG : 0;
@@ -731,24 +753,39 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<p><strong>Sucres</strong> : recommandation <strong>OMS (2015, ligne directrice sur les sucres)</strong> — sucres libres &lt; 10% de l\'apport énergétique total. Pertinent pour le débloat aussi : le glycogène (réserve de glucides dans le muscle/foie) retient environ <strong>3g d\'eau par gramme de glycogène stocké</strong> — un excès de sucres/glucides au-delà de ce que la séance du jour consomme se traduit en partie par de l\'eau retenue, pas juste des calories.</p>' +
       '<p><strong>Poids demain</strong> : estimation décomposée, pas un chiffre inventé — graisse/masse maigre via ~7700 kcal/kg (équivalence énergétique standard), eau via le glycogène (<strong>Olsson &amp; Saltin, 1970</strong> — ~3g d\'eau/g de glycogène) et via le sel (même règle que le lien avec l\'eau ci-dessus). Séance (Fitness) réduit l\'effet glycogène du jour puisqu\'une partie sert à recharger ce qui vient d\'être vidé. Le poids d\'un seul jour reste dominé par ces variations d\'eau — la vraie tendance se lit sur plusieurs jours (Fitness → Poids).</p>' +
       '<p><strong>Jour de repos</strong> : la calendrier de séance de Fitness (Push/Pull/Legs/Repos) est lu directement — un jour de repos fait baisser d\'un cran le facteur d\'activité (plancher sédentaire), au lieu d\'appliquer la même moyenne hebdomadaire tous les jours. C\'est la logique du "carb cycling" — faire correspondre l\'apport à la dépense réelle du jour — une pratique courante en musculation, pas une règle validée par un essai clinique dédié.</p>' +
+      '<p><strong>Fibres</strong> : <strong>Institute of Medicine (2005)</strong>, Dietary Reference Intakes — apport adéquat de 38g/j (hommes ≤50 ans), 30g (hommes 50+), 25g (femmes ≤50 ans), 21g (femmes 50+). Gardé fixe même en déficit calorique : leur effet sur la satiété (<strong>Slavin, 2005</strong>, revue Nutrition) est justement plus utile pendant une sèche, pas moins. "Fi?" dans un aliment veut dire que la valeur n\'était pas sur l\'étiquette — compté comme 0g dans le total du jour (sous-estimation volontaire plutôt qu\'un chiffre inventé), donc ton vrai total est probablement un peu au-dessus de ce qui s\'affiche.</p>' +
       '</details>';
+
+    const kcalRemaining = targets.target - totals.kcal;
+    const fiberTarget = fiberTargetG(targets.profile);
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Aujourd\'hui</div>' +
       '<div class="ring-row">' +
-      ring(pP, ringColor(pP), totals.protein, targets.proteinG, 'Protéines') +
-      ring(pC, ringColor(pC), totals.carbs, targets.carbsG, 'Glucides') +
-      ring(pF, ringColor(pF), totals.fat, targets.fatG, 'Lipides') +
+      ring(pP, ringColor(pP), totals.protein, targets.proteinG, '🥩 Protéines') +
+      ring(pC, ringColor(pC), totals.carbs, targets.carbsG, '🍞 Glucides') +
+      ring(pF, ringColor(pF), totals.fat, targets.fatG, '🧈 Lipides') +
       '</div>' +
-      '<div class="kcal-total"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal</div>' +
-      '<div class="salt-row"><div class="salt-row-head"><span>Sel</span><strong>' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g</strong></div>' +
+      '<div class="kcal-total"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal' +
+      '<div class="kcal-remaining" style="color:' + (kcalRemaining < 0 ? 'var(--danger)' : 'var(--text-tertiary)') + '">' +
+      (kcalRemaining >= 0 ? 'reste ' + Math.round(kcalRemaining) + ' kcal aujourd\'hui' : 'dépassé de ' + Math.round(-kcalRemaining) + ' kcal') +
+      '</div></div>' +
+      '<div class="salt-row"><div class="salt-row-head"><span>🧂 Sel</span><strong>' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g</strong></div>' +
       '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.salt/SALT_TARGET_G)*100).toFixed(0) + '%;background:' + (totals.salt > SALT_TARGET_G ? 'var(--danger)' : 'var(--lime)') + ';"></div></div></div>' +
-      '<div class="salt-row"><div class="salt-row-head"><span>Sucres</span><strong>' + Math.round(totals.sugar) + ' / ' + Math.round(sugarTargetG) + ' g</strong></div>' +
+      '<div class="salt-row"><div class="salt-row-head"><span>🍬 Sucres</span><strong>' + Math.round(totals.sugar) + ' / ' + Math.round(sugarTargetG) + ' g</strong></div>' +
       '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.sugar/sugarTargetG)*100).toFixed(0) + '%;background:' + (totals.sugar > sugarTargetG ? 'var(--danger)' : 'var(--lime)') + ';"></div></div></div>' +
+      '<div class="salt-row"><div class="salt-row-head"><span>🌾 Fibres</span><strong>' + Math.round(totals.fiber) + ' / ' + fiberTarget + ' g</strong></div>' +
+      '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.fiber/fiberTarget)*100).toFixed(0) + '%;background:' + (totals.fiber >= fiberTarget ? 'var(--lime)' : 'var(--warning)') + ';"></div></div></div>' +
       '</div>';
 
-    html += renderDebloatCard(totals);
-    html += renderPredictionCard(targets, totals);
+    html += '<div class="gm-card">' +
+      '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +
+      (entries.length ? entries.map(e =>
+        '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
+        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span>' +
+        '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
+      ).join('') : '<p class="empty-note">Rien enregistré aujourd\'hui.</p>') +
+      '</div>';
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Programme (sèche adaptative)</div>' +
@@ -762,22 +799,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '<div class="program-note">Pas encore assez de semaines de pesées pour ajuster automatiquement — le déficit de départ (-20%) est utilisé tel quel.</div>') +
       '</div>';
 
-    html += '<div class="gm-card">' +
-      '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +
-      (entries.length ? entries.map(e =>
-        '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
-        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span>' +
-        '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
-      ).join('') : '<p class="empty-note">Rien enregistré aujourd\'hui.</p>') +
-      '</div>';
-
-    html += '<div class="gm-card">' +
-      '<div class="section-title">Micronutriments<a class="gm-ghost" href="health.html">💊 Santé →</a></div>' +
-      (stack.length ?
-        '<p style="font-size:12px;color:var(--text-tertiary);margin:0 0 10px;">Complète les apports des repas — suivi précis par micronutriment non disponible sans base alimentaire externe, donc pas de faux chiffres ici. Ce que tu prends actuellement (Santé) :</p>' +
-        '<div class="microlist">' + stack.map(s => '<span>' + escapeHtml(s.name) + '</span>').join('') + '</div>' :
-        '<p class="empty-note">Aucun complément enregistré dans Santé. Pendant une sèche, les apports en micronutriments (fer, calcium, vitamine D, magnésium…) méritent une attention particulière — ajoute tes compléments dans Santé pour les voir apparaître ici.</p>') +
-      '</div>';
+    html += renderPredictionCard(targets, totals);
+    html += renderDebloatCard(totals);
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Mes aliments (' + db.length + ')<button type="button" class="gm-ghost" id="manageFoodsBtn">Gérer</button></div>' +
@@ -876,11 +899,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           '</div>' +
           '<div class="field-row">' +
           '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
-          '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
+          '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="newFoodFiber" step="0.1" placeholder="ex. 3"></div>' +
           '</div>' +
           '<div class="field-row">' +
+          '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
           '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="newFoodK" step="1" placeholder="ex. 350"></div>' +
-          '<div class="field-col"></div>' +
           '</div>' +
           '<div class="field-row">' +
           '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150"></div>' +
@@ -899,6 +922,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
             carbsPer100g: parseFloat(document.getElementById('newFoodC').value) || 0,
             sugarPer100g: parseFloat(document.getElementById('newFoodSugar').value) || 0,
             fatPer100g: parseFloat(document.getElementById('newFoodF').value) || 0,
+            fiberPer100g: document.getElementById('newFoodFiber').value.trim() === '' ? null : parseFloat(document.getElementById('newFoodFiber').value) || 0,
             saltPer100g: parseFloat(document.getElementById('newFoodSalt').value) || 0,
             potassiumPer100g: parseFloat(document.getElementById('newFoodK').value) || 0,
             servingGrams: parseFloat(document.getElementById('newFoodServingG').value) || null,
@@ -940,7 +964,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           kcal: f.kcalPer100g * ratio, protein: f.proteinPer100g * ratio,
           carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio,
           salt: (f.saltPer100g || 0) * ratio, potassium: (f.potassiumPer100g || 0) * ratio,
-          sugar: (f.sugarPer100g || 0) * ratio
+          sugar: (f.sugarPer100g || 0) * ratio, fiber: (f.fiberPer100g || 0) * ratio
         });
         closeModal();
         renderMain();
@@ -965,7 +989,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           ).join('') + '</div>' +
           '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
-            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' Fi' + (f.fiberPer100g == null ? '?' : f.fiberPer100g) + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
           ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
