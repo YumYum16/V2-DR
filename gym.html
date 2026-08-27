@@ -1178,17 +1178,30 @@ img, video, canvas, svg { max-width: 100%; }
 .gym-heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .gym-heat-cell { aspect-ratio: 1; border-radius: 5px; background: var(--border); }
 
+/* ===== Muscle preview card (iframes muscle-tracker.html) ===== */
+.po-muscle-preview-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.po-muscle-preview-link { text-decoration: none; }
+.po-muscle-preview-frame {
+  width: 100%; height: 230px; border: 0; border-radius: 12px;
+  display: block; background: transparent;
+}
+
 /* ===== Desktop-only: reclaim the unused side margins ===== */
 @media (min-width: 1100px) {
   .po-shell { max-width: min(1040px, 94vw); }
   .po-top-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
     align-items: start;
     gap: 16px;
   }
-  .po-top-grid .wt-section { margin: 0; }
-  .po-top-grid .card { margin: 0; height: 100%; }
+  .po-top-grid .po-muscle-preview { grid-column: 1; grid-row: 1; margin: 0; }
+  .po-top-grid .wt-section { grid-column: 1; grid-row: 2; margin: 0; }
+  .po-top-grid .card:not(.po-muscle-preview) { grid-column: 2; grid-row: 1 / span 2; margin: 0; height: 100%; }
   .po-ex-card-thumb { width: 48px; height: 48px; border-radius: 11px; }
 }
 </style>
@@ -1212,6 +1225,16 @@ img, video, canvas, svg { max-width: 100%; }
        to use the extra horizontal space on wide viewports. Mobile keeps
        the original stacked layout untouched. -->
   <div class="po-top-grid">
+  <!-- Muscle preview — front + back body heatmap, auto-computed from the
+       sets logged below (see muscle-tracker.html). Read-only here; tap
+       through for the full breakdown. -->
+  <div class="card po-muscle-preview">
+    <div class="po-muscle-preview-head">
+      <span class="wt-progress-label">APERÇU MUSCULAIRE</span>
+      <a href="muscle-tracker.html" class="wt-progress-arrow po-muscle-preview-link" aria-label="Voir le suivi musculaire complet">→</a>
+    </div>
+    <iframe class="po-muscle-preview-frame" src="muscle-tracker.html" title="Aperçu musculaire" loading="lazy"></iframe>
+  </div>
   <!-- WEIGHT + PROGRESS PHOTOS -->
   <div class="wt-section">
     <div class="wt-divider"><span>POIDS</span></div>

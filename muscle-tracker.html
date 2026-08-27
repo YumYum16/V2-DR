@@ -6,9 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
 <title>Suivi Musculaire · Tableau de bord</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="sync.js" defer></script>
+<script>
+  // Compact mode when embedded (e.g. the preview inside gym.html): just
+  // the two body figures, no chrome. Runs synchronously so there's no
+  // flash of the full page before it collapses.
+  try { if (window.self !== window.top) document.documentElement.classList.add('mt-embedded'); } catch (e) {}
+</script>
 <script src="topbar.js" defer></script>
 
 <style>
@@ -332,12 +335,47 @@
   .bilan-item.optimal .btag{color:var(--success); background:rgba(107,227,164,.14);}
   .bilan-item.correct .btag{color:var(--warning); background:rgba(242,192,99,.14);}
   .bilan-item.low .btag{color:var(--danger); background:rgba(255,107,107,.14);}
+  .mt-detail{
+    max-width:1100px;
+    margin:0 auto 22px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:14px 18px;
+    backdrop-filter:blur(24px) saturate(1.2);
+    -webkit-backdrop-filter:blur(24px) saturate(1.2);
+  }
+  .mt-detail-title{
+    font-size:.85rem; font-weight:700; color:var(--text-primary);
+  }
+  .mt-detail-sub{
+    font-size:.72rem; font-weight:500; color:var(--text-tertiary);
+  }
+  .mt-detail-empty{
+    font-size:.78rem; color:var(--text-tertiary); margin-top:6px;
+  }
+  .mt-detail-list{
+    margin:8px 0 0; padding-left:18px; font-size:.78rem; color:var(--text-secondary);
+  }
+  .mt-detail-list li{ margin-bottom:2px; }
   .note{
     text-align:center;
     color:var(--text-tertiary);
     font-size:.72rem;
     margin-top:30px;
   }
+  /* Embedded compact mode (iframed from gym.html): just the two figures. */
+  html.mt-embedded body{ padding:10px; background:transparent; }
+  html.mt-embedded body::before, html.mt-embedded body::after{ display:none; }
+  html.mt-embedded h1, html.mt-embedded p.sub, html.mt-embedded .toolbar,
+  html.mt-embedded details.info, html.mt-embedded .legend,
+  html.mt-embedded .mt-detail, html.mt-embedded .bilan, html.mt-embedded .note{
+    display:none !important;
+  }
+  html.mt-embedded .layout{ gap:14px; margin:0; justify-content:center; }
+  html.mt-embedded .figure-card{ padding:8px 6px 6px; }
+  html.mt-embedded .stage{ width:120px; }
+  html.mt-embedded .figure-card h2{ font-size:.62rem; }
   ::-webkit-scrollbar{width:6px;}
   ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
   @media (max-width:480px){
@@ -348,7 +386,7 @@
 </head>
 <body>
 <h1>Suivi Musculaire</h1>
-<p class="sub">Clique sur un muscle (sur le corps ou dans la liste) à chaque séance. Sa couleur reflète la charge d'entraînement récente ; le bilan en bas résume ton assiduité sur la période choisie.</p>
+<p class="sub">Reflète automatiquement les séries enregistrées dans Musculation — rien à cocher ici. Touche un muscle (sur le corps ou dans la liste) pour voir quels exercices l'ont fait travailler ; le bilan en bas résume ton assiduité sur la période choisie.</p>
 
 <div class="toolbar">
   <div class="segmented" id="periodSelector">
@@ -356,18 +394,18 @@
     <button data-days="182">6 mois</button>
     <button data-days="365">1 an</button>
   </div>
-  <button class="reset" id="resetBtn">Réinitialiser tout</button>
 </div>
 
 <details class="info">
   <summary>Comment ce système est calculé (base scientifique)</summary>
-  <p>La couleur d'un muscle correspond à une <strong>charge d'entraînement récente</strong> : chaque séance ajoute du vert, qui s'estompe progressivement si le muscle n'est pas re-sollicité (les adaptations à l'entraînement commencent à régresser après ~2 à 3 semaines d'arrêt total).</p>
+  <p>Aucune saisie manuelle : chaque série enregistrée dans <strong>Musculation</strong> est reliée aux muscles qu'elle sollicite (moteurs primaires vs. synergistes/stabilisateurs), d'après les tables d'implication musculaire de référence (Delavier ; ExRx.net). La couleur d'un muscle correspond à une <strong>charge d'entraînement récente</strong> : chaque séance ajoute du vert, qui s'estompe progressivement si le muscle n'est pas re-sollicité (les adaptations à l'entraînement commencent à régresser après ~2 à 3 semaines d'arrêt total).</p>
   <p>L'échelle est calibrée sur les repères issus des méta-analyses sur l'hypertrophie (Schoenfeld, Grgic, Krieger) :</p>
   <ul>
     <li>Entraîner un muscle <strong>≥ 2 fois par semaine</strong> est plus efficace qu'une fois par semaine à volume égal &rarr; vert quasi plein.</li>
     <li><strong>1 fois par semaine</strong> reste utile mais sous-optimal &rarr; vert intermédiaire.</li>
     <li>Au-delà de 3-4 fois/semaine sur le même muscle, le bénéfice supplémentaire est marginal si la récupération n'est pas augmentée en conséquence &rarr; le vert plafonne, il ne monte pas à l'infini.</li>
     <li>Sans séance pendant plusieurs semaines, le vert redescend (désentraînement).</li>
+    <li>Un muscle seulement <strong>secondaire</strong> sur un exercice (ex. les triceps sur un développé couché) verdit moins qu'un muscle qui en est la cible directe.</li>
   </ul>
   <p>Le bilan (1 mois / 6 mois / 1 an) compte séparément le nombre de séances et la fréquence hebdomadaire moyenne sur la période choisie, pour repérer les muscles négligés sur la durée &mdash; indépendamment de la couleur "du moment" affichée sur le corps.</p>
 </details>
@@ -390,6 +428,8 @@
   <div class="legend" id="legend"></div>
 </div>
 
+<div class="mt-detail" id="mtDetail" style="display:none"></div>
+
 <div class="bilan" id="bilan">
   <h2 id="bilanTitle">Bilan &mdash; 1 mois</h2>
   <p class="summary-line" id="bilanSummary"></p>
@@ -406,52 +446,137 @@ const DAY_MS = 86400000;
 </script>
 <script>
 (function(){
-  // history[key] = tableau de dates "YYYY-MM-DD" (une séance loguée par jour et par muscle)
+  // Rien n'est loggé ici à la main : ce tracker lit directement les séries
+  // que tu as enregistrées dans Musculation (gym.html, clé localStorage
+  // "po_coach_v1") et en déduit, exercice par exercice, quels muscles ont
+  // été sollicités. history[key] = { 'YYYY-MM-DD': intensité 0-1 } — la
+  // vérité vient de tes séances, pas d'un clic à reset.
+  const GYM_KEY = 'po_coach_v1';
   const history = {};
+  const contrib = {}; // key -> [{ date, name, weight }] pour le détail au clic
   const pieceIndex = { front: [], back: [] };
-  const STORE_KEY = 'po_muscle_v1';
   let periodDays = 30;
 
   function keyFor(view, group){ return view + '_' + group; }
-  function todayStr(){
-    const d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  }
   function parseDate(s){
     const [y,m,d] = s.split('-').map(Number);
     return new Date(y, m-1, d);
   }
-
-  // Same pattern as the rest of the dashboard: localStorage locally,
-  // mirrored across devices via initCloudSync (from sync.js) when present.
-  function loadState(){
-    try{
-      const raw = JSON.parse(localStorage.getItem(STORE_KEY));
-      if(raw && typeof raw === 'object') Object.assign(history, raw);
-    }catch(e){ /* pas encore de sauvegarde */ }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-  function saveState(){
-    try{ localStorage.setItem(STORE_KEY, JSON.stringify(history)); }catch(e){}
+
+  // ------------------------------------------------------------------
+  // Correspondance exercice -> muscles sollicités. Calibrée sur les
+  // tableaux d'implication musculaire de référence (Delavier, "Guide des
+  // mouvements de musculation" ; ExRx.net muscle/movement tables) :
+  // poids ~1 pour un moteur primaire, ~0.4-0.6 pour un synergiste
+  // important, ~0.2-0.3 pour un stabilisateur secondaire. Le nom de
+  // l'exercice est libre (saisi à la main dans Musculation), donc le
+  // matching se fait par mots-clés FR/EN courants — un nom trop
+  // spécifique/inhabituel ne matchera simplement rien.
+  // ------------------------------------------------------------------
+  const EXERCISE_MUSCLE_MAP = [
+    // --- Pectoraux ---
+    { match: /d[ée]velopp[ée].*couch[ée]|\bbench\b/i, hits: [['front_pec',1],['back_triceps',.5],['front_delt',.35]] },
+    { match: /d[ée]velopp[ée].*inclin[ée]|incline.*press/i, hits: [['front_pec',.9],['front_delt',.5],['back_triceps',.5]] },
+    { match: /d[ée]velopp[ée].*d[ée]clin[ée]|decline.*press/i, hits: [['front_pec',1],['back_triceps',.4]] },
+    { match: /[ée]cart[ée]|\bfly\b|pec.?deck|papillon/i, hits: [['front_pec',1],['front_delt',.2]] },
+    { match: /pompe|push.?up/i, hits: [['front_pec',.8],['back_triceps',.5],['front_delt',.3],['front_abdos',.2]] },
+    { match: /\bdips?\b/i, hits: [['front_pec',.6],['back_triceps',.8],['front_delt',.25]] },
+    // --- Dos ---
+    { match: /traction|pull.?up|chin.?up/i, hits: [['back_dorsaux',1],['front_biceps',.5],['back_avantbras',.3]] },
+    { match: /tirage.*vertical|lat.?pulldown|poulie.*haute/i, hits: [['back_dorsaux',1],['front_biceps',.4]] },
+    { match: /tirage|rowing|\brow\b/i, hits: [['back_dorsaux',1],['back_trap',.4],['front_biceps',.35]] },
+    { match: /soulev[ée].*terre|\bdeadlift\b/i, hits: [['back_lombaires',1],['back_fessier',.8],['back_ischios',.8],['back_dorsaux',.5],['back_trap',.3]] },
+    { match: /roumain|romanian|\brdl\b|jambes?.*tendues?/i, hits: [['back_ischios',1],['back_fessier',.7],['back_lombaires',.5]] },
+    { match: /hyperextension|lombaire|good.?morning/i, hits: [['back_lombaires',1],['back_fessier',.4],['back_ischios',.3]] },
+    { match: /pull.?over/i, hits: [['back_dorsaux',.8],['front_pec',.4],['front_dentele',.3]] },
+    { match: /haussement|shrug/i, hits: [['back_trap',1]] },
+    // --- Épaules ---
+    { match: /d[ée]velopp[ée].*militaire|overhead|\bohp\b|shoulder.?press/i, hits: [['front_delt',1],['back_triceps',.5],['back_trap',.3]] },
+    { match: /[ée]l[ée]vation.*lat[ée]rale|lateral.?raise/i, hits: [['front_delt',1]] },
+    { match: /[ée]l[ée]vation.*frontale|front.?raise/i, hits: [['front_delt',.9]] },
+    { match: /oiseau|rear.?delt|reverse.?fly|face.?pull/i, hits: [['back_deltb',1],['back_trap',.3]] },
+    // --- Bras ---
+    { match: /curl.*marteau|hammer.?curl/i, hits: [['front_biceps',.8],['front_avantbras',.5]] },
+    { match: /curl/i, hits: [['front_biceps',1],['front_avantbras',.3]] },
+    { match: /extension.*triceps|triceps.*extension|pushdown|barre.*au.*front|skull.?crusher|kickback/i, hits: [['back_triceps',1]] },
+    { match: /poignet|wrist.?curl/i, hits: [['back_avantbras',1]] },
+    // --- Jambes ---
+    { match: /front.?squat/i, hits: [['front_quad',1],['back_fessier',.5]] },
+    { match: /squat/i, hits: [['front_quad',1],['back_fessier',.8],['back_ischios',.3],['front_add',.3],['back_lombaires',.3]] },
+    { match: /presse.*cuisses|leg.?press/i, hits: [['front_quad',1],['back_fessier',.6],['back_ischios',.2]] },
+    { match: /fente|lunge/i, hits: [['front_quad',.8],['back_fessier',.8],['back_ischios',.3]] },
+    { match: /extension.*jambes?|leg.?extension/i, hits: [['front_quad',1]] },
+    { match: /curl.*ischio|curl.*jambes?|leg.?curl/i, hits: [['back_ischios',1]] },
+    { match: /hip.?thrust|pont.*fessier|glute.?bridge/i, hits: [['back_fessier',1],['back_ischios',.4]] },
+    { match: /adducteur|adductor/i, hits: [['front_add',1]] },
+    { match: /abducteur|abductor/i, hits: [['back_fessier',.6],['front_hanche',.4]] },
+    { match: /mollet|calf/i, hits: [['front_mollet',1],['back_mollet',1]] },
+    // --- Sangle abdominale ---
+    { match: /gainage|planche|plank/i, hits: [['front_abdos',1],['back_lombaires',.3]] },
+    { match: /crunch|relev[ée].*buste|abdo/i, hits: [['front_abdos',1]] },
+    { match: /obliqu|russian.?twist|rotation.*buste/i, hits: [['front_obliques',1],['front_abdos',.4]] },
+    { match: /relev[ée].*jambes?|leg.?raise/i, hits: [['front_abdos',.8],['front_hanche',.4]] }
+  ];
+  function musclesForExercise(name){
+    const n = String(name || '');
+    for (const rule of EXERCISE_MUSCLE_MAP) if (rule.match.test(n)) return rule.hits;
+    return null;
+  }
+  function readGymState(){
+    try { return JSON.parse(localStorage.getItem(GYM_KEY)) || {}; } catch(e){ return {}; }
+  }
+  // Reconstruit tout depuis zéro à partir des logs Musculation. Plusieurs
+  // exercices touchant le même muscle le même jour ne s'additionnent pas :
+  // seule l'intensité la plus forte de la journée est retenue (un
+  // "moteur primaire" prime sur un simple stabilisateur), comme une vraie
+  // séance ne compte qu'une fois par jour.
+  function rebuildHistory(){
+    Object.keys(history).forEach(k => delete history[k]);
+    Object.keys(contrib).forEach(k => delete contrib[k]);
+    const gym = readGymState();
+    const exercises = Array.isArray(gym.exercises) ? gym.exercises : [];
+    const logs = (gym.logs && typeof gym.logs === 'object') ? gym.logs : {};
+    exercises.forEach(ex => {
+      const hits = musclesForExercise(ex.name);
+      if (!hits) return;
+      const sets = logs[ex.id] || [];
+      const doneDates = new Set(sets.map(s => (s.date || '').slice(0, 10)).filter(Boolean));
+      doneDates.forEach(dateStr => {
+        hits.forEach(([key, w]) => {
+          history[key] = history[key] || {};
+          history[key][dateStr] = Math.max(history[key][dateStr] || 0, w);
+          contrib[key] = contrib[key] || [];
+          contrib[key].push({ date: dateStr, name: ex.name, weight: w });
+        });
+      });
+    });
   }
 
   // --- Modèle scientifique : charge d'entraînement récente (0 à 1) ---
+  // Chaque date pèse pour son intensité (moteur primaire = 1, synergiste
+  // secondaire < 1) multipliée par sa décroissance exponentielle — un
+  // stabilisateur travaillé une fois ne "verdit" jamais autant qu'un
+  // muscle qui est la cible directe et régulière de l'exercice.
   function currentScore(key){
-    const dates = history[key] || [];
-    if(!dates.length) return 0;
+    const dates = history[key];
+    if(!dates) return 0;
     const now = new Date();
     let raw = 0;
-    for(const s of dates){
+    for(const s in dates){
       const days = (now - parseDate(s)) / DAY_MS;
       if(days < 0) continue;
-      raw += Math.exp(-days / TAU_DAYS);
+      raw += Math.exp(-days / TAU_DAYS) * dates[s];
     }
     return Math.min(1, raw / NORMALIZER);
   }
 
   function periodStats(key, days){
-    const dates = history[key] || [];
+    const dates = history[key] || {};
     const now = new Date();
-    const inPeriod = dates.filter(s => (now - parseDate(s)) / DAY_MS <= days);
+    const inPeriod = Object.keys(dates).filter(s => (now - parseDate(s)) / DAY_MS <= days);
     const weeks = days / 7;
     const perWeek = inPeriod.length / weeks;
     return { count: inPeriod.length, perWeek };
@@ -518,7 +643,7 @@ const DAY_MS = 86400000;
     stage.addEventListener('click', (evt) => {
       const { nx, ny } = naturalCoords(evt);
       const hit = hitTest(nx, ny);
-      if(hit) logSession(hit.key);
+      if(hit) showDetail(hit.key, hit.label);
     });
     stage.addEventListener('mousemove', (evt) => {
       const { nx, ny } = naturalCoords(evt);
@@ -534,15 +659,27 @@ const DAY_MS = 86400000;
     });
   }
 
-  // Un clic = bascule la séance du jour (log si absent, retire si déjà loggé aujourd'hui = annule un clic accidentel)
-  function logSession(key){
-    const t = todayStr();
-    if(!history[key]) history[key] = [];
-    const idx = history[key].indexOf(t);
-    if(idx === -1) history[key].push(t);
-    else history[key].splice(idx, 1);
-    render();
-    saveState();
+  // Un clic sur un muscle (corps ou légende) affiche d'où vient sa charge —
+  // aucune action ne modifie plus l'historique, qui vient uniquement des
+  // séries enregistrées dans Musculation.
+  function showDetail(key, label){
+    const panel = document.getElementById('mtDetail');
+    if(!panel) return;
+    const items = (contrib[key] || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+    if(!items.length){
+      panel.innerHTML = '<div class="mt-detail-title">' + escapeHtml(label) + '</div>'
+        + '<div class="mt-detail-empty">Aucun exercice enregistré dans Musculation ne cible ce muscle pour l\'instant.</div>';
+      panel.style.display = 'block';
+      return;
+    }
+    const lastDays = Math.max(0, Math.floor((new Date() - parseDate(items[0].date)) / DAY_MS));
+    const seen = {};
+    const names = items.filter(it => (seen[it.name] ? false : (seen[it.name] = true))).slice(0, 6);
+    panel.innerHTML =
+      '<div class="mt-detail-title">' + escapeHtml(label)
+      + ' <span class="mt-detail-sub">· dernière séance il y a ' + lastDays + (lastDays <= 1 ? ' jour' : ' jours') + '</span></div>'
+      + '<ul class="mt-detail-list">' + names.map(it => '<li>' + escapeHtml(it.name) + '</li>').join('') + '</ul>';
+    panel.style.display = 'block';
   }
 
   function render(){
@@ -575,7 +712,7 @@ const DAY_MS = 86400000;
         row.innerHTML =
           '<div class="row-top"><span class="name">' + p.label + '</span><span class="freq" data-freq></span></div>' +
           '<div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>';
-        row.addEventListener('click', () => logSession(k));
+        row.addEventListener('click', () => showDetail(k, p.label));
         legend.appendChild(row);
       });
     });
@@ -611,7 +748,7 @@ const DAY_MS = 86400000;
     });
 
     const totalDaysActive = new Set(
-      Object.values(history).flat().filter(s => (new Date() - parseDate(s)) / DAY_MS <= periodDays)
+      Object.values(history).flatMap(h => Object.keys(h)).filter(s => (new Date() - parseDate(s)) / DAY_MS <= periodDays)
     ).size;
     const trained = rows.filter(r => r.stat.count > 0).length;
     document.getElementById('bilanSummary').textContent =
@@ -625,19 +762,12 @@ const DAY_MS = 86400000;
       const item = document.createElement('div');
       item.className = 'bilan-item ' + v.cls;
       item.innerHTML =
-        '<div class="bname">' + r.label + ' <span style="color:var(--muted);font-weight:400;">(' + (r.view==='front'?'devant':'dos') + ')</span></div>' +
+        '<div class="bname">' + r.label + ' <span style="color:var(--text-tertiary);font-weight:400;">(' + (r.view==='front'?'devant':'dos') + ')</span></div>' +
         '<div class="bstat">' + r.stat.count + ' séance(s) &middot; ' + r.stat.perWeek.toFixed(1) + '/semaine</div>' +
         '<span class="btag">' + v.tag + '</span>';
       grid.appendChild(item);
     });
   }
-
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if(!confirm('Effacer tout l\'historique d\'entraînement ?')) return;
-    Object.keys(history).forEach(k => delete history[k]);
-    render();
-    saveState();
-  });
 
   document.querySelectorAll('#periodSelector button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -653,16 +783,15 @@ const DAY_MS = 86400000;
   buildLegend();
 
   const allLoads = [...pieceIndex.front, ...pieceIndex.back].map(loadPieceCanvas);
-  Promise.all(allLoads).then(() => loadState()).then(render);
+  Promise.all(allLoads).then(() => { rebuildHistory(); render(); });
 
-  // Mirror this tracker's history across devices, like the other pages.
-  if (window.initCloudSync) {
-    window.initCloudSync({
-      appKey: 'muscle',
-      syncedKeys: [STORE_KEY],
-      onApplied: () => { Object.keys(history).forEach(k => delete history[k]); loadState(); render(); }
-    });
-  }
+  // Musculation (gym.html) is the source of truth — re-derive whenever its
+  // logs might have changed: another tab wrote to localStorage, or this
+  // tab/window regained focus after a session was logged elsewhere.
+  function refresh(){ rebuildHistory(); render(); }
+  window.addEventListener('storage', (e) => { if(!e.key || e.key === GYM_KEY) refresh(); });
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
 })();
 </script>
 </body>
