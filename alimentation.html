@@ -9,7 +9,6 @@
 <title>Alimentation · Tableau de bord</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
 
 <style>
@@ -20,7 +19,9 @@
   --success: #6BE3A4;
   --warning: #F2C063;
   --danger:  #FF6B6B;
+  --lime: #84CC16;
   --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 html, body {
@@ -45,11 +46,7 @@ body::after {
   background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
   background-size: 3px 3px; pointer-events: none; z-index: -1;
 }
-@keyframes drift {
-  0%   { transform: translate3d(0,0,0); }
-  100% { transform: translate3d(-22px, 14px, 0); }
-}
-/* ===== Fond atmosphérique "Récolte" (vert-citron + particules) ===== */
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
 .atmo-wash {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background-image:
@@ -67,8 +64,7 @@ body::after {
 }
 @keyframes atmo-drift {
   0%   { transform: translate3d(0, 0, 0); opacity: 0; }
-  10%  { opacity: 0.7; }
-  90%  { opacity: 0.5; }
+  10%  { opacity: 0.7; } 90%  { opacity: 0.5; }
   100% { transform: translate3d(var(--dx, 12px), var(--dy, -100vh), 0); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .atmo-particles span { animation: none; } }
@@ -80,23 +76,128 @@ body::after {
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
 }
+.dash-sub { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
 .gm-card {
   position: relative; background: rgba(255, 255, 255, 0.04); border-radius: 16px;
-  padding: 28px 22px; margin-bottom: 14px; text-align: center;
+  padding: 20px; margin-bottom: 14px;
   backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
   box-shadow: 0 12px 40px rgba(0,0,0,0.45);
 }
-.gm-emoji { font-size: 40px; margin-bottom: 10px; }
-.gm-card h2 { margin: 0 0 8px; font-size: 17px; color: var(--text-primary); }
-.gm-card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-tertiary); }
-.cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.empty-note { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 10px 4px; line-height: 1.6; }
+.gm-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gm-ghost:hover { background: rgba(255,255,255,0.07); }
+.gm-add {
+  padding: 12px 18px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+}
+
+/* ---- info panel ---- */
+details.info {
+  margin: 0 0 18px; padding: 2px 18px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.55;
+}
+details.info summary { cursor: pointer; padding: 12px 0; color: var(--text-primary); font-weight: 600; list-style: none; }
+details.info summary::-webkit-details-marker { display: none; }
+details.info p { margin: 8px 0; } details.info strong { color: var(--text-primary); }
+
+/* ---- rings ---- */
+.ring-row { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; margin-bottom: 14px; }
+.ring-wrap { position: relative; width: 92px; height: 92px; text-align: center; }
+.ring-wrap svg { transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 8; }
+.ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease, stroke 0.3s; }
+.ring-label-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ring-num { font-size: 15px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ring-name { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 1px; }
+.kcal-total { text-align: center; font-size: 13px; color: var(--text-secondary); }
+.kcal-total strong { color: var(--text-primary); font-size: 20px; font-variant-numeric: tabular-nums; }
+
+/* ---- program ---- */
+.program-badge {
+  display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: rgba(132,204,22,0.14); color: var(--lime); margin-bottom: 10px;
+}
+.program-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12.5px; }
+.program-row:last-child { border-bottom: 0; }
+.program-row span:first-child { color: var(--text-tertiary); }
+.program-row span:last-child { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.program-note { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+
+/* ---- food log ---- */
+.log-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.log-row:last-child { border-bottom: 0; }
+.log-name { flex: 1; font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.log-meta { font-size: 11px; color: var(--text-tertiary); }
+.log-macros { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.log-del { border: 0; background: none; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px 6px; }
+.log-del:hover { color: var(--danger); }
+
+/* ---- add-food form ---- */
+.field-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.field-col { flex: 1 1 120px; display: flex; flex-direction: column; gap: 6px; }
+.field-col label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.field-col input, .field-col select {
+  padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+}
+.food-pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 10px; }
+.food-pick-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.food-pick-item:hover { background: rgba(255,255,255,0.07); }
+.food-pick-item.active { border-color: rgba(132,204,22,0.4); background: rgba(132,204,22,0.08); }
+.food-pick-name { flex: 1; font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.food-pick-macro { font-size: 10.5px; color: var(--text-tertiary); }
+.food-pick-del { border: 0; background: none; color: var(--text-tertiary); font-size: 14px; cursor: pointer; padding: 2px 6px; }
+.food-pick-del:hover { color: var(--danger); }
+.seg-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.10); border-radius: 999px; overflow: hidden; background: rgba(0,0,0,0.25); margin-bottom: 14px; }
+.seg-toggle button {
+  border: 0; background: transparent; color: var(--text-tertiary); font-family: inherit;
+  font-size: 12px; font-weight: 700; padding: 9px 16px; cursor: pointer;
+}
+.seg-toggle button.active { background: rgba(132,204,22,0.16); color: var(--lime); }
+.modal-bg {
+  display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6);
+  align-items: flex-end; justify-content: center; padding: 0;
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: #14140f; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 0 0;
+  padding: 22px 18px max(22px, env(safe-area-inset-bottom)); width: 100%; max-width: 640px; max-height: 86vh; overflow-y: auto;
+}
+.modal h3 { margin: 0 0 14px; font-size: 16px; color: var(--text-primary); }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions button { flex: 1; padding: 12px; border-radius: 12px; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.btn-secondary { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-primary); }
+.btn-primary { border: 0; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; }
+
+/* ---- micronutrients ---- */
+.microlist { display: flex; flex-wrap: wrap; gap: 6px; }
+.microlist span {
+  padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary);
+}
+
+.cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .cross-nav a {
   display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
   color: var(--text-secondary); text-decoration: none; font-size: 12.5px; font-weight: 600;
-  transition: background .15s, color .15s;
 }
 .cross-nav a:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
   .dash-title { font-size: 22px; }
@@ -110,20 +211,492 @@ body::after {
   <div class="atmo-particles" id="atmoParticles"></div>
 </div>
 
-<div class="page">
-  <h1 class="dash-title">Alimentation</h1>
-  <div class="gm-card">
-    <div class="gm-emoji">🍎</div>
-    <h2>Bientôt disponible</h2>
-    <p>Dis-moi ce que tu veux suivre ici — repas, calories, macros, hydratation liée aux repas, etc. — et je le construis, dans le même esprit que Séance et Fatigue : basé sur de vraies données, rien d'inventé.</p>
-    <div class="cross-nav">
-      <a href="gym.html">💪 Fitness</a>
-      <a href="seance.html">🏋️ Séance</a>
-      <a href="fatigue.html">🔋 Fatigue</a>
-    </div>
-  </div>
-</div>
+<div class="page" id="app"></div>
 
+<script>
+(async function(){
+  'use strict';
+
+  const WATER_KEY = 'po_water_v1';
+  const GYM_KEY = 'po_coach_v1';
+  const WEIGHTS_KEY = 'po_coach_weights';
+  const FOOD_DB_KEY = 'po_food_db_v1';
+  const FOOD_LOG_KEY = 'po_food_log_v1';
+  const PROGRAM_KEY = 'po_nutrition_program_v1';
+  const STACK_KEY = 'stack:items';
+  const DAY_MS = 86400000;
+
+  // ================================================================
+  // CLOUD SYNC — own Supabase row ("nutrition"), same pull-once /
+  // push-on-write pattern as Séance/Fatigue. Pulled before anything
+  // reads local state below.
+  // ================================================================
+  const PC_APP_KEY = 'nutrition';
+  const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
+  const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
+  const PC_SYNCED_KEYS = [FOOD_DB_KEY, FOOD_LOG_KEY, PROGRAM_KEY];
+  let pcSupa = null;
+  if (window.supabase && PC_SUPABASE_URL.indexOf('PASTE-') !== 0 && PC_SUPABASE_KEY.indexOf('PASTE-') !== 0) {
+    try { pcSupa = window.supabase.createClient(PC_SUPABASE_URL, PC_SUPABASE_KEY); } catch (e) {}
+  }
+  async function pcPullOnce() {
+    if (!pcSupa) return;
+    try {
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', PC_APP_KEY).maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (!result) return;
+      const { data, error } = result;
+      if (!error && data && data.data) {
+        Object.keys(data.data).forEach(k => {
+          if (PC_SYNCED_KEYS.indexOf(k) === -1) return;
+          try { localStorage.setItem(k, JSON.stringify(data.data[k])); } catch (e) {}
+        });
+      }
+    } catch (e) {}
+  }
+  async function pcPushNow() {
+    if (!pcSupa) return;
+    const out = {};
+    PC_SYNCED_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v == null) return;
+      try { out[k] = JSON.parse(v); } catch (e) { out[k] = v; }
+    });
+    try {
+      await pcSupa.from('app_state').upsert(
+        { key: PC_APP_KEY, data: out, updated_at: new Date().toISOString() }, { onConflict: 'key' }
+      );
+    } catch (e) {}
+  }
+
+  // ---- storage helpers ----
+  function loadJSON(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } }
+  function saveJSON(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); pcPushNow(); return true; }
+    catch (e) {
+      console.error('save failed', k, e);
+      if (!window.__lastSaveFailAlert || Date.now() - window.__lastSaveFailAlert > 60000) {
+        window.__lastSaveFailAlert = Date.now();
+        alert('⚠️ Échec de l\'enregistrement (stockage plein ?). Essaie de libérer de la place — par exemple en supprimant d\'anciennes photos de progression dans Fitness — puis réessaie.');
+      }
+      return false;
+    }
+  }
+  function dateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function todayStr(){ return dateStr(new Date()); }
+  function daysAgoStr(n){ const d=new Date(); d.setDate(d.getDate()-n); return dateStr(d); }
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function uid(){ return 'f_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
+  function isoWeekKey(d){
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = (t.getUTCDay() + 6) % 7;
+    t.setUTCDate(t.getUTCDate() - day + 3);
+    const firstThu = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+    const week = 1 + Math.round(((t - firstThu) / DAY_MS - 3 + ((firstThu.getUTCDay()+6)%7)) / 7);
+    return t.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
+  }
+
+  await pcPullOnce();
+
+  // ================================================================
+  // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
+  // taille) so nothing has to be entered twice; weight always follows
+  // Fitness's latest weigh-in, same as Eau does.
+  // ================================================================
+  function readProfile() {
+    const w = loadJSON(WATER_KEY, null);
+    return (w && w.profile) || { weightKg: 75, age: 25, sex: 'm', activityHrsPerWeek: 5, heightCm: 175 };
+  }
+  function readLiveWeightKg() {
+    const entries = loadJSON(WEIGHTS_KEY, []);
+    if (!entries.length) return null;
+    const gym = loadJSON(GYM_KEY, {});
+    const unit = (gym && gym.units) || 'kg';
+    const latest = entries[entries.length - 1];
+    return unit === 'lb' ? latest.weight / 2.20462 : latest.weight;
+  }
+  function weeklyAvgWeightKg(startAgo, endAgo) {
+    const entries = loadJSON(WEIGHTS_KEY, []);
+    if (!entries.length) return null;
+    const gym = loadJSON(GYM_KEY, {});
+    const unit = (gym && gym.units) || 'kg';
+    const inWindow = entries.filter(e => {
+      const days = (Date.now() - new Date(e.dateKey).getTime()) / DAY_MS;
+      return days >= startAgo && days < endAgo;
+    });
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, e) => s + e.weight, 0) / inWindow.length;
+    return unit === 'lb' ? avg / 2.20462 : avg;
+  }
+
+  // ================================================================
+  // TDEE + MACROS — Mifflin-St Jeor (1990) for BMR (most accurate
+  // widely-validated equation per Frankenfield et al. 2005), standard
+  // activity multipliers, protein prioritized per Helms, Aragon &
+  // Fitschen (2014, JISSN systematic review): 1.8-2.7 g/kg bodyweight
+  // during energy restriction for lean resistance-trained athletes —
+  // 2.2 g/kg used here, mid-upper end since training continues through
+  // the cut. Fat floored at 25% of calories for hormonal health, carbs
+  // take the remainder to fuel training performance.
+  // ================================================================
+  function activityMultiplier(hrsPerWeek) {
+    const h = hrsPerWeek || 0;
+    if (h < 2) return 1.2;
+    if (h < 4) return 1.375;
+    if (h < 7) return 1.55;
+    if (h < 10) return 1.725;
+    return 1.9;
+  }
+  function computeBMR(profile, weightKg) {
+    // Mifflin-St Jeor only has male/female constants; "o" uses their
+    // midpoint as the least-biased estimate available.
+    const s = profile.sex === 'f' ? -161 : (profile.sex === 'm' ? 5 : -78);
+    return 10 * weightKg + 6.25 * (profile.heightCm || 175) - 5 * (profile.age || 25) + s;
+  }
+  function computeTDEE(profile, weightKg) {
+    return computeBMR(profile, weightKg) * activityMultiplier(profile.activityHrsPerWeek);
+  }
+
+  // ---- adaptive weekly program (client-side, recomputed off real weigh-ins) ----
+  // Garthe et al. (2011): athletes losing weight at 0.7%/week on a moderate
+  // deficit GAINED lean mass and strength vs. 1.4%/week, which did not —
+  // that 0.5-0.7%/week band is the target this program steers toward.
+  function loadProgram() {
+    const p = loadJSON(PROGRAM_KEY, null);
+    if (p && typeof p.deficitPct === 'number') return p;
+    return { deficitPct: 20, lastWeekChecked: null, history: [] };
+  }
+  function tickProgram(profile) {
+    const program = loadProgram();
+    const thisWeek = isoWeekKey(new Date());
+    if (program.lastWeekChecked === thisWeek) return program; // already adjusted this week
+    const recent = weeklyAvgWeightKg(0, 7);
+    const prior = weeklyAvgWeightKg(7, 14);
+    if (recent != null && prior != null && prior > 0) {
+      const pctChange = ((recent - prior) / prior) * 100; // negative = losing
+      let note, delta = 0;
+      if (pctChange > 0) { delta = 4; note = 'Poids en hausse — déficit augmenté.'; }
+      else if (pctChange > -0.4) { delta = 3; note = 'Perte trop lente (' + pctChange.toFixed(1) + '%/sem) — déficit augmenté.'; }
+      else if (pctChange < -1.0) { delta = -4; note = 'Perte trop rapide (' + pctChange.toFixed(1) + '%/sem, risque pour le muscle) — déficit réduit.'; }
+      else { delta = 0; note = 'Perte dans la zone optimale (' + pctChange.toFixed(1) + '%/sem, Garthe et al. 2011) — inchangé.'; }
+      program.deficitPct = Math.max(10, Math.min(30, program.deficitPct + delta));
+      program.history = (program.history || []).concat([{ week: thisWeek, pctChange: Math.round(pctChange * 100) / 100, deficitPct: program.deficitPct, note }]).slice(-8);
+    }
+    program.lastWeekChecked = thisWeek;
+    saveJSON(PROGRAM_KEY, program);
+    return program;
+  }
+  function computeTargets() {
+    const profile = readProfile();
+    const liveWeight = readLiveWeightKg();
+    const weightKg = liveWeight || profile.weightKg || 75;
+    const tdee = computeTDEE(profile, weightKg);
+    const program = tickProgram(profile);
+    const target = tdee * (1 - program.deficitPct / 100);
+    const proteinG = Math.round(weightKg * 2.2);
+    const proteinKcal = proteinG * 4;
+    const fatKcal = Math.max(target * 0.25, weightKg * 0.6 * 9); // floor ~0.6g/kg
+    const fatG = Math.round(fatKcal / 9);
+    const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
+    const carbsG = Math.round(carbsKcal / 4);
+    return { weightKg, weightIsLive: !!liveWeight, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, program };
+  }
+
+  // ================================================================
+  // FOOD LOG for today
+  // ================================================================
+  function todaysEntries() {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    return log[todayStr()] || [];
+  }
+  function addLogEntry(entry) {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    const k = todayStr();
+    log[k] = (log[k] || []).concat([Object.assign({ id: uid(), time: new Date().toTimeString().slice(0,5) }, entry)]);
+    return saveJSON(FOOD_LOG_KEY, log);
+  }
+  function removeLogEntry(id) {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    const k = todayStr();
+    log[k] = (log[k] || []).filter(e => e.id !== id);
+    return saveJSON(FOOD_LOG_KEY, log);
+  }
+  function todayTotals() {
+    const entries = todaysEntries();
+    return entries.reduce((acc, e) => ({
+      kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
+      carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0)
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  }
+
+  // ================================================================
+  // RENDER
+  // ================================================================
+  const app = document.getElementById('app');
+  const CROSS_NAV =
+    '<div class="cross-nav">' +
+    '<a href="gym.html">💪 Fitness</a>' +
+    '<a href="seance.html">🏋️ Séance</a>' +
+    '<a href="fatigue.html">🔋 Fatigue</a>' +
+    '<a href="health.html">💊 Santé</a>' +
+    '</div>';
+
+  function ring(pct, color, value, label) {
+    const r = 38, c = 2 * Math.PI * r;
+    const clamped = Math.max(0, Math.min(1, pct));
+    const offset = c * (1 - clamped);
+    return '<div class="ring-wrap"><svg width="92" height="92" viewBox="0 0 92 92">' +
+      '<circle class="ring-track" cx="46" cy="46" r="' + r + '"></circle>' +
+      '<circle class="ring-fill" cx="46" cy="46" r="' + r + '" stroke="' + color + '" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"></circle>' +
+      '</svg><div class="ring-label-wrap"><div class="ring-num">' + Math.round(value) + 'g</div><div class="ring-name">' + label + '</div></div></div>';
+  }
+  function ringColor(pct){
+    if (pct >= 1) return '#6BE3A4';
+    // red -> green as pct goes 0 -> 1
+    const r = Math.round(255 - (255-107)*pct), g = Math.round(107 + (227-107)*pct), b = Math.round(107 + (164-107)*pct);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function renderMain() {
+    const targets = computeTargets();
+    const totals = todayTotals();
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const entries = todaysEntries();
+    const stack = loadJSON(STACK_KEY, []);
+
+    const pP = targets.proteinG ? totals.protein / targets.proteinG : 0;
+    const pC = targets.carbsG ? totals.carbs / targets.carbsG : 0;
+    const pF = targets.fatG ? totals.fat / targets.fatG : 0;
+
+    let html = '<h1 class="dash-title">Alimentation</h1>' +
+      '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta vraie perte de poids.</p>' +
+      '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
+      '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau).</p>' +
+      '<p><strong>Déficit adaptatif</strong> : <strong>Garthe et al. (2011)</strong> ont montré que des athlètes perdant du poids à <strong>0.7%/semaine</strong> gagnaient de la masse maigre et de la force pendant leur sèche, contrairement à ceux perdant 1.4%/semaine. Ce programme vise 0.5-0.7%/semaine et ajuste ton déficit chaque semaine selon ta perte réelle (Fitness → Poids), pas une estimation figée.</p>' +
+      '<p><strong>Protéines</strong> : <strong>Helms, Aragon &amp; Fitschen (2014)</strong>, revue systématique — 1.8 à 2.7 g/kg de poids de corps pendant une restriction calorique chez les athlètes entraînés en résistance ; 2.2 g/kg utilisé ici. Le reste des calories est réparti entre lipides (plancher ~25% pour la santé hormonale) et glucides (le reste, pour soutenir l\'intensité à l\'entraînement).</p>' +
+      '</details>';
+
+    html += '<div class="gm-card">' +
+      '<div class="section-title">Aujourd\'hui</div>' +
+      '<div class="ring-row">' +
+      ring(pP, ringColor(pP), totals.protein, 'Protéines') +
+      ring(pC, ringColor(pC), totals.carbs, 'Glucides') +
+      ring(pF, ringColor(pF), totals.fat, 'Lipides') +
+      '</div>' +
+      '<div class="kcal-total"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal</div>' +
+      '</div>';
+
+    html += '<div class="gm-card">' +
+      '<div class="section-title">Programme (sèche adaptative)</div>' +
+      '<span class="program-badge">Déficit actuel : -' + targets.program.deficitPct + '%</span>' +
+      '<div class="program-row"><span>Poids utilisé</span><span>' + targets.weightKg.toFixed(1) + ' kg' + (targets.weightIsLive ? ' (Fitness, live)' : ' (profil Eau)') + '</span></div>' +
+      '<div class="program-row"><span>TDEE estimé</span><span>' + targets.tdee + ' kcal</span></div>' +
+      '<div class="program-row"><span>Objectif</span><span>' + targets.target + ' kcal</span></div>' +
+      (targets.program.history && targets.program.history.length ?
+        '<div class="program-note">' + escapeHtml(targets.program.history[targets.program.history.length-1].note) + '</div>' :
+        '<div class="program-note">Pas encore assez de semaines de pesées pour ajuster automatiquement — le déficit de départ (-20%) est utilisé tel quel.</div>') +
+      '</div>';
+
+    html += '<div class="gm-card">' +
+      '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +
+      (entries.length ? entries.map(e =>
+        '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
+        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + '</span>' +
+        '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
+      ).join('') : '<p class="empty-note">Rien enregistré aujourd\'hui.</p>') +
+      '</div>';
+
+    html += '<div class="gm-card">' +
+      '<div class="section-title">Micronutriments<a class="gm-ghost" href="health.html">💊 Santé →</a></div>' +
+      (stack.length ?
+        '<p style="font-size:12px;color:var(--text-tertiary);margin:0 0 10px;">Complète les apports des repas — suivi précis par micronutriment non disponible sans base alimentaire externe, donc pas de faux chiffres ici. Ce que tu prends actuellement (Santé) :</p>' +
+        '<div class="microlist">' + stack.map(s => '<span>' + escapeHtml(s.name) + '</span>').join('') + '</div>' :
+        '<p class="empty-note">Aucun complément enregistré dans Santé. Pendant une sèche, les apports en micronutriments (fer, calcium, vitamine D, magnésium…) méritent une attention particulière — ajoute tes compléments dans Santé pour les voir apparaître ici.</p>') +
+      '</div>';
+
+    html += '<div class="gm-card">' +
+      '<div class="section-title">Mes aliments (' + db.length + ')<button type="button" class="gm-ghost" id="manageFoodsBtn">Gérer</button></div>' +
+      (db.length ? '<p class="empty-note">' + db.length + ' aliment(s) enregistré(s), synchronisés sur tous tes appareils.</p>' : '<p class="empty-note">Aucun aliment créé — touche "+ Ajouter" pour en créer un premier.</p>') +
+      '</div>';
+
+    html += CROSS_NAV;
+    app.innerHTML = html;
+
+    document.getElementById('addFoodBtn').addEventListener('click', openAddFoodModal);
+    document.getElementById('manageFoodsBtn').addEventListener('click', openManageFoodsModal);
+    app.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => { removeLogEntry(btn.dataset.del); renderMain(); });
+    });
+  }
+
+  // ---- add-food modal (pick existing or create new, then log a quantity) ----
+  function ensureModal() {
+    let bg = document.getElementById('foodModalBg');
+    if (bg) return bg;
+    bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'foodModalBg';
+    bg.innerHTML = '<div class="modal" id="foodModalInner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
+    return bg;
+  }
+  function closeModal() { const bg = document.getElementById('foodModalBg'); if (bg) bg.classList.remove('show'); }
+
+  function openAddFoodModal() {
+    const bg = ensureModal();
+    const inner = document.getElementById('foodModalInner');
+    let mode = 'pick'; // 'pick' | 'new'
+    let selectedFood = null;
+
+    function renderModal() {
+      const db = loadJSON(FOOD_DB_KEY, []);
+      inner.innerHTML =
+        '<h3>Ajouter un aliment</h3>' +
+        '<div class="seg-toggle"><button type="button" data-m="pick" class="' + (mode==='pick'?'active':'') + '">Mes aliments</button><button type="button" data-m="new" class="' + (mode==='new'?'active':'') + '">Créer</button></div>' +
+        '<div id="modalBody"></div>';
+      inner.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => { mode = b.dataset.m; selectedFood = null; renderModal(); }));
+
+      const body = document.getElementById('modalBody');
+      if (mode === 'pick') {
+        if (!db.length) {
+          body.innerHTML = '<p class="empty-note">Aucun aliment créé. Passe sur "Créer" pour en ajouter un.</p>';
+          return;
+        }
+        body.innerHTML =
+          '<div class="food-pick-list">' + db.map(f =>
+            '<div class="food-pick-item' + (selectedFood && selectedFood.id===f.id ? ' active':'') + '" data-id="' + f.id + '">' +
+            '<div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
+            '</div>'
+          ).join('') + '</div>' +
+          (selectedFood ? renderQuantityForm(selectedFood) : '');
+        body.querySelectorAll('.food-pick-item').forEach(el => {
+          el.addEventListener('click', (e) => {
+            if (e.target.closest('[data-fdel]')) return;
+            selectedFood = db.find(f => f.id === el.dataset.id);
+            renderModal();
+          });
+        });
+        body.querySelectorAll('[data-fdel]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const list = loadJSON(FOOD_DB_KEY, []).filter(f => f.id !== btn.dataset.fdel);
+            saveJSON(FOOD_DB_KEY, list);
+            if (selectedFood && selectedFood.id === btn.dataset.fdel) selectedFood = null;
+            renderModal();
+          });
+        });
+        wireQuantityForm(body);
+      } else {
+        body.innerHTML =
+          '<div class="field-row">' +
+          '<div class="field-col" style="flex:1 1 100%"><label>Nom</label><input type="text" id="newFoodName" placeholder="ex. Steak haché 5%"></div>' +
+          '</div>' +
+          '<div class="field-row">' +
+          '<div class="field-col"><label>Kcal /100g</label><input type="number" id="newFoodKcal" step="1"></div>' +
+          '<div class="field-col"><label>Protéines /100g</label><input type="number" id="newFoodP" step="0.1"></div>' +
+          '</div>' +
+          '<div class="field-row">' +
+          '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1"></div>' +
+          '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
+          '</div>' +
+          '<div class="field-row">' +
+          '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150"></div>' +
+          '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="newFoodServingLabel" placeholder="ex. steak"></div>' +
+          '</div>' +
+          '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelNewFood">Annuler</button><button type="button" class="btn-primary" id="saveNewFood">Créer</button></div>';
+        document.getElementById('cancelNewFood').addEventListener('click', closeModal);
+        document.getElementById('saveNewFood').addEventListener('click', () => {
+          const name = document.getElementById('newFoodName').value.trim();
+          const kcalPer100g = parseFloat(document.getElementById('newFoodKcal').value) || 0;
+          if (!name || !kcalPer100g) { alert('Nom et kcal/100g requis.'); return; }
+          const food = {
+            id: uid(), name,
+            kcalPer100g,
+            proteinPer100g: parseFloat(document.getElementById('newFoodP').value) || 0,
+            carbsPer100g: parseFloat(document.getElementById('newFoodC').value) || 0,
+            fatPer100g: parseFloat(document.getElementById('newFoodF').value) || 0,
+            servingGrams: parseFloat(document.getElementById('newFoodServingG').value) || null,
+            servingLabel: document.getElementById('newFoodServingLabel').value.trim() || null
+          };
+          const list = loadJSON(FOOD_DB_KEY, []).concat([food]);
+          saveJSON(FOOD_DB_KEY, list);
+          selectedFood = food; mode = 'pick';
+          renderModal();
+        });
+      }
+    }
+
+    function renderQuantityForm(food) {
+      const useServing = !!food.servingGrams;
+      return '<div class="gm-card" style="margin-top:10px;">' +
+        '<div class="field-row">' +
+        (useServing ?
+          '<div class="field-col"><label>Nombre de ' + escapeHtml(food.servingLabel || 'unités') + ' (1 = ' + food.servingGrams + 'g)</label><input type="number" id="qtyUnits" step="0.25" value="1"></div>' :
+          '<div class="field-col"><label>Grammes</label><input type="number" id="qtyGrams" step="1" value="100"></div>') +
+        '</div>' +
+        '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelQty">Annuler</button><button type="button" class="btn-primary" id="saveQty">Ajouter au journal</button></div>' +
+        '</div>';
+    }
+    function wireQuantityForm(body) {
+      const cancelBtn = body.querySelector('#cancelQty');
+      const saveBtn = body.querySelector('#saveQty');
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (saveBtn) saveBtn.addEventListener('click', () => {
+        const f = selectedFood;
+        let grams;
+        const unitsEl = body.querySelector('#qtyUnits'), gramsEl = body.querySelector('#qtyGrams');
+        if (unitsEl) grams = (parseFloat(unitsEl.value) || 0) * f.servingGrams;
+        else grams = parseFloat(gramsEl.value) || 0;
+        if (!grams) { alert('Quantité invalide.'); return; }
+        const ratio = grams / 100;
+        addLogEntry({
+          foodId: f.id, foodName: f.name, grams: Math.round(grams),
+          kcal: f.kcalPer100g * ratio, protein: f.proteinPer100g * ratio,
+          carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio
+        });
+        closeModal();
+        renderMain();
+      });
+    }
+
+    renderModal();
+    bg.classList.add('show');
+  }
+
+  function openManageFoodsModal() {
+    const bg = ensureModal();
+    const inner = document.getElementById('foodModalInner');
+    function render() {
+      const db = loadJSON(FOOD_DB_KEY, []);
+      inner.innerHTML = '<h3>Mes aliments</h3>' +
+        (db.length ?
+          '<div class="food-pick-list">' + db.map(f =>
+            '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
+            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
+          ).join('') + '</div>' :
+          '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
+        '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeManage">Fermer</button></div>';
+      document.getElementById('closeManage').addEventListener('click', closeModal);
+      inner.querySelectorAll('[data-fdel2]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const list = loadJSON(FOOD_DB_KEY, []).filter(f => f.id !== btn.dataset.fdel2);
+          saveJSON(FOOD_DB_KEY, list);
+          render();
+        });
+      });
+    }
+    render();
+    bg.classList.add('show');
+  }
+
+  renderMain();
+})();
+</script>
 <script id="atmo-backdrop-js">
 (function () {
   function spawnParticles() {

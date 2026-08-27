@@ -48,6 +48,13 @@
   width: 8px; height: 8px; border-radius: 50%;
   background: #7DD3FC; flex-shrink: 0;
 }
+.topbar-food-pill {
+  border-right: 1px solid rgba(132, 204, 22, 0.16);
+  border-radius: 12px;
+  background: rgba(132, 204, 22, 0.08);
+  border-color: rgba(132, 204, 22, 0.16);
+}
+.topbar-food-pill .topbar-pill-dot { background: #84CC16; }
 .topbar-water-pill.warn .topbar-pill-dot { background: #fbbf24; }
 .topbar-water-pill.miss .topbar-pill-dot {
   background: #ff8a8a;
@@ -204,6 +211,10 @@ body.topbar-modal-open {
     </a>
     <button class="topbar-water-add" id="topbarWaterAdd" aria-label="Log one drink" type="button">+</button>
   </div>
+  <a href="alimentation.html" class="topbar-water-pill topbar-food-pill" id="topbarFood" aria-label="Food progress">
+    <span class="topbar-pill-dot"></span>
+    <span class="topbar-pill-count" id="topbarFoodCount">0/0</span>
+  </a>
   <a href="finance.html" class="topbar-finance-btn" id="topbarFinance" aria-label="Finance">
     <span class="topbar-finance-icon">📊</span>
   </a>
@@ -340,6 +351,44 @@ body.topbar-modal-open {
     return { done, total };
   }
 
+  // Same Mifflin-St Jeor + activity-multiplier calc as alimentation.html,
+  // duplicated here so the pill works without loading that page — reads
+  // the adaptive deficit that page already computed rather than
+  // re-deriving it (that requires several weeks of weigh-ins).
+  function getFoodProgress() {
+    let water = null;
+    try { water = JSON.parse(localStorage.getItem('po_water_v1')); } catch (e) {}
+    const p = (water && water.profile) || {};
+    let weightKg = p.weightKg || 75;
+    try {
+      const entries = JSON.parse(localStorage.getItem('po_coach_weights'));
+      if (Array.isArray(entries) && entries.length) {
+        let unit = 'kg';
+        try { const gym = JSON.parse(localStorage.getItem('po_coach_v1')); unit = (gym && gym.units) || 'kg'; } catch (e) {}
+        const latest = entries[entries.length - 1];
+        weightKg = unit === 'lb' ? latest.weight / 2.20462 : latest.weight;
+      }
+    } catch (e) {}
+    const h = p.activityHrsPerWeek || 0;
+    const mult = h < 2 ? 1.2 : h < 4 ? 1.375 : h < 7 ? 1.55 : h < 10 ? 1.725 : 1.9;
+    const s = p.sex === 'f' ? -161 : (p.sex === 'm' ? 5 : -78);
+    const bmr = 10 * weightKg + 6.25 * (p.heightCm || 175) - 5 * (p.age || 25) + s;
+    const tdee = bmr * mult;
+    let deficitPct = 20;
+    try {
+      const program = JSON.parse(localStorage.getItem('po_nutrition_program_v1'));
+      if (program && typeof program.deficitPct === 'number') deficitPct = program.deficitPct;
+    } catch (e) {}
+    const total = Math.round(tdee * (1 - deficitPct / 100));
+    let done = 0;
+    try {
+      const log = JSON.parse(localStorage.getItem('po_food_log_v1'));
+      const entries = (log && log[calendarDateKey()]) || [];
+      done = Math.round(entries.reduce((s, e) => s + (e.kcal || 0), 0));
+    } catch (e) {}
+    return { done, total };
+  }
+
   function classifyStatus(done, total) {
     if (total === 0) return 'idle';
     if (done >= total) return 'good';
@@ -363,6 +412,14 @@ body.topbar-modal-open {
     const countEl = document.getElementById('topbarWaterCount');
     if (countEl) countEl.textContent = w.total ? w.done + '/' + w.total : '0/0';
     setPillStatus(waterEl, classifyStatus(w.done, w.total));
+
+    const foodEl = document.getElementById('topbarFood');
+    if (foodEl) {
+      const f = getFoodProgress();
+      const foodCountEl = document.getElementById('topbarFoodCount');
+      if (foodCountEl) foodCountEl.textContent = f.total ? f.done + '/' + f.total : '0/0';
+      setPillStatus(foodEl, classifyStatus(f.done, f.total));
+    }
   }
 
   // -------- Water +1 (works from any page) --------
