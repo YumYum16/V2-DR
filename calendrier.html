@@ -470,7 +470,13 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const bg = document.getElementById('dayModalBg');
     const inner = document.getElementById('dayModalInner');
     if (!bg || !inner) return;
-    const labels = Array.from(new Set((gym.splitRotation || []).map(s => (s||'').trim()).filter(Boolean)));
+    // Pulled from state.days — the actual "séances" list you manage in
+    // Fitness (Réglages → Mes séances, e.g. Upper/Lower or Push/Pull/Legs,
+    // whatever you've actually named them there), not splitRotation, which
+    // is a separate, independently-edited schedule that can drift out of
+    // sync with what your séances are actually called.
+    const dayNames = ((gym.days || []).map(d => (d && d.name || '').trim()).filter(Boolean));
+    const labels = Array.from(new Set(dayNames.concat([REST_DEFAULT_LABEL])));
     const current = overrides[dk];
     const [yy, mm, dd] = dk.split('-').map(Number);
     const dateLabel = new Date(yy, mm-1, dd).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -479,7 +485,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '<div class="day-pick-row">' + labels.map(l =>
           '<button type="button" class="day-pick-btn' + (current === l ? ' current' : '') + '" data-l="' + escapeHtml(l) + '">' + escapeHtml(l) + '</button>'
         ).join('') + '</div>' :
-        '<p class="empty-note">Configure ta répartition dans Fitness d\'abord (Réglages → Répartition) pour pouvoir choisir un type de jour ici.</p>') +
+        '<p class="empty-note">Crée tes séances dans Fitness d\'abord (Réglages → Mes séances) pour pouvoir choisir un type de jour ici.</p>') +
       '<div class="modal-actions">' +
       (current ? '<button type="button" class="btn-secondary" id="dayReset">Réinitialiser (auto)</button>' : '') +
       '<button type="button" class="btn-secondary" id="dayCancel">Fermer</button>' +
