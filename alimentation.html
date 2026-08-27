@@ -142,6 +142,43 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .program-row span:last-child { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
 .program-note { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
 
+/* ---- food calendar ---- */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+.cal-nav-btn {
+  width: 32px; height: 32px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary); font-size: 16px; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+}
+.cal-nav-btn:hover { background: rgba(255,255,255,0.08); }
+.cal-month { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
+.cal-weekday { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.06em; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-cell {
+  aspect-ratio: 0.82; border-radius: 9px; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 3px 2px; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cal-cell.logged:hover { background: rgba(255,255,255,0.07); }
+.cal-cell.empty { cursor: default; opacity: 0.5; }
+.cal-cell.today { box-shadow: inset 0 0 0 1px rgba(132,204,22,0.45); }
+.cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
+.cal-score { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal-score-empty { color: var(--text-tertiary); font-weight: 400; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+.cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-tertiary); }
+.cal-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ---- day detail modal ---- */
+.day-detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.day-detail-score {
+  width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0; border: 1px solid;
+  display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800;
+}
+.day-detail-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+
 /* ---- food log ---- */
 .log-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .log-row:last-child { border-bottom: 0; }
@@ -220,6 +257,17 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 }
 .cross-nav a:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
 
+/* PC has room to spare — two columns of cards so the page reads more
+   like a dashboard and less like a long phone-width scroll, without
+   touching the phone layout above. Title/intro/info panel and the
+   bottom nav span the full width; each card stays intact in one column
+   (break-inside: avoid) instead of splitting mid-content. */
+@media (min-width: 900px) {
+  .page { max-width: 1040px; column-count: 2; column-gap: 18px; }
+  .dash-title, .dash-sub, details.info, .cross-nav { column-span: all; }
+  .gm-card { break-inside: avoid; }
+}
+
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
   .dash-title { font-size: 22px; }
@@ -245,6 +293,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const FOOD_DB_KEY = 'po_food_db_v1';
   const FOOD_LOG_KEY = 'po_food_log_v1';
   const PROGRAM_KEY = 'po_nutrition_program_v1';
+  const MOOD_KEY = 'po_motivation_v1';
   const DAY_MS = 86400000;
 
   // ================================================================
@@ -291,10 +340,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       );
     } catch (e) {}
   }
-  // Day placements (repos/entraînement) are owned by Calendrier/Fitness,
-  // stored in their own "po-coach" row — pull that one key read-only so a
-  // device that only ever opens Alimentation still sees the real placement
-  // instead of falling back to "untouched day" logic on stale/empty local data.
+  // Day placements (repos/entraînement) and mood check-ins are owned by
+  // Calendrier/Fatigue, stored in their own "po-coach" row — pull those
+  // keys read-only so a device that only ever opens Alimentation still
+  // sees the real placement/mood instead of stale or empty local data
+  // (needed for the food calendar's day-type badge and humeur below).
   async function pcPullOverridesOnce() {
     if (!pcSupa) return;
     try {
@@ -304,8 +354,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       ]);
       if (!result) return;
       const { data, error } = result;
-      if (!error && data && data.data && data.data.po_day_overrides_v1 !== undefined) {
-        try { localStorage.setItem('po_day_overrides_v1', JSON.stringify(data.data.po_day_overrides_v1)); } catch (e) {}
+      if (!error && data && data.data) {
+        ['po_day_overrides_v1', MOOD_KEY].forEach(k => {
+          if (data.data[k] !== undefined) {
+            try { localStorage.setItem(k, JSON.stringify(data.data[k])); } catch (e) {}
+          }
+        });
       }
     } catch (e) {}
   }
@@ -551,11 +605,75 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
 
   // ================================================================
+  // TARGETS FOR A PAST DATE — same formula as computeTargets(), but for
+  // the food calendar's day score, which needs "what was the target THAT
+  // day" rather than today's. Nothing is stored per-day historically, so
+  // this reconstructs it: weight from the closest weigh-in on/before that
+  // date, rest/training from that date's Calendrier placement (same
+  // "untouched = repos" default), and the deficit % from the adaptive
+  // program's weekly history (nearest earlier week if that exact week
+  // isn't in history, else today's current deficit). An approximation,
+  // not a stored fact — profile (age/sexe/taille) is assumed unchanged.
+  // ================================================================
+  function weightKgOnOrBefore(dateKey) {
+    const entries = loadJSON(WEIGHTS_KEY, []);
+    if (!entries.length) return null;
+    const gym = loadJSON(GYM_KEY, {});
+    const unit = (gym && gym.units) || 'kg';
+    const upTo = entries.filter(e => e.dateKey <= dateKey);
+    const pick = upTo.length ? upTo[upTo.length - 1] : entries[0];
+    return unit === 'lb' ? pick.weight / 2.20462 : pick.weight;
+  }
+  function isRestDayOn(dateKey) {
+    const overrides = loadJSON('po_day_overrides_v1', {});
+    const override = overrides[dateKey];
+    return override ? /repos|rest/i.test(override) : true;
+  }
+  function deficitPctOn(program, dateObj) {
+    const wk = isoWeekKey(dateObj);
+    const hist = (program.history || []).slice().sort((a, b) => a.week < b.week ? -1 : 1);
+    const exact = hist.find(h => h.week === wk);
+    if (exact) return exact.deficitPct;
+    const earlier = hist.filter(h => h.week < wk);
+    if (earlier.length) return earlier[earlier.length - 1].deficitPct;
+    return program.deficitPct;
+  }
+  function computeTargetsForDate(dateKey) {
+    const profile = readProfile();
+    const dateObj = new Date(dateKey + 'T00:00:00');
+    const weightKg = weightKgOnOrBefore(dateKey) || profile.weightKg || 75;
+    const restDay = isRestDayOn(dateKey);
+    const tdee = computeTDEE(profile, weightKg, restDay);
+    const program = loadProgram();
+    const deficitPct = deficitPctOn(program, dateObj);
+    const target = tdee * (1 - deficitPct / 100);
+    const proteinG = Math.round(weightKg * 2.2);
+    const proteinKcal = proteinG * 4;
+    const fatKcal = Math.max(target * 0.25, weightKg * 0.6 * 9);
+    const fatG = Math.round(fatKcal / 9);
+    const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
+    const carbsG = Math.round(carbsKcal / 4);
+    return { weightKg, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, deficitPct };
+  }
+
+  // ================================================================
   // FOOD LOG for today
   // ================================================================
   function todaysEntries() {
     const log = loadJSON(FOOD_LOG_KEY, {});
     return log[todayStr()] || [];
+  }
+  function entriesForDate(dateKey) {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    return log[dateKey] || [];
+  }
+  function totalsFor(entries) {
+    return entries.reduce((acc, e) => ({
+      kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
+      carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0),
+      salt: acc.salt + (e.salt||0), potassium: acc.potassium + (e.potassium||0),
+      sugar: acc.sugar + (e.sugar||0), fiber: acc.fiber + (e.fiber||0)
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0, fiber: 0 });
   }
   function addLogEntry(entry) {
     const log = loadJSON(FOOD_LOG_KEY, {});
@@ -602,6 +720,52 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const SUGAR_TARGET_PCT = 0.10;
 
   // ================================================================
+  // NOTE DU JOUR (0-100) — pour le calendrier alimentaire en bas de page.
+  // Pas un chiffre de la littérature : une mesure de distance à la cible
+  // DE CE JOUR-LÀ (kcal/macros reconstitués via computeTargetsForDate),
+  // qui pénalise autant le trop que le pas-assez — pondérée vers les
+  // protéines (macro le plus déterminant pour ce programme). Le sel et
+  // les sucres au-delà de leur seuil retirent quelques points, atteindre
+  // les fibres en ajoute. Un jour sans aucune entrée n'a pas de note
+  // (null), distinct d'un 0 — "rien enregistré" n'est pas "mauvaise
+  // journée".
+  // ================================================================
+  function componentScore(pct) {
+    if (!isFinite(pct) || pct == null) return 0;
+    const dist = Math.abs(pct - 1);
+    return Math.max(0, 100 - dist * 140);
+  }
+  function dayScore(dateKey) {
+    const entries = entriesForDate(dateKey);
+    if (!entries.length) return null;
+    const totals = totalsFor(entries);
+    const targets = computeTargetsForDate(dateKey);
+    const kcalPct = targets.target ? totals.kcal / targets.target : 0;
+    const proteinPct = targets.proteinG ? totals.protein / targets.proteinG : 0;
+    const carbsPct = targets.carbsG ? totals.carbs / targets.carbsG : 0;
+    const fatPct = targets.fatG ? totals.fat / targets.fatG : 0;
+    let score = componentScore(kcalPct) * 0.30 + componentScore(proteinPct) * 0.35 +
+      componentScore(carbsPct) * 0.20 + componentScore(fatPct) * 0.15;
+    if (totals.salt > SALT_TARGET_G) score -= Math.min(10, (totals.salt - SALT_TARGET_G) * 2);
+    const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
+    if (totals.sugar > sugarTargetG) score -= Math.min(10, (totals.sugar - sugarTargetG) / 3);
+    if (totals.fiber >= fiberTargetG(readProfile())) score += 5;
+    return Math.round(Math.max(0, Math.min(100, score)));
+  }
+  // Same red→amber→green ramp as the app's --danger/--warning/--success
+  // palette, so a bad day and an over-target macro ring read the same way.
+  function scoreColor(score) {
+    if (score <= 50) {
+      const t = score / 50;
+      const r = Math.round(255 + (242-255)*t), g = Math.round(107 + (192-107)*t), b = Math.round(107 + (99-107)*t);
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    const t = (score - 50) / 50;
+    const r = Math.round(242 + (107-242)*t), g = Math.round(192 + (227-192)*t), b = Math.round(99 + (164-99)*t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  // ================================================================
   // RENDER
   // ================================================================
   const app = document.getElementById('app');
@@ -613,6 +777,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     '<a href="fatigue.html">🔋 Fatigue</a>' +
     '<a href="health.html">💊 Santé</a>' +
     '</div>';
+
+  const MONTH_NAMES = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const WEEKDAY_LABELS = ['L','M','M','J','V','S','D'];
+  const MOOD_EMOJI = { 1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '🔥' };
+  let foodCalMonthOffset = 0;
 
   function ring(pct, color, value, target, label) {
     const r = 38, c = 2 * Math.PI * r;
@@ -746,6 +915,92 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '</div>';
   }
 
+  // ================================================================
+  // CALENDRIER ALIMENTAIRE — un mois, une note/100 (voir dayScore) sur
+  // chaque jour où au moins un aliment a été enregistré. Les jours vides
+  // restent neutres (pas de note inventée). Touche un jour noté pour le
+  // détail (journal exact, macros, humeur, repos/entraînement).
+  // ================================================================
+  function renderFoodCalendarCard() {
+    const now = new Date();
+    const todayKey = todayStr();
+    const base = new Date(now.getFullYear(), now.getMonth() + foodCalMonthOffset, 1);
+    const y = base.getFullYear(), m = base.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7;
+    const log = loadJSON(FOOD_LOG_KEY, {});
+
+    let html = '<div class="gm-card"><div class="section-title">Calendrier alimentaire</div>' +
+      '<div class="cal-head">' +
+      '<button type="button" class="cal-nav-btn" id="foodCalPrev" aria-label="Mois précédent">‹</button>' +
+      '<span class="cal-month">' + MONTH_NAMES[m] + ' ' + y + '</span>' +
+      '<button type="button" class="cal-nav-btn" id="foodCalNext" aria-label="Mois suivant">›</button>' +
+      '</div>' +
+      '<div class="cal-weekdays">' + WEEKDAY_LABELS.map(d => '<div class="cal-weekday">' + d + '</div>').join('') + '</div>' +
+      '<div class="cal-grid">';
+    for (let i = 0; i < firstWeekday; i++) html += '<div></div>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(y, m, d);
+      const dk = dateStr(date);
+      const hasLog = !!(log[dk] && log[dk].length);
+      const isToday = dk === todayKey;
+      const score = hasLog ? dayScore(dk) : null;
+      const color = hasLog ? scoreColor(score) : null;
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (hasLog ? ' logged' : ' empty');
+      html += '<button type="button" class="' + cls + '"' +
+        (hasLog ? ' data-date="' + dk + '" style="border-left-color:' + color + ';"' : ' disabled') + '>' +
+        '<span class="cal-day">' + d + '</span>' +
+        (hasLog ? '<span class="cal-score" style="color:' + color + '">' + score + '</span>' : '<span class="cal-score cal-score-empty">·</span>') +
+        '</button>';
+    }
+    html += '</div>' +
+      '<div class="cal-legend">' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--success)"></span>Proche des objectifs</span>' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--danger)"></span>Loin des objectifs</span>' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:rgba(255,255,255,0.15)"></span>Rien enregistré</span>' +
+      '</div>' +
+      '<div class="program-note">Note = distance aux kcal/macros de ce jour-là (poids, repos/entraînement et déficit reconstitués rétroactivement) — vert proche de la cible, rouge loin (trop ou pas assez). Touche un jour noté pour voir le détail.</div>' +
+      '</div>';
+    return html;
+  }
+
+  function openDayDetailModal(dk) {
+    const bg = ensureModal();
+    const inner = document.getElementById('foodModalInner');
+    const entries = entriesForDate(dk);
+    const totals = totalsFor(entries);
+    const targets = computeTargetsForDate(dk);
+    const score = dayScore(dk);
+    const color = scoreColor(score);
+    const overrides = loadJSON('po_day_overrides_v1', {});
+    const override = overrides[dk];
+    const restDay = override ? /repos|rest/i.test(override) : true;
+    const dayTypeLabel = override || 'Repos (par défaut)';
+    const mood = loadJSON(MOOD_KEY, {})[dk];
+    const [yy, mm, dd] = dk.split('-').map(Number);
+    const dateLabel = new Date(yy, mm - 1, dd).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    inner.innerHTML = '<h3>' + escapeHtml(dateLabel) + '</h3>' +
+      '<div class="day-detail-head">' +
+      '<div class="day-detail-score" style="color:' + color + ';border-color:' + color + ';background:' + color.replace('rgb', 'rgba').replace(')', ',0.14)') + ';">' + score + '</div>' +
+      '<div class="day-detail-badges">' +
+      '<span class="program-badge' + (restDay ? ' warn' : '') + '">' + (restDay ? '😴 ' : '💪 ') + escapeHtml(dayTypeLabel) + '</span>' +
+      (mood ? '<span class="program-badge">Humeur ' + (MOOD_EMOJI[mood.mood] || '') + '</span>' : '') +
+      '</div>' +
+      '</div>' +
+      '<div class="kcal-total" style="margin-bottom:14px;"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal' +
+      '<div class="kcal-remaining" style="color:var(--text-tertiary);">P' + Math.round(totals.protein) + '/' + targets.proteinG + 'g · G' + Math.round(totals.carbs) + '/' + targets.carbsG + 'g · L' + Math.round(totals.fat) + '/' + targets.fatG + 'g</div>' +
+      '</div>' +
+      '<div class="section-title">Journal de cette journée</div>' +
+      (entries.length ? entries.map(e =>
+        '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
+        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span></div>'
+      ).join('') : '<p class="empty-note">Rien enregistré.</p>') +
+      '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeDayDetail">Fermer</button></div>';
+    document.getElementById('closeDayDetail').addEventListener('click', closeModal);
+    bg.classList.add('show');
+  }
+
   function renderMain() {
     const targets = computeTargets();
     const totals = todayTotals();
@@ -822,6 +1077,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       (db.length ? '<p class="empty-note">' + db.length + ' aliment(s) enregistré(s), synchronisés sur tous tes appareils.</p>' : '<p class="empty-note">Aucun aliment créé — touche "+ Ajouter" pour en créer un premier.</p>') +
       '</div>';
 
+    html += renderFoodCalendarCard();
     html += CROSS_NAV;
     app.innerHTML = html;
 
@@ -829,6 +1085,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     document.getElementById('manageFoodsBtn').addEventListener('click', openManageFoodsModal);
     app.querySelectorAll('[data-del]').forEach(btn => {
       btn.addEventListener('click', () => { removeLogEntry(btn.dataset.del); renderMain(); });
+    });
+    document.getElementById('foodCalPrev').addEventListener('click', () => { foodCalMonthOffset--; renderMain(); });
+    document.getElementById('foodCalNext').addEventListener('click', () => { foodCalMonthOffset++; renderMain(); });
+    app.querySelectorAll('.cal-cell[data-date]').forEach(btn => {
+      btn.addEventListener('click', () => openDayDetailModal(btn.dataset.date));
     });
   }
 
