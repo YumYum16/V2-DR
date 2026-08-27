@@ -336,6 +336,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // ================================================================
   const MONTH_NAMES = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const WEEKDAY_LABELS = ['L','M','M','J','V','S','D'];
+  const REST_DEFAULT_LABEL = 'Repos';
   const CROSS_NAV =
     '<div class="cross-nav">' +
     '<a href="gym.html">💪 Fitness</a>' +
@@ -358,9 +359,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7; // Monday-first
 
     let html = '<h1 class="dash-title">Calendrier</h1>' +
-      '<p class="dash-sub">Rien n\'est placé tout seul — touche un jour (passé ou futur, n\'importe quel mois) pour lui donner un type toi-même. Les calories s\'ajustent seules selon ton choix.</p>' +
+      '<p class="dash-sub">Un jour non placé compte comme repos par défaut, kcal adaptée en conséquence — touche un jour (passé ou futur, n\'importe quel mois) pour dire qu\'il s\'agit d\'un entraînement à la place.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres</summary>' +
-      '<p>Le type de jour vient uniquement de ce que tu places toi-même ici (touche un jour) — rien n\'est deviné à partir de la répartition automatique de <strong>Fitness</strong>, même si tu l\'as configurée là-bas. Un jour vide reste vide tant que tu n\'y touches pas.</p>' +
+      '<p>Le type de jour vient de ce que tu places toi-même ici (touche un jour) — rien n\'est deviné à partir de la répartition automatique de <strong>Fitness</strong>, même si tu l\'as configurée là-bas. Sans placement, un jour compte simplement comme repos (l\'hypothèse la plus sûre), pas comme un entraînement précis inventé.</p>' +
       '<p>Les calories utilisent la même formule que <strong>Alimentation</strong> : <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base, un facteur d\'activité selon tes heures d\'entraînement/semaine, et un cran d\'activité en moins les jours de repos (même logique de "carb cycling" qu\'Alimentation). Le déficit actuel de ton programme adaptatif est appliqué tel quel.</p>' +
       '<p>Ces chiffres sont une <strong>référence figée pour le mois</strong>, pas recalculée jour par jour sur ton poids réel de ce jour précis — pour le chiffre du jour exact, ajusté à ton poids et ton statut repos/entraînement d\'aujourd\'hui, c\'est toujours <strong>Alimentation</strong> qui fait foi. Un jour placé manuellement ici compte aussi pour Alimentation (et la pastille kcal en haut de chaque page), pas seulement pour cette page.</p>' +
       '</details>';
@@ -377,36 +378,38 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(y, m, d);
       const dk = dateKey(date);
-      // Only a day YOU placed shows a split/kcal — nothing gets guessed or
-      // pre-filled onto the calendar without you touching it first.
-      const split = overrides[dk] || null;
-      const rest = split == null ? null : isRestLabel(split);
+      // A day you placed shows exactly that. An untouched day defaults to
+      // Repos (not a guessed training type) so it always has a sensible
+      // kcal target — but that default never gets pushed to the phone
+      // feed, which stays strictly "only what you actually placed".
+      const isManual = !!overrides[dk];
+      const split = overrides[dk] || REST_DEFAULT_LABEL;
+      const rest = isRestLabel(split);
       const isToday = dk === todayKey;
-      const cls = 'cal-cell' + (isToday ? ' today' : '') + (split ? ' manual' : '') + (rest == null ? '' : rest ? ' rest' : ' train');
-      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + (split ? escapeHtml(split) + ' (placé par toi)' : 'Pas encore défini — touche pour choisir') + '">' +
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (isManual ? ' manual' : '') + (rest ? ' rest' : ' train');
+      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split) + (isManual ? ' (placé par toi)' : ' (par défaut — touche pour changer)') + '">' +
         '<span class="cal-day">' + d + '</span>' +
-        (split ? '<span class="cal-split">' + escapeHtml(split) + '</span>' : '') +
-        (split ? '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' : '') +
+        '<span class="cal-split">' + escapeHtml(split) + '</span>' +
+        '<span class="cal-kcal">' + (rest ? kcal.rest : kcal.train) + '</span>' +
         '</button>';
     }
     html += '</div>' +
       '<div class="cal-legend">' +
       '<span class="cal-legend-item"><span class="cal-legend-dot train"></span>Entraînement · ~' + kcal.train + ' kcal</span>' +
       '<span class="cal-legend-item"><span class="cal-legend-dot rest"></span>Repos · ~' + kcal.rest + ' kcal</span>' +
-      '</div><div class="program-note">Un jour vide n\'est pas défini — rien n\'est deviné ni ajouté tout seul, ni ici ni dans l\'abonnement téléphone. Touche un jour pour le placer.</div></div>';
+      '</div><div class="program-note">Un jour non placé compte comme repos par défaut (kcal adaptée) — touche-le pour dire qu\'il s\'agit d\'un jour d\'entraînement. Seuls les jours que tu places réellement apparaissent dans l\'abonnement téléphone.</div></div>';
 
-    // today summary — only reflects what YOU placed for today, nothing guessed
-    const todaySplit = overrides[todayKey] || null;
-    const todayRest = todaySplit ? isRestLabel(todaySplit) : false;
+    // today summary — placed day if there is one, Repos by default otherwise
+    const todayManual = !!overrides[todayKey];
+    const todaySplit = overrides[todayKey] || REST_DEFAULT_LABEL;
+    const todayRest = isRestLabel(todaySplit);
     html += '<div class="gm-card"><div class="section-title">Aujourd\'hui</div>' +
-      (todaySplit ?
-        '<div class="today-row">' +
-        '<div class="today-badge">' + (todayRest ? '😴' : '💪') + '</div>' +
-        '<div class="today-info">' +
-        '<div class="today-split">' + escapeHtml(todaySplit) + '</div>' +
-        '<div class="today-kcal">Vise ~' + (todayRest ? kcal.rest : kcal.train) + ' kcal aujourd\'hui</div>' +
-        '</div></div>' :
-        '<p class="empty-note">Pas encore placé — touche la case d\'aujourd\'hui dans le calendrier ci-dessus pour choisir.</p>') +
+      '<div class="today-row">' +
+      '<div class="today-badge">' + (todayRest ? '😴' : '💪') + '</div>' +
+      '<div class="today-info">' +
+      '<div class="today-split">' + escapeHtml(todaySplit) + (todayManual ? '' : ' <span style="color:var(--text-tertiary);font-size:12px;font-weight:600;">(par défaut)</span>') + '</div>' +
+      '<div class="today-kcal">Vise ~' + (todayRest ? kcal.rest : kcal.train) + ' kcal aujourd\'hui</div>' +
+      '</div></div>' +
       '<div class="today-links">' +
       '<a class="today-link" href="seance.html">Lancer la séance →</a>' +
       '<a class="today-link" href="alimentation.html">Voir Alimentation →</a>' +
