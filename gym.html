@@ -334,6 +334,8 @@ img, video, canvas, svg { max-width: 100%; }
 .po-ex-card-thumb {
   width: 38px; height: 38px; border-radius: 9px; object-fit: cover;
   flex-shrink: 0; margin-right: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 .po-ex-card-name-wrap { display: flex; align-items: center; flex: 1; min-width: 0; gap: 8px; }
 .po-ex-card-name-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -1105,6 +1107,23 @@ img, video, canvas, svg { max-width: 100%; }
 
 .hidden { display: none !important; }
 
+/* ===== Exercise thumbnail lightbox (tap/click to enlarge) ===== */
+.img-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(4,6,10,0.88);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.img-lightbox.is-open { opacity: 1; pointer-events: auto; }
+.img-lightbox img {
+  max-width: min(560px, 100%); max-height: 80vh;
+  border-radius: 16px; object-fit: contain;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+}
+
 /* ===== Fond atmosphérique "Braise" (lueur orange/rouge + particules) ===== */
 .atmo-wash {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -1166,6 +1185,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
   .po-top-grid .wt-section { margin: 0; }
   .po-top-grid .card { margin: 0; height: 100%; }
+  .po-ex-card-thumb { width: 48px; height: 48px; border-radius: 11px; }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1392,6 +1412,11 @@ img, video, canvas, svg { max-width: 100%; }
       <div id="exList"></div>
     </div>
   </div>
+</div>
+
+<!-- Exercise thumbnail lightbox -->
+<div class="img-lightbox" id="imgLightbox" aria-hidden="true">
+  <img id="imgLightboxImg" src="" alt="">
 </div>
 
 <!-- Add / Edit Exercise Modal -->
@@ -1691,7 +1716,7 @@ img, video, canvas, svg { max-width: 100%; }
     return '<div class="po-ex-card" data-ex-id="' + ex.id + '">'
       + '<div class="po-ex-card-head">'
       +   '<div class="po-ex-card-name-wrap">'
-      +     (ex.image ? '<img class="po-ex-card-thumb" src="' + ex.image + '" alt="">' : '')
+      +     (ex.image ? '<img class="po-ex-card-thumb" data-action="view-img" src="' + ex.image + '" alt="">' : '')
       +     '<div class="po-ex-card-name-col"><span class="po-ex-card-name">' + escape(ex.name) + '</span><span class="po-ex-badge">' + badge + '</span></div>'
       +   '</div>'
       +   '<button type="button" class="po-btn-icon po-ex-card-edit" data-action="edit" title="Modifier / supprimer" aria-label="Modifier">' + EX_EDIT_ICON + '</button>'
@@ -1717,8 +1742,21 @@ img, video, canvas, svg { max-width: 100%; }
       const ex = state.exercises.find(e => e.id === exId);
       if (!ex) return;
       card.querySelector('[data-action="edit"]').addEventListener('click', () => openExModal('edit', ex));
+      const thumb = card.querySelector('[data-action="view-img"]');
+      if (thumb) thumb.addEventListener('click', () => openImgLightbox(ex.image));
     });
   }
+  function openImgLightbox(src) {
+    if (!src) return;
+    $('imgLightboxImg').src = src;
+    $('imgLightbox').classList.add('is-open');
+    $('imgLightbox').setAttribute('aria-hidden', 'false');
+  }
+  function closeImgLightbox() {
+    $('imgLightbox').classList.remove('is-open');
+    $('imgLightbox').setAttribute('aria-hidden', 'true');
+  }
+  $('imgLightbox').addEventListener('click', closeImgLightbox);
   // Compute today's split from state.splitRotation + state.splitAnchor.
   // Returns the rotation entry name (e.g. "Push" or "Rest") AND the index.
   function todaySplit() {
