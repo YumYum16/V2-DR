@@ -241,6 +241,7 @@ details.info strong { color: var(--text-primary); }
       <details class="info"><summary>D'où viennent ces chiffres (études citées)</summary>
         <p><strong>Caféine</strong> : demi-vie de 5h (moyenne de la littérature pharmacocinétique), pic d'effet ~45 min après la prise.</p>
         <p><strong>Repas → énergie</strong> : chaque aliment enregistré dans <a href="alimentation.html" style="color:var(--text-primary)">Alimentation</a> (avec son heure) influence la courbe. Les glucides nets (glucides − 2×fibres, une approximation de la charge glycémique réelle — les fibres ralentissent l'absorption du glucose, <strong>Jenkins et al.</strong>, travaux fondateurs sur l'index glycémique) donnent un pic d'énergie ~35 min après le repas puis une baisse ~90 min après, un effet dose-dépendant documenté par <strong>Philippou &amp; Constantinou (2014, Nutrition Reviews)</strong> : plus la charge glycémique est élevée, plus la baisse qui suit le pic est marquée. Les lipides ajoutent une somnolence plus lente et plus longue (<strong>Wells et al. 1997, Physiological Behavior</strong> : les repas riches en graisses augmentent la somnolence post-prandiale davantage que les repas riches en glucides). La taille du repas (kcal) ajoute elle-même une petite baisse, indépendamment de sa composition (le "coup de barre" post-repas classique). Les fibres ne fatiguent pas dans cette littérature — elles atténuent le pic-puis-chute des glucides, l'effet inverse de ce qu'on pourrait croire.</p>
+        <p><strong>Étiquettes sur la courbe</strong> : quand une baisse est assez marquée pour valoir une étiquette, elle est colorée selon la cause dominante — <span style="color:#F2A65A">🟠 lipides</span> ou <span style="color:#F5D76E">🟡 glucides</span>, selon lequel des deux pèse le plus à ce moment-là. Pas de couleur "protéines" : contrairement aux glucides et lipides, il n'existe pas de mécanisme établi par lequel les protéines provoqueraient une baisse d'énergie post-repas — la littérature (hypothèse tyrosine/vigilance de Wurtman) pencherait plutôt dans l'autre sens, mais reste trop contestée pour être modélisée ici. Rien n'est inventé pour compléter la liste de trois.</p>
         <p><strong>Limite</strong> : sans repas enregistré à une heure donnée, la courbe ne prévoit aucun effet alimentaire à ce moment — elle ne devine pas les repas non enregistrés.</p>
       </details>
       <div class="energy-head">
@@ -449,18 +450,28 @@ details.info strong { color: var(--text-primary); }
   // Per-meal energy effect, driven by what's actually logged in Alimentation
   // (food + its time), not a generic fixed lunchtime dip. See the "D'où
   // viennent ces chiffres" note above for the studies behind each term.
-  function entryEffectAt(entry, t){
+  // Protein isn't in here on purpose: there's no good evidence for protein
+  // driving a post-meal energy dip the way carbs/fat do — if anything the
+  // weak, contested literature (Wurtman's tyrosine/alertness hypothesis)
+  // points the other way. Only two real causal terms exist, so only two
+  // are ever attributed on the chart: carbs (crash) and fat (fatDrag).
+  function entryEffectComponents(entry, t){
     const mealT = timeStrToHour(entry.time);
     const carbs = entry.carbs || 0, fat = entry.fat || 0, fiber = entry.fiber || 0, kcal = entry.kcal || 0;
     // Fiber blunts the effective glycemic load rather than adding fatigue
     // of its own (Jenkins et al.) — approximated as 2g of "blunting" per
     // gram of fiber.
     const netCarbs = Math.max(0, carbs - fiber*2);
-    const bump = 0.12*netCarbs*gauss(t, mealT+0.6, 0.5);   // Philippou & Constantinou 2014: early alertness rise
-    const crash = 0.10*netCarbs*gauss(t, mealT+1.6, 0.7);  // ...followed by a dose-dependent dip ~90min later
-    const fatDrag = 0.15*fat*gauss(t, mealT+1.6, 1.1);     // Wells et al. 1997: high-fat meals → more postprandial sleepiness
-    const sizeDip = 0.004*kcal*gauss(t, mealT+1.1, 0.9);   // any large meal costs some energy to digest, regardless of macros
-    return bump - crash - fatDrag - sizeDip;
+    return {
+      bump: 0.12*netCarbs*gauss(t, mealT+0.6, 0.5),    // Philippou & Constantinou 2014: early alertness rise
+      crash: 0.10*netCarbs*gauss(t, mealT+1.6, 0.7),   // ...followed by a dose-dependent dip ~90min later
+      fatDrag: 0.15*fat*gauss(t, mealT+1.6, 1.1),      // Wells et al. 1997: high-fat meals → more postprandial sleepiness
+      sizeDip: 0.004*kcal*gauss(t, mealT+1.1, 0.9)     // any large meal costs some energy to digest, regardless of macros
+    };
+  }
+  function entryEffectAt(entry, t){
+    const c = entryEffectComponents(entry, t);
+    return c.bump - c.crash - c.fatDrag - c.sizeDip;
   }
   function foodEffectAt(t){
     let e = 0;
@@ -471,6 +482,9 @@ details.info strong { color: var(--text-primary); }
   // actually move the curve — otherwise every snack would get a label and
   // the chart turns into clutter instead of an answer to "why did it drop".
   const FOOD_DIP_MARKER_THRESHOLD = 3.5;
+  // Orange for fat, yellow for carbs — whichever term is actually bigger
+  // at the trough is named as the cause.
+  const FOOD_CAUSE_COLOR = { fat: '#F2A65A', carb: '#F5D76E' };
   function foodDipMarkers(){
     const marks = [];
     todaysFoodEntries().forEach(entry => {
@@ -480,9 +494,12 @@ details.info strong { color: var(--text-primary); }
         const t = mealT + dt, eff = entryEffectAt(entry, t);
         if (eff < worstV) { worstV = eff; worstT = t; }
       }
+      if (worstT == null || -worstV < FOOD_DIP_MARKER_THRESHOLD) return;
+      const comp = entryEffectComponents(entry, worstT);
+      const cause = comp.fatDrag >= comp.crash ? 'fat' : 'carb';
       // Label sits partway down the slope into the trough, not at the flat
       // bottom — that's the point actually on the diagonal descent.
-      if (worstT != null && -worstV >= FOOD_DIP_MARKER_THRESHOLD) marks.push({ t: Math.max(mealT+0.1, worstT-0.4), name: entry.foodName });
+      marks.push({ t: Math.max(mealT+0.1, worstT-0.4), name: entry.foodName, cause, color: FOOD_CAUSE_COLOR[cause] });
     });
     return marks.sort((a,b) => a.t - b.t);
   }
@@ -640,10 +657,11 @@ details.info strong { color: var(--text-primary); }
       const labelY = yMid + 16 + level*15;
       const label = '↘ ' + (mk.name.length>15 ? mk.name.slice(0,14)+'…' : mk.name);
       const boxW = label.length*5.6 + 8;
+      const causeWord = mk.cause==='fat' ? 'lipides' : 'glucides';
       parts.push('<g transform="translate('+x.toFixed(1)+','+labelY.toFixed(1)+') rotate('+angle.toFixed(1)+')">'
-        +'<title>'+escapeHtml(mk.name)+' — baisse d\'énergie liée à ce repas</title>'
-        +'<rect x="'+(-boxW/2).toFixed(1)+'" y="-9" width="'+boxW.toFixed(1)+'" height="13" rx="4" fill="rgba(10,8,6,0.72)" stroke="rgba(255,138,138,0.35)" stroke-width="1"/>'
-        +'<text x="0" y="1" text-anchor="middle" font-size="10" font-family="ui-monospace, monospace" fill="#FF9E9E">'+escapeHtml(label)+'</text>'
+        +'<title>'+escapeHtml(mk.name)+' — baisse d\'énergie liée aux '+causeWord+' de ce repas</title>'
+        +'<rect x="'+(-boxW/2).toFixed(1)+'" y="-9" width="'+boxW.toFixed(1)+'" height="13" rx="4" fill="rgba(10,8,6,0.72)" stroke="'+mk.color+'" stroke-opacity="0.4" stroke-width="1"/>'
+        +'<text x="0" y="1" text-anchor="middle" font-size="10" font-family="ui-monospace, monospace" fill="'+mk.color+'">'+escapeHtml(label)+'</text>'
         +'</g>');
     });
 
