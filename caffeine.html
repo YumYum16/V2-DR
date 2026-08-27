@@ -449,22 +449,40 @@ details.info strong { color: var(--text-primary); }
   // Per-meal energy effect, driven by what's actually logged in Alimentation
   // (food + its time), not a generic fixed lunchtime dip. See the "D'où
   // viennent ces chiffres" note above for the studies behind each term.
+  function entryEffectAt(entry, t){
+    const mealT = timeStrToHour(entry.time);
+    const carbs = entry.carbs || 0, fat = entry.fat || 0, fiber = entry.fiber || 0, kcal = entry.kcal || 0;
+    // Fiber blunts the effective glycemic load rather than adding fatigue
+    // of its own (Jenkins et al.) — approximated as 2g of "blunting" per
+    // gram of fiber.
+    const netCarbs = Math.max(0, carbs - fiber*2);
+    const bump = 0.12*netCarbs*gauss(t, mealT+0.6, 0.5);   // Philippou & Constantinou 2014: early alertness rise
+    const crash = 0.10*netCarbs*gauss(t, mealT+1.6, 0.7);  // ...followed by a dose-dependent dip ~90min later
+    const fatDrag = 0.15*fat*gauss(t, mealT+1.6, 1.1);     // Wells et al. 1997: high-fat meals → more postprandial sleepiness
+    const sizeDip = 0.004*kcal*gauss(t, mealT+1.1, 0.9);   // any large meal costs some energy to digest, regardless of macros
+    return bump - crash - fatDrag - sizeDip;
+  }
   function foodEffectAt(t){
     let e = 0;
+    todaysFoodEntries().forEach(entry => { e += entryEffectAt(entry, t); });
+    return e;
+  }
+  // Only worth pointing an arrow at a meal if its own dip is big enough to
+  // actually move the curve — otherwise every snack would get a label and
+  // the chart turns into clutter instead of an answer to "why did it drop".
+  const FOOD_DIP_MARKER_THRESHOLD = 3.5;
+  function foodDipMarkers(){
+    const marks = [];
     todaysFoodEntries().forEach(entry => {
       const mealT = timeStrToHour(entry.time);
-      const carbs = entry.carbs || 0, fat = entry.fat || 0, fiber = entry.fiber || 0, kcal = entry.kcal || 0;
-      // Fiber blunts the effective glycemic load rather than adding fatigue
-      // of its own (Jenkins et al.) — approximated as 2g of "blunting" per
-      // gram of fiber.
-      const netCarbs = Math.max(0, carbs - fiber*2);
-      const bump = 0.12*netCarbs*gauss(t, mealT+0.6, 0.5);   // Philippou & Constantinou 2014: early alertness rise
-      const crash = 0.10*netCarbs*gauss(t, mealT+1.6, 0.7);  // ...followed by a dose-dependent dip ~90min later
-      const fatDrag = 0.15*fat*gauss(t, mealT+1.6, 1.1);     // Wells et al. 1997: high-fat meals → more postprandial sleepiness
-      const sizeDip = 0.004*kcal*gauss(t, mealT+1.1, 0.9);   // any large meal costs some energy to digest, regardless of macros
-      e += bump - crash - fatDrag - sizeDip;
+      let worstT = null, worstV = 0;
+      for (let dt = 0; dt <= 4; dt += 1/12) {
+        const t = mealT + dt, eff = entryEffectAt(entry, t);
+        if (eff < worstV) { worstV = eff; worstT = t; }
+      }
+      if (worstT != null && -worstV >= FOOD_DIP_MARKER_THRESHOLD) marks.push({ t: worstT, name: entry.foodName });
     });
-    return e;
+    return marks;
   }
   function sleepPressure(awakeH){ return clamp(awakeH,0,24)*1.7; }
   function morningBump(t){ const d=t-wakeHour; return (d<0||d>4)?0:10*gauss(d,1.2,0.9); }
@@ -600,6 +618,18 @@ details.info strong { color: var(--text-primary); }
       parts.push('<path d="'+area+'" fill="url(#eg)"/>');
       parts.push('<path d="'+line+'" fill="none" stroke="#6BE3A4" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(107,227,164,0.55))"/>');
     }
+
+    // markers: food-driven dips — only shown when a meal's own effect is
+    // big enough to matter (see FOOD_DIP_MARKER_THRESHOLD), so this stays
+    // an answer to "why did it drop" rather than a label on every entry.
+    foodDipMarkers().forEach(mk => {
+      const x=X(mk.t), yPoint=Y(energyAt(mk.t,true)), yLabel=Math.max(12, yPoint-26);
+      const label = mk.name.length>16 ? mk.name.slice(0,15)+'…' : mk.name;
+      parts.push('<g><title>'+escapeHtml(mk.name)+' — baisse d\'énergie liée à ce repas</title>'
+        +'<line x1="'+x.toFixed(1)+'" y1="'+(yLabel+8).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+(yPoint-4).toFixed(1)+'" stroke="rgba(255,138,138,0.55)" stroke-width="1.3"/>'
+        +'<path d="M '+x.toFixed(1)+' '+(yPoint-4).toFixed(1)+' l -3 -6 l 6 0 z" fill="#FF8A8A"/>'
+        +'<text x="'+x.toFixed(1)+'" y="'+yLabel.toFixed(1)+'" text-anchor="middle" font-size="10" font-family="ui-monospace, monospace" fill="#FF8A8A">'+escapeHtml(label)+'</text></g>');
+    });
 
     // markers: now + scrub
     const xNow=X(now).toFixed(1);
