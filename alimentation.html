@@ -121,6 +121,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .ring-name { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 1px; }
 .kcal-total { text-align: center; font-size: 13px; color: var(--text-secondary); }
 .kcal-total strong { color: var(--text-primary); font-size: 20px; font-variant-numeric: tabular-nums; }
+.salt-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+.salt-row-head { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 6px; }
+.salt-row-head strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.salt-bar-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.salt-bar-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
 
 /* ---- program ---- */
 .program-badge {
@@ -427,9 +432,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const entries = todaysEntries();
     return entries.reduce((acc, e) => ({
       kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
-      carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0)
-    }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+      carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0),
+      salt: acc.salt + (e.salt||0)
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0 });
   }
+  // WHO recommends under 5g of salt/day (~2000mg sodium) for the general
+  // population; training/sweating increases sodium needs somewhat, but
+  // 5g stays the standard reference point rather than an invented number.
+  const SALT_TARGET_G = 5;
 
   // ================================================================
   // RENDER
@@ -486,6 +496,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       ring(pF, ringColor(pF), totals.fat, 'Lipides') +
       '</div>' +
       '<div class="kcal-total"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal</div>' +
+      '<div class="salt-row"><div class="salt-row-head"><span>Sel</span><strong>' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g</strong></div>' +
+      '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.salt/SALT_TARGET_G)*100).toFixed(0) + '%;background:' + (totals.salt > SALT_TARGET_G ? 'var(--danger)' : 'var(--lime)') + ';"></div></div></div>' +
       '</div>';
 
     html += '<div class="gm-card">' +
@@ -503,7 +515,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +
       (entries.length ? entries.map(e =>
         '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
-        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + '</span>' +
+        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span>' +
         '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
       ).join('') : '<p class="empty-note">Rien enregistré aujourd\'hui.</p>') +
       '</div>';
@@ -604,6 +616,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
           '</div>' +
           '<div class="field-row">' +
+          '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
+          '<div class="field-col"></div>' +
+          '</div>' +
+          '<div class="field-row">' +
           '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150"></div>' +
           '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="newFoodServingLabel" placeholder="ex. steak"></div>' +
           '</div>' +
@@ -619,6 +635,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
             proteinPer100g: parseFloat(document.getElementById('newFoodP').value) || 0,
             carbsPer100g: parseFloat(document.getElementById('newFoodC').value) || 0,
             fatPer100g: parseFloat(document.getElementById('newFoodF').value) || 0,
+            saltPer100g: parseFloat(document.getElementById('newFoodSalt').value) || 0,
             servingGrams: parseFloat(document.getElementById('newFoodServingG').value) || null,
             servingLabel: document.getElementById('newFoodServingLabel').value.trim() || null
           };
@@ -656,7 +673,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         addLogEntry({
           foodId: f.id, foodName: f.name, grams: Math.round(grams),
           kcal: f.kcalPer100g * ratio, protein: f.proteinPer100g * ratio,
-          carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio
+          carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio,
+          salt: (f.saltPer100g || 0) * ratio
         });
         closeModal();
         renderMain();
@@ -676,7 +694,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         (db.length ?
           '<div class="food-pick-list">' + db.map(f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
-            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' S' + (f.saltPer100g||0) + ' /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
           ).join('') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
