@@ -338,10 +338,17 @@ body.topbar-modal-open {
       const dose = (x && x.dose != null ? x.dose : (x && x.defaultDose)) || 0;
       return s + Math.max(0, dose * ((x && x.mlPerUnit) || 0));
     }, 0);
+    let salt = 0;
+    try {
+      const log = JSON.parse(localStorage.getItem('po_food_log_v1'));
+      const entries = (log && log[calendarDateKey()]) || [];
+      const saltG = entries.reduce((s, e) => s + (e.salt || 0), 0);
+      salt = Math.max(0, saltG - 5) * 65; // same threshold-based rule as po-water.html
+    } catch (e) {}
     let adjust = 0;
     if (p.sex === 'm') adjust += 200;
     if ((p.age || 0) >= 50) adjust += 100;
-    const totalMl = base + exercise + caffeine + subs + adjust;
+    const totalMl = base + exercise + caffeine + subs + salt + adjust;
     let unitVol;
     if (state.unit === 'glass') unitVol = state.glassMl || 250;
     else if (state.unit === 'oz') unitVol = 30;

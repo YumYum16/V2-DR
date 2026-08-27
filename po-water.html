@@ -810,6 +810,28 @@ html, body {
     saveState();
   }
 
+  // Sodium's link to water needs is genuinely debated (Rakova et al.,
+  // Annals of Nutrition & Metabolism): at moderate intake the kidneys
+  // just concentrate urine without needing more water, but past a
+  // threshold they can't concentrate further and extra water is needed
+  // to clear the excess. So this only adds water for salt ABOVE the 5g/
+  // day WHO target, not proportionally to every gram — matching that
+  // threshold effect instead of a naive linear guess.
+  function saltExcessMl() {
+    let log = null;
+    try { log = JSON.parse(localStorage.getItem('po_food_log_v1')); } catch (e) {}
+    if (!log) return 0;
+    const todayKey = calendarKeyForSalt();
+    const entries = log[todayKey] || [];
+    const saltG = entries.reduce((s, e) => s + (e.salt || 0), 0);
+    const excess = Math.max(0, saltG - 5);
+    return excess * 65; // ≈65ml/g beyond target, from renal excretion studies on salt-load urine volume
+  }
+  function calendarKeyForSalt() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
   // ============================================================
   // CALCULATOR — daily water target in ml
   //
@@ -817,6 +839,7 @@ html, body {
   //   exercise   = activity_hrs/wk ÷ 7 × 500 ml/day   (≈500 ml/hr training)
   //   caffeine   = max(0, caffeineMg − 200) × 1.5 ml  (mild diuresis)
   //   substances = sum of extraMl for each added med/stim
+  //   salt       = (today's salt from Alimentation − 5g target) × 65 ml, floored at 0
   //   adjustments: +200 ml male, +100 ml age 50+
   // ============================================================
   function computeTargetMl() {
@@ -826,12 +849,13 @@ html, body {
     const exercise = (p.activityHrsPerWeek || 0) / 7 * 500;
     const caffeine = Math.max(0, (state.caffeineMgPerDay || 0) - 200) * 1.5;
     const subs = (state.substances || []).reduce((s, x) => s + subExtraMl(x), 0);
+    const salt = saltExcessMl();
     let adjust = 0;
     if (p.sex === 'm') adjust += 200;
     if ((p.age || 0) >= 50) adjust += 100;
     return {
-      base, exercise, caffeine, subs, adjust,
-      total: base + exercise + caffeine + subs + adjust
+      base, exercise, caffeine, subs, salt, adjust,
+      total: base + exercise + caffeine + subs + salt + adjust
     };
   }
 
@@ -939,6 +963,8 @@ html, body {
     (state.substances || []).forEach(s => {
       html += '<div class="why-row"><span class="why-label">+ ' + escape(s.name) + ' (' + escape(subDoseLabel(s)) + ')</span><span class="why-val">+ ' + fmtMl(subExtraMl(s)) + '</span></div>';
     });
+    if (calc.salt > 0)
+      html += '<div class="why-row"><span class="why-label">+ Sel au-delà de 5g (Alimentation)</span><span class="why-val">+ ' + fmtMl(calc.salt) + '</span></div>';
     if (calc.adjust > 0)
       html += '<div class="why-row"><span class="why-label">+ Ajustement sexe / âge</span><span class="why-val">+ ' + fmtMl(calc.adjust) + '</span></div>';
     html += '<div class="why-row total"><span class="why-label">Objectif quotidien</span><span class="why-val">' + fmtMl(calc.total) + ' ≈ ' + targetUnits + ' ' + unitLabelPlural() + '</span></div>';

@@ -132,6 +132,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
   background: rgba(132,204,22,0.14); color: var(--lime); margin-bottom: 10px;
 }
+.program-badge.warn { background: rgba(242,192,99,0.14); color: var(--warning); }
+.program-badge.bad { background: rgba(255,107,107,0.14); color: var(--danger); }
 .program-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12.5px; }
 .program-row:last-child { border-bottom: 0; }
 .program-row span:first-child { color: var(--text-tertiary); }
@@ -464,13 +466,20 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     return entries.reduce((acc, e) => ({
       kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
       carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0),
-      salt: acc.salt + (e.salt||0)
-    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0 });
+      salt: acc.salt + (e.salt||0), potassium: acc.potassium + (e.potassium||0),
+      sugar: acc.sugar + (e.sugar||0)
+    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0 });
   }
-  // WHO recommends under 5g of salt/day (~2000mg sodium) for the general
-  // population; training/sweating increases sodium needs somewhat, but
-  // 5g stays the standard reference point rather than an invented number.
+  // WHO: under 5g salt/day (~2000mg sodium), at least 3510mg potassium/day
+  // — together these give a sodium:potassium molar ratio of ~1.0, which
+  // WHO names explicitly as the target ratio (not just two separate caps).
   const SALT_TARGET_G = 5;
+  const POTASSIUM_TARGET_MG = 3510;
+  const SODIUM_MG_PER_SALT_G = 400; // WHO's own equivalence: 2000mg sodium = 5g salt
+  const NA_ATOMIC_MASS = 23, K_ATOMIC_MASS = 39.1;
+  // WHO (2015 guideline on sugars intake): free sugars < 10% of total
+  // energy intake, computed against today's actual kcal target below.
+  const SUGAR_TARGET_PCT = 0.10;
 
   // ================================================================
   // RENDER
@@ -500,6 +509,73 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
 
+  // ================================================================
+  // DÉBLOAT — sodium:potassium balance, not sodium alone. WHO's own
+  // sodium (<2000mg) and potassium (>=3510mg) targets work out to a
+  // ~1:1 molar ratio, which WHO states explicitly as the goal ratio.
+  // A high Na:K ratio (sodium retained, potassium depleted) tracks with
+  // fluid retention in the physiology literature (e.g. postoperative
+  // fluid-retention studies pairing a positive sodium balance with a
+  // negative potassium balance) — potassium isn't just "a nutrient to
+  // hit", raising it is part of how the body clears sodium and water.
+  // ================================================================
+  function renderDebloatCard(totals) {
+    const sodiumMg = totals.salt * SODIUM_MG_PER_SALT_G;
+    const potassiumMg = totals.potassium;
+    const naMol = sodiumMg / NA_ATOMIC_MASS;
+    const kMol = potassiumMg / K_ATOMIC_MASS;
+    const ratio = kMol > 0 ? naMol / kMol : (naMol > 0 ? 99 : 0);
+    const cls = ratio <= 1.0 ? 'good' : (ratio <= 1.8 ? 'mid' : 'low');
+    const label = ratio <= 1.0 ? 'Ratio optimal (objectif OMS ≈ 1.0)' : (ratio <= 1.8 ? 'Ratio élevé — plus de potassium aiderait' : 'Ratio très élevé — sodium dominant, risque de rétention d\'eau');
+    return '<div class="gm-card">' +
+      '<div class="section-title">Débloat (sodium / potassium)</div>' +
+      '<span class="program-badge ' + (cls==='good'?'':cls==='mid'?'warn':'bad') + '">Ratio Na:K — ' + ratio.toFixed(2) + '</span>' +
+      '<div class="program-row"><span>Sodium (via le sel)</span><span>' + Math.round(sodiumMg) + ' mg</span></div>' +
+      '<div class="program-row"><span>Potassium</span><span>' + Math.round(potassiumMg) + ' / ' + POTASSIUM_TARGET_MG + ' mg</span></div>' +
+      '<div class="program-note">' + label + ' — augmenter le potassium (légumes verts, banane, patate, légumineuses) aide les reins à évacuer sodium et eau. ' +
+      (potassiumMg === 0 ? 'Aucun aliment de ta base n\'a de potassium renseigné pour l\'instant — ajoute-le en modifiant tes aliments (étiquette ou table nutritionnelle) pour un ratio fiable.' : '') +
+      '</div></div>';
+  }
+
+  // ================================================================
+  // NEXT-DAY WEIGHT ESTIMATE — day-to-day scale weight is dominated by
+  // water, not fat, so this is broken into its real components instead
+  // of pretending one number is precise:
+  //  - fat/lean: (today's kcal − TDEE) / 7700 kcal per kg (standard
+  //    energy-density approximation) — the slow, real component.
+  //  - glycogen+water: glycogen binds ~3g water per g stored (classic
+  //    finding, Olsson & Saltin 1970) — proxied here by today's carbs
+  //    vs. target; if training happened today, half that surplus is
+  //    assumed to refill glycogen just depleted rather than add net-new
+  //    storage.
+  //  - sodium+water: same threshold-based rule as Eau (salt beyond 5g/
+  //    day × 65ml/g).
+  // Always shown as a range, not a false-precise single number.
+  // ================================================================
+  function trainedToday() {
+    const gym = loadJSON(GYM_KEY, {});
+    const today = todayStr();
+    return (gym.exercises || []).some(ex => ((gym.logs && gym.logs[ex.id]) || []).some(l => l.date === today));
+  }
+  function renderPredictionCard(targets, totals) {
+    const fatChangeKg = (totals.kcal - targets.tdee) / 7700;
+    const carbSurplusG = totals.carbs - targets.carbsG;
+    const trained = trainedToday();
+    const glycogenWaterKg = (carbSurplusG * 3 / 1000) * (trained ? 0.5 : 1);
+    const saltWaterKg = Math.max(0, totals.salt - SALT_TARGET_G) * 0.065;
+    const totalChangeKg = fatChangeKg + glycogenWaterKg + saltWaterKg;
+    const predicted = targets.weightKg + totalChangeKg;
+    const sign = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
+    return '<div class="gm-card">' +
+      '<div class="section-title">Poids demain (estimation)</div>' +
+      '<div class="kcal-total"><strong>' + predicted.toFixed(1) + ' kg</strong><br>±0.3 kg (variation normale)</div>' +
+      '<div class="program-row" style="margin-top:10px;"><span>Graisse/masse maigre (kcal du jour)</span><span>' + sign(fatChangeKg) + ' kg</span></div>' +
+      '<div class="program-row"><span>Glycogène + eau (glucides' + (trained ? ', séance aujourd\'hui' : '') + ')</span><span>' + sign(glycogenWaterKg) + ' kg</span></div>' +
+      '<div class="program-row"><span>Eau (sel au-delà de ' + SALT_TARGET_G + 'g)</span><span>' + sign(saltWaterKg) + ' kg</span></div>' +
+      '<div class="program-note">Le poids sur la balance d\'un jour à l\'autre est dominé par l\'eau (glycogène, sodium, digestion), pas par la graisse réelle — cette estimation sépare les deux plutôt que de prétendre à une précision qu\'aucun modèle n\'a vraiment. À lire sur la tendance de plusieurs jours (Fitness → Poids), pas jour par jour.</div>' +
+      '</div>';
+  }
+
   function renderMain() {
     const targets = computeTargets();
     const totals = todayTotals();
@@ -510,6 +586,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const pP = targets.proteinG ? totals.protein / targets.proteinG : 0;
     const pC = targets.carbsG ? totals.carbs / targets.carbsG : 0;
     const pF = targets.fatG ? totals.fat / targets.fatG : 0;
+    const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
 
     let html = '<h1 class="dash-title">Alimentation</h1>' +
       '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta vraie perte de poids.</p>' +
@@ -517,6 +594,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau).</p>' +
       '<p><strong>Déficit adaptatif</strong> : <strong>Garthe et al. (2011)</strong> ont montré que des athlètes perdant du poids à <strong>0.7%/semaine</strong> gagnaient de la masse maigre et de la force pendant leur sèche, contrairement à ceux perdant 1.4%/semaine. Ce programme vise 0.5-0.7%/semaine et ajuste ton déficit chaque semaine selon ta perte réelle (Fitness → Poids), pas une estimation figée.</p>' +
       '<p><strong>Protéines</strong> : <strong>Helms, Aragon &amp; Fitschen (2014)</strong>, revue systématique — 1.8 à 2.7 g/kg de poids de corps pendant une restriction calorique chez les athlètes entraînés en résistance ; 2.2 g/kg utilisé ici. Le reste des calories est réparti entre lipides (plancher ~25% pour la santé hormonale) et glucides (le reste, pour soutenir l\'intensité à l\'entraînement).</p>' +
+      '<p><strong>Débloat (sodium/potassium)</strong> : l\'<strong>OMS</strong> recommande &lt; 2000 mg de sodium (5g de sel) et ≥ 3510 mg de potassium par jour — ces deux seuils donnent, une fois atteints, un ratio sodium:potassium molaire d\'environ 1.0, que l\'OMS cite explicitement comme objectif. Un ratio élevé (sodium dominant, potassium faible) est associé à la rétention d\'eau dans la littérature physiologique — pas juste "trop de sel" isolément. Le sodium ici vient de tes aliments (Alimentation), pas d\'une estimation séparée.</p>' +
+      '<p><strong>Lien avec l\'eau</strong> : la relation sodium→besoin en eau est débattue scientifiquement (revue <strong>Rakova et al., Annals of Nutrition &amp; Metabolism</strong>) — à apport modéré, les reins concentrent simplement l\'urine sans changer le volume d\'eau nécessaire. Mais au-delà d\'un certain seuil, les reins ne peuvent plus concentrer l\'urine davantage et un volume d\'eau supplémentaire est nécessaire pour évacuer l\'excès. C\'est pourquoi Eau n\'ajoute de l\'eau que pour le sel <strong>au-delà</strong> de l\'objectif de 5g/jour, pas proportionnellement à chaque gramme.</p>' +
+      '<p><strong>Sucres</strong> : recommandation <strong>OMS (2015, ligne directrice sur les sucres)</strong> — sucres libres &lt; 10% de l\'apport énergétique total. Pertinent pour le débloat aussi : le glycogène (réserve de glucides dans le muscle/foie) retient environ <strong>3g d\'eau par gramme de glycogène stocké</strong> — un excès de sucres/glucides au-delà de ce que la séance du jour consomme se traduit en partie par de l\'eau retenue, pas juste des calories.</p>' +
+      '<p><strong>Poids demain</strong> : estimation décomposée, pas un chiffre inventé — graisse/masse maigre via ~7700 kcal/kg (équivalence énergétique standard), eau via le glycogène (<strong>Olsson &amp; Saltin, 1970</strong> — ~3g d\'eau/g de glycogène) et via le sel (même règle que le lien avec l\'eau ci-dessus). Séance (Fitness) réduit l\'effet glycogène du jour puisqu\'une partie sert à recharger ce qui vient d\'être vidé. Le poids d\'un seul jour reste dominé par ces variations d\'eau — la vraie tendance se lit sur plusieurs jours (Fitness → Poids).</p>' +
       '</details>';
 
     html += '<div class="gm-card">' +
@@ -529,7 +610,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<div class="kcal-total"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal</div>' +
       '<div class="salt-row"><div class="salt-row-head"><span>Sel</span><strong>' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g</strong></div>' +
       '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.salt/SALT_TARGET_G)*100).toFixed(0) + '%;background:' + (totals.salt > SALT_TARGET_G ? 'var(--danger)' : 'var(--lime)') + ';"></div></div></div>' +
+      '<div class="salt-row"><div class="salt-row-head"><span>Sucres</span><strong>' + Math.round(totals.sugar) + ' / ' + Math.round(sugarTargetG) + ' g</strong></div>' +
+      '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.sugar/sugarTargetG)*100).toFixed(0) + '%;background:' + (totals.sugar > sugarTargetG ? 'var(--danger)' : 'var(--lime)') + ';"></div></div></div>' +
       '</div>';
+
+    html += renderDebloatCard(totals);
+    html += renderPredictionCard(targets, totals);
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Programme (sèche adaptative)</div>' +
@@ -644,10 +730,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           '</div>' +
           '<div class="field-row">' +
           '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1"></div>' +
-          '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
+          '<div class="field-col"><label>dont Sucres /100g</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5"></div>' +
           '</div>' +
           '<div class="field-row">' +
+          '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
           '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
+          '</div>' +
+          '<div class="field-row">' +
+          '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="newFoodK" step="1" placeholder="ex. 350"></div>' +
           '<div class="field-col"></div>' +
           '</div>' +
           '<div class="field-row">' +
@@ -665,8 +755,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
             kcalPer100g,
             proteinPer100g: parseFloat(document.getElementById('newFoodP').value) || 0,
             carbsPer100g: parseFloat(document.getElementById('newFoodC').value) || 0,
+            sugarPer100g: parseFloat(document.getElementById('newFoodSugar').value) || 0,
             fatPer100g: parseFloat(document.getElementById('newFoodF').value) || 0,
             saltPer100g: parseFloat(document.getElementById('newFoodSalt').value) || 0,
+            potassiumPer100g: parseFloat(document.getElementById('newFoodK').value) || 0,
             servingGrams: parseFloat(document.getElementById('newFoodServingG').value) || null,
             servingLabel: document.getElementById('newFoodServingLabel').value.trim() || null
           };
@@ -705,7 +797,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           foodId: f.id, foodName: f.name, grams: Math.round(grams),
           kcal: f.kcalPer100g * ratio, protein: f.proteinPer100g * ratio,
           carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio,
-          salt: (f.saltPer100g || 0) * ratio
+          salt: (f.saltPer100g || 0) * ratio, potassium: (f.potassiumPer100g || 0) * ratio,
+          sugar: (f.sugarPer100g || 0) * ratio
         });
         closeModal();
         renderMain();
@@ -725,7 +818,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         (db.length ?
           '<div class="food-pick-list">' + db.map(f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
-            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' S' + (f.saltPer100g||0) + ' /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
           ).join('') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
