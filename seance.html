@@ -21,6 +21,7 @@
   --warning: #F2C063;
   --danger:  #FF6B6B;
   --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 html, body {
@@ -35,7 +36,7 @@ body {
 body::before {
   content: ''; position: fixed; inset: 0;
   background:
-    radial-gradient(circle at 82% 14%, rgba(255, 138, 101, 0.16), transparent 45%),
+    radial-gradient(circle at 82% 14%, rgba(255, 107, 107, 0.14), transparent 45%),
     radial-gradient(circle at 18% 90%, rgba(180, 180, 200, 0.06), transparent 50%);
   filter: blur(40px); pointer-events: none; z-index: -2;
   animation: drift 36s ease-in-out infinite alternate;
@@ -49,22 +50,28 @@ body::after {
   0%   { transform: translate3d(0,0,0); }
   100% { transform: translate3d(-22px, 14px, 0); }
 }
-.page { max-width: 640px; margin: 0 auto; }
+.hidden { display: none !important; }
+.page { max-width: 720px; margin: 0 auto; }
 .dash-title {
-  margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
   background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
 }
+.dash-sub { margin: 0 0 20px; font-size: 13px; color: var(--text-tertiary); }
 .gm-card {
   position: relative; background: rgba(255, 255, 255, 0.04); border-radius: 16px;
-  padding: 28px 22px; margin-bottom: 14px; text-align: center;
+  padding: 20px; margin-bottom: 14px;
   backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
   box-shadow: 0 12px 40px rgba(0,0,0,0.45);
 }
-.gm-emoji { font-size: 40px; margin-bottom: 10px; }
-.gm-card h2 { margin: 0 0 8px; font-size: 17px; color: var(--text-primary); }
-.gm-card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-tertiary); }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 12px;
+}
+.gm-emoji { font-size: 40px; margin-bottom: 10px; text-align: center; }
+.gm-card h2 { margin: 0 0 8px; font-size: 17px; color: var(--text-primary); text-align: center; }
+.gm-card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-tertiary); text-align: center; }
 .gm-ghost {
   display: inline-block; margin-top: 18px;
   padding: 11px 18px; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
@@ -73,21 +80,558 @@ body::after {
   transition: background 0.15s, border-color 0.15s;
 }
 .gm-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
+
+/* ---- Day picker (shared by desktop form + mobile step 1) ---- */
+.day-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.day-btn {
+  flex: 1 1 100px; padding: 14px 10px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+  color: var(--text-primary); font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.day-btn:hover { background: rgba(255,255,255,0.07); }
+.day-btn.active {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 12px rgba(0,0,0,.35);
+}
+.day-chosen-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.day-chosen-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.day-change-link {
+  border: 0; background: none; color: var(--danger); font-family: inherit;
+  font-size: 12px; font-weight: 600; cursor: pointer; padding: 0;
+}
+
+/* ---- Desktop retroactive form ---- */
+.field-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+.field-col { flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px; }
+.field-col label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.field-col input {
+  padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+}
+.ex-form-card { padding: 16px; }
+.ex-form-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.ex-form-thumb { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; flex-shrink: 0; }
+.ex-form-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.set-idx {
+  width: 22px; flex-shrink: 0; text-align: center; font-family: var(--font-mono);
+  font-size: 12px; color: var(--text-tertiary);
+}
+.set-row input {
+  flex: 1 1 0; min-width: 0; padding: 9px 10px; border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.28);
+  color: var(--text-primary); font-family: inherit; font-size: 13.5px;
+}
+.set-fail-btn {
+  flex-shrink: 0; padding: 8px 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-tertiary);
+  font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.set-fail-btn.active { background: rgba(255,107,107,0.16); color: var(--danger); border-color: rgba(255,107,107,0.4); }
+.set-del-btn {
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04); color: var(--text-tertiary); cursor: pointer; font-size: 15px; line-height: 1;
+}
+.add-set-btn {
+  margin-top: 2px; padding: 8px 14px; border-radius: 999px; border: 1px dashed rgba(255,255,255,0.16);
+  background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12.5px;
+  font-weight: 600; cursor: pointer;
+}
+.add-set-btn:hover { border-color: rgba(255,255,255,0.32); color: var(--text-primary); }
+.gm-add {
+  width: 100%; padding: 13px 20px; border: 0; border-radius: 12px; margin-top: 6px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.35), 0 8px 22px rgba(0,0,0,0.25);
+}
+.save-flash { text-align: center; font-size: 12.5px; color: var(--success); margin-top: 10px; }
+
+/* ---- Mobile live workout mode ---- */
+body.seance-live { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+body.seance-live .topbar, body.seance-live .bottombar { display: none !important; }
+.live-view { max-width: 460px; margin: 0 auto; }
+.live-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.live-day-name {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.live-end-btn {
+  border: 1px solid rgba(255,107,107,0.35); background: rgba(255,107,107,0.1); color: var(--danger);
+  border-radius: 999px; padding: 7px 14px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.live-current { text-align: center; padding: 22px 16px; }
+.live-ex-img { width: 84px; height: 84px; border-radius: 16px; object-fit: cover; margin: 0 auto 12px; display: block; }
+.live-ex-img-placeholder {
+  width: 84px; height: 84px; border-radius: 16px; margin: 0 auto 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 34px; background: rgba(255,255,255,0.05);
+}
+.live-ex-name { font-size: 19px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px; }
+.live-set-label { font-size: 12.5px; color: var(--text-tertiary); }
+.wakelock-pill {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+  font-size: 10.5px; color: var(--text-tertiary); background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 4px 10px;
+}
+.wakelock-pill.on { color: var(--success); border-color: rgba(107,227,164,0.3); }
+.timer-card { text-align: center; }
+.timer-display {
+  font-family: var(--font-mono); font-size: 48px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-primary); margin-bottom: 14px; font-variant-numeric: tabular-nums;
+}
+.timer-controls { display: flex; gap: 10px; justify-content: center; }
+.timer-btn {
+  flex: 1; max-width: 160px; padding: 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05); color: var(--text-primary); font-family: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.timer-btn.primary {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; border: 0;
+}
+.live-set-form { display: flex; flex-direction: column; gap: 10px; }
+.live-input-row { display: flex; gap: 10px; }
+.live-input-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.live-input-col label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.live-input-col input {
+  width: 100%; padding: 14px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 18px; text-align: center;
+}
+.live-fail-toggle {
+  padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-tertiary); font-family: inherit;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.live-fail-toggle.active { background: rgba(255,107,107,0.16); color: var(--danger); border-color: rgba(255,107,107,0.4); }
+.live-validate-btn {
+  padding: 16px; border: 0; border-radius: 14px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.live-queue-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-tertiary); margin: 18px 0 10px; }
+.live-queue-item {
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.live-queue-item.current { border-color: rgba(255,107,107,0.4); background: rgba(255,107,107,0.08); }
+.live-queue-thumb { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.06); }
+.live-queue-name { flex: 1; font-size: 13.5px; color: var(--text-primary); }
+.live-queue-badge { font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+.pick-list { display: flex; flex-direction: column; gap: 8px; }
+.pick-item {
+  display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 14px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pick-item:hover { background: rgba(255,255,255,0.06); }
+.pick-thumb { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.06); }
+.pick-name { flex: 1; font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+.pick-arrow { color: var(--text-tertiary); }
+
+.empty-note { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 20px 10px; }
+
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
   .dash-title { font-size: 22px; }
+  .timer-display { font-size: 40px; }
 }
 </style>
 </head>
 <body>
-<div class="page">
-  <h1 class="dash-title">Séance</h1>
-  <div class="gm-card">
-    <div class="gm-emoji">🏋️</div>
-    <h2>Bientôt disponible</h2>
-    <p>Cet écran servira à lancer une séance : choisir le split du jour, enregistrer tes séries au fil de l'entraînement, et alimenter automatiquement l'historique de performance et le suivi musculaire.</p>
-    <a class="gm-ghost" href="gym.html">← Retour à Fitness</a>
-  </div>
-</div>
+<div class="page" id="app"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  const LS_KEY = 'po_coach_v1';
+  const IS_MOBILE = window.matchMedia('(max-width: 720px)').matches;
+
+  function loadGym(){
+    try { const raw = JSON.parse(localStorage.getItem(LS_KEY)); return (raw && typeof raw === 'object') ? raw : null; }
+    catch(e){ return null; }
+  }
+  function saveGym(state){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
+  }
+  function todayStr(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function nowTimeStr(){
+    const d = new Date();
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function exercisesForDay(state, dayId){
+    return (state.exercises || []).filter(e => Array.isArray(e.days) && e.days.includes(dayId));
+  }
+  function lastLogFor(state, exId){
+    const logs = (state.logs && state.logs[exId]) || [];
+    return logs.length ? logs[logs.length - 1] : null;
+  }
+  function uid(){ return 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
+
+  const app = document.getElementById('app');
+  const state = loadGym();
+  const days = (state && Array.isArray(state.days)) ? state.days : [];
+  const unit = (state && state.units) || 'kg';
+
+  if (!state || !days.length) {
+    app.innerHTML =
+      '<h1 class="dash-title">Séance</h1>' +
+      '<div class="gm-card"><div class="gm-emoji">🏋️</div>' +
+      '<h2>Pas encore de séances</h2>' +
+      '<p>Va d\'abord dans Fitness pour créer tes exercices et tes séances (Push / Pull / Legs…), puis reviens ici pour les lancer.</p>' +
+      '<div style="text-align:center"><a class="gm-ghost" href="gym.html">→ Aller à Fitness</a></div></div>';
+    return;
+  }
+
+  if (IS_MOBILE) bootMobile(); else bootDesktop();
+
+  // ================================================================
+  // DESKTOP — retroactive form. Fill in a session any time (during,
+  // right after, or days later if you forgot) — date/time default to
+  // now but stay editable.
+  // ================================================================
+  function bootDesktop(){
+    let chosenDay = null;
+
+    render();
+
+    function render(){
+      if (!chosenDay) { renderDayPick(); return; }
+      renderForm(chosenDay);
+    }
+
+    function renderDayPick(){
+      app.innerHTML =
+        '<h1 class="dash-title">Séance</h1>' +
+        '<p class="dash-sub">Choisis la séance à remplir — aujourd\'hui ou en retard, la date reste modifiable.</p>' +
+        '<div class="gm-card"><div class="section-title">Quelle séance ?</div>' +
+        '<div class="day-grid">' + days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '">' + escapeHtml(d.name) + '</button>').join('') + '</div>' +
+        '</div>';
+      app.querySelectorAll('.day-btn').forEach(b => {
+        b.addEventListener('click', () => { chosenDay = b.dataset.day; render(); });
+      });
+    }
+
+    function renderForm(dayId){
+      const day = days.find(d => d.id === dayId);
+      const exList = exercisesForDay(state, dayId);
+
+      let html =
+        '<h1 class="dash-title">Séance</h1>' +
+        '<div class="gm-card"><div class="day-chosen-row">' +
+        '<span class="day-chosen-name">' + escapeHtml(day ? day.name : '') + '</span>' +
+        '<button type="button" class="day-change-link" id="changeDayBtn">Changer</button></div>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>Date</label><input type="date" id="seanceDate" value="' + todayStr() + '"></div>' +
+        '<div class="field-col"><label>Fin de séance</label><input type="time" id="seanceTime" value="' + nowTimeStr() + '"></div>' +
+        '</div></div>';
+
+      if (!exList.length) {
+        html += '<div class="gm-card"><p class="empty-note">Aucun exercice assigné à cette séance pour l\'instant. Ajoute-les depuis Fitness.</p></div>';
+      } else {
+        exList.forEach(ex => {
+          const last = lastLogFor(state, ex.id);
+          html +=
+            '<div class="gm-card ex-form-card" data-ex-id="' + ex.id + '">' +
+            '<div class="ex-form-head">' +
+            (ex.image ? '<img class="ex-form-thumb" src="' + ex.image + '" alt="">' : '') +
+            '<span class="ex-form-name">' + escapeHtml(ex.name) + '</span>' +
+            '</div>' +
+            '<div class="set-rows" id="rows-' + ex.id + '" data-last-weight="' + (last ? last.weight : '') + '" data-last-reps="' + (last ? last.reps : '') + '"></div>' +
+            '<button type="button" class="add-set-btn" data-ex="' + ex.id + '">+ Série</button>' +
+            '</div>';
+        });
+        html += '<button type="button" class="gm-add" id="saveSeanceBtn">Enregistrer la séance</button><div id="saveFlash"></div>';
+      }
+
+      app.innerHTML = html;
+      document.getElementById('changeDayBtn').addEventListener('click', () => { chosenDay = null; render(); });
+
+      app.querySelectorAll('.add-set-btn').forEach(btn => {
+        btn.addEventListener('click', () => addSetRow(btn.dataset.ex));
+      });
+      exList.forEach(ex => addSetRow(ex.id)); // start each exercise with one row
+
+      const saveBtn = document.getElementById('saveSeanceBtn');
+      if (saveBtn) saveBtn.addEventListener('click', saveSession);
+    }
+
+    function addSetRow(exId){
+      const rows = document.getElementById('rows-' + exId);
+      if (!rows) return;
+      const idx = rows.children.length + 1;
+      const prevRow = rows.lastElementChild;
+      const prevWeight = prevRow ? prevRow.querySelector('.set-weight').value : rows.dataset.lastWeight;
+      const prevReps = prevRow ? prevRow.querySelector('.set-reps').value : rows.dataset.lastReps;
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      row.innerHTML =
+        '<span class="set-idx">' + idx + '</span>' +
+        '<input type="number" step="0.1" inputmode="decimal" class="set-weight" placeholder="' + unit + '" value="' + (prevWeight || '') + '">' +
+        '<input type="number" inputmode="numeric" class="set-reps" placeholder="reps" value="' + (prevReps || '') + '">' +
+        '<button type="button" class="set-fail-btn">Échec</button>' +
+        '<button type="button" class="set-del-btn" aria-label="Supprimer">×</button>';
+      row.querySelector('.set-fail-btn').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+      row.querySelector('.set-del-btn').addEventListener('click', () => {
+        row.remove();
+        Array.from(rows.children).forEach((r, i) => { r.querySelector('.set-idx').textContent = i + 1; });
+      });
+      rows.appendChild(row);
+    }
+
+    function saveSession(){
+      const date = document.getElementById('seanceDate').value || todayStr();
+      const time = document.getElementById('seanceTime').value || nowTimeStr();
+      let savedSets = 0;
+      app.querySelectorAll('.ex-form-card').forEach(card => {
+        const exId = card.dataset.exId;
+        state.logs = state.logs || {};
+        state.logs[exId] = state.logs[exId] || [];
+        card.querySelectorAll('.set-row').forEach(row => {
+          const weight = parseFloat(row.querySelector('.set-weight').value);
+          const reps = parseInt(row.querySelector('.set-reps').value, 10);
+          if (!reps) return; // skip empty rows
+          state.logs[exId].push({
+            id: uid(), date, time, dayId: chosenDay,
+            weight: isNaN(weight) ? 0 : weight, reps: reps,
+            failed: row.querySelector('.set-fail-btn').classList.contains('active')
+          });
+          savedSets++;
+        });
+      });
+      saveGym(state);
+      const flash = document.getElementById('saveFlash');
+      if (flash) flash.innerHTML = '<div class="save-flash">✓ ' + savedSets + ' série(s) enregistrée(s).</div>';
+    }
+  }
+
+  // ================================================================
+  // MOBILE — live, first-person flow: pick séance → pick exercise →
+  // guided workout screen with rest timer, quick set entry, and a
+  // queue of the séance's other exercises to jump between.
+  // ================================================================
+  function bootMobile(){
+    let chosenDay = null;
+    let queue = [];       // exercises for the chosen day, in order
+    let currentIdx = 0;
+    const setCounts = {}; // exId -> next set number this session
+    let wakeLock = null;
+
+    renderDayPick();
+
+    function renderDayPick(){
+      app.innerHTML =
+        '<h1 class="dash-title">Séance</h1>' +
+        '<p class="dash-sub">Quelle séance veux-tu lancer ?</p>' +
+        '<div class="day-grid" style="flex-direction:column">' +
+        days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '" style="padding:18px;">' + escapeHtml(d.name) + '</button>').join('') +
+        '</div>';
+      app.querySelectorAll('.day-btn').forEach(b => {
+        b.addEventListener('click', () => { chosenDay = b.dataset.day; startExercisePick(); });
+      });
+    }
+
+    function startExercisePick(){
+      queue = exercisesForDay(state, chosenDay);
+      if (!queue.length) {
+        app.innerHTML =
+          '<h1 class="dash-title">Séance</h1>' +
+          '<div class="gm-card"><p class="empty-note">Aucun exercice assigné à cette séance. Ajoute-les depuis Fitness.</p>' +
+          '<div style="text-align:center"><a class="gm-ghost" href="gym.html">→ Aller à Fitness</a></div></div>';
+        return;
+      }
+      renderExercisePick();
+    }
+
+    function renderExercisePick(){
+      app.innerHTML =
+        '<h1 class="dash-title">Séance</h1>' +
+        '<p class="dash-sub">Quel exercice fais-tu maintenant ?</p>' +
+        '<div class="pick-list">' +
+        queue.map((ex, i) =>
+          '<div class="pick-item" data-idx="' + i + '">' +
+          (ex.image ? '<img class="pick-thumb" src="' + ex.image + '" alt="">' : '<div class="pick-thumb"></div>') +
+          '<span class="pick-name">' + escapeHtml(ex.name) + '</span>' +
+          '<span class="pick-arrow">→</span></div>'
+        ).join('') +
+        '</div>';
+      app.querySelectorAll('.pick-item').forEach(el => {
+        el.addEventListener('click', () => { currentIdx = parseInt(el.dataset.idx, 10); startLive(); });
+      });
+    }
+
+    // ---- timer state ----
+    let timerMs = 0, timerRunning = false, timerStartedAt = 0, timerInterval = null;
+    function timerTick(){
+      const el = document.getElementById('timerDisplay');
+      if (!el) return;
+      const total = timerMs + (timerRunning ? (Date.now() - timerStartedAt) : 0);
+      const s = Math.floor(total / 1000);
+      el.textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }
+    function timerStartPause(){
+      if (timerRunning) {
+        timerMs += Date.now() - timerStartedAt;
+        timerRunning = false;
+        clearInterval(timerInterval);
+      } else {
+        timerStartedAt = Date.now();
+        timerRunning = true;
+        timerInterval = setInterval(timerTick, 250);
+      }
+      const btn = document.getElementById('timerStartPause');
+      if (btn) btn.textContent = timerRunning ? 'Pause' : 'Démarrer';
+      timerTick();
+    }
+    function timerReset(){
+      timerMs = 0; timerRunning = false;
+      clearInterval(timerInterval);
+      const btn = document.getElementById('timerStartPause');
+      if (btn) btn.textContent = 'Démarrer';
+      timerTick();
+    }
+
+    // ---- wake lock (keeps the phone screen on during live mode) ----
+    async function acquireWakeLock(){
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; updateWakeLockPill(); });
+          updateWakeLockPill();
+        }
+      } catch(e) { updateWakeLockPill(); }
+    }
+    function releaseWakeLock(){
+      if (wakeLock) { try { wakeLock.release(); } catch(e){} wakeLock = null; }
+    }
+    function updateWakeLockPill(){
+      const pill = document.getElementById('wakeLockPill');
+      if (!pill) return;
+      if (wakeLock) { pill.textContent = '🔒 Écran maintenu allumé'; pill.classList.add('on'); }
+      else { pill.textContent = '🔓 Veille non bloquée'; pill.classList.remove('on'); }
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && document.body.classList.contains('seance-live') && !wakeLock) {
+        acquireWakeLock();
+      }
+    });
+
+    function startLive(){
+      document.body.classList.add('seance-live');
+      timerReset();
+      renderLive();
+      acquireWakeLock();
+    }
+    function endLive(){
+      releaseWakeLock();
+      clearInterval(timerInterval);
+      document.body.classList.remove('seance-live');
+      chosenDay = null; queue = []; currentIdx = 0;
+      renderDayPick();
+    }
+
+    function renderLive(){
+      const ex = queue[currentIdx];
+      const day = days.find(d => d.id === chosenDay);
+      const last = lastLogFor(state, ex.id);
+      if (!(ex.id in setCounts)) setCounts[ex.id] = 1;
+      const prefWeight = last ? last.weight : '';
+      const prefReps = last ? last.reps : '';
+
+      app.innerHTML =
+        '<div class="live-view">' +
+        '<div class="live-head"><span class="live-day-name">' + escapeHtml(day ? day.name : '') + '</span>' +
+        '<button type="button" class="live-end-btn" id="liveEndBtn">Terminer</button></div>' +
+        '<div class="gm-card live-current">' +
+        (ex.image ? '<img class="live-ex-img" src="' + ex.image + '" alt="">' : '<div class="live-ex-img-placeholder">🏋️</div>') +
+        '<h2 class="live-ex-name">' + escapeHtml(ex.name) + '</h2>' +
+        '<div class="live-set-label">Série <span id="liveSetNum">' + setCounts[ex.id] + '</span></div>' +
+        '<div class="wakelock-pill" id="wakeLockPill">—</div>' +
+        '</div>' +
+        '<div class="gm-card timer-card">' +
+        '<div class="timer-display" id="timerDisplay">00:00</div>' +
+        '<div class="timer-controls">' +
+        '<button type="button" class="timer-btn primary" id="timerStartPause">Démarrer</button>' +
+        '<button type="button" class="timer-btn" id="timerReset">Réinitialiser</button>' +
+        '</div></div>' +
+        '<div class="gm-card">' +
+        '<div class="live-set-form">' +
+        '<div class="live-input-row">' +
+        '<div class="live-input-col"><label>Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeight" value="' + prefWeight + '"></div>' +
+        '<div class="live-input-col"><label>Reps</label><input type="number" inputmode="numeric" id="liveReps" value="' + prefReps + '"></div>' +
+        '</div>' +
+        '<button type="button" class="live-fail-toggle" id="liveFailToggle">Marquer échec</button>' +
+        '<button type="button" class="live-validate-btn" id="liveValidateSet">✓ Valider la série</button>' +
+        '</div></div>' +
+        '<div class="live-queue-title">File d\'attente — ' + escapeHtml(day ? day.name : '') + '</div>' +
+        '<div id="liveQueue"></div>' +
+        '</div>';
+
+      updateWakeLockPill();
+      timerTick();
+      renderQueue();
+
+      const spBtn = document.getElementById('timerStartPause');
+      spBtn.textContent = timerRunning ? 'Pause' : 'Démarrer';
+      document.getElementById('liveEndBtn').addEventListener('click', endLive);
+      spBtn.addEventListener('click', timerStartPause);
+      document.getElementById('timerReset').addEventListener('click', timerReset);
+      document.getElementById('liveFailToggle').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+      document.getElementById('liveValidateSet').addEventListener('click', validateSet);
+    }
+
+    function renderQueue(){
+      const q = document.getElementById('liveQueue');
+      if (!q) return;
+      q.innerHTML = queue.map((ex, i) =>
+        '<div class="live-queue-item' + (i === currentIdx ? ' current' : '') + '" data-idx="' + i + '">' +
+        (ex.image ? '<img class="live-queue-thumb" src="' + ex.image + '" alt="">' : '<div class="live-queue-thumb"></div>') +
+        '<span class="live-queue-name">' + escapeHtml(ex.name) + '</span>' +
+        '<span class="live-queue-badge">' + (i === currentIdx ? 'EN COURS' : (setCounts[ex.id] ? (setCounts[ex.id]-1) + ' série(s)' : '')) + '</span>' +
+        '</div>'
+      ).join('');
+      q.querySelectorAll('.live-queue-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const i = parseInt(el.dataset.idx, 10);
+          if (i === currentIdx) return;
+          currentIdx = i;
+          renderLive();
+        });
+      });
+    }
+
+    function validateSet(){
+      const ex = queue[currentIdx];
+      const weight = parseFloat(document.getElementById('liveWeight').value);
+      const reps = parseInt(document.getElementById('liveReps').value, 10);
+      if (!reps) return;
+      const failed = document.getElementById('liveFailToggle').classList.contains('active');
+      state.logs = state.logs || {};
+      state.logs[ex.id] = state.logs[ex.id] || [];
+      state.logs[ex.id].push({
+        id: uid(), date: todayStr(), time: nowTimeStr(), dayId: chosenDay,
+        weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed
+      });
+      saveGym(state);
+      setCounts[ex.id] = (setCounts[ex.id] || 1) + 1;
+      timerReset();
+      timerStartPause(); // auto-starts the rest timer for the next set
+      renderLive();
+    }
+  }
+})();
+</script>
 </body>
 </html>
