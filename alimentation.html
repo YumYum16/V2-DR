@@ -180,6 +180,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   font-size: 12px; font-weight: 700; padding: 9px 16px; cursor: pointer;
 }
 .seg-toggle button.active { background: rgba(132,204,22,0.16); color: var(--lime); }
+.cat-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.cat-filter-btn {
+  border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.035); color: var(--text-tertiary);
+  font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.cat-filter-btn:hover { color: var(--text-primary); }
+.cat-filter-btn.active { background: rgba(132,204,22,0.16); color: var(--lime); border-color: rgba(132,204,22,0.35); }
 .modal-bg {
   display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6);
   align-items: flex-end; justify-content: center; padding: 0;
@@ -188,6 +196,13 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .modal {
   background: #14140f; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 0 0;
   padding: 22px 18px max(22px, env(safe-area-inset-bottom)); width: 100%; max-width: 640px; max-height: 86vh; overflow-y: auto;
+}
+/* PC has room to spare — wider sheet, taller list, so browsing/creating
+   foods doesn't feel as cramped as the phone bottom-sheet layout. */
+@media (min-width: 820px) {
+  .modal-bg { align-items: center; padding: 24px; }
+  .modal { max-width: 820px; border-radius: 20px; max-height: 82vh; }
+  .food-pick-list { max-height: 440px; }
 }
 .modal h3 { margin: 0 0 14px; font-size: 16px; color: var(--text-primary); }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
@@ -752,6 +767,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const inner = document.getElementById('foodModalInner');
     let mode = 'pick'; // 'pick' | 'new'
     let selectedFood = null;
+    let catFilter = 'Tous';
 
     function renderModal() {
       const db = loadJSON(FOOD_DB_KEY, []);
@@ -767,14 +783,21 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           body.innerHTML = '<p class="empty-note">Aucun aliment créé. Passe sur "Créer" pour en ajouter un.</p>';
           return;
         }
+        const shown = catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter);
         body.innerHTML =
-          '<div class="food-pick-list">' + foodListHtml(db, f =>
+          '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
+            '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
+          ).join('') + '</div>' +
+          '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
             '<div class="food-pick-item' + (selectedFood && selectedFood.id===f.id ? ' active':'') + '" data-id="' + f.id + '">' +
             '<div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
             '</div>'
-          ) + '</div>' +
+          ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' +
           (selectedFood ? renderQuantityForm(selectedFood) : '');
+        body.querySelectorAll('[data-cat]').forEach(b => {
+          b.addEventListener('click', () => { catFilter = b.dataset.cat; selectedFood = null; renderModal(); });
+        });
         body.querySelectorAll('.food-pick-item').forEach(el => {
           el.addEventListener('click', (e) => {
             if (e.target.closest('[data-fdel]')) return;
@@ -885,18 +908,26 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function openManageFoodsModal() {
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
+    let catFilter = 'Tous';
     function render() {
       const db = loadJSON(FOOD_DB_KEY, []);
+      const shown = catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter);
       inner.innerHTML = '<h3>Mes aliments</h3>' +
         (db.length ?
-          '<div class="food-pick-list">' + foodListHtml(db, f =>
+          '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
+            '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
+          ).join('') + '</div>' +
+          '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
             '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
-          ) + '</div>' :
+          ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeManage">Fermer</button></div>';
       document.getElementById('closeManage').addEventListener('click', closeModal);
+      inner.querySelectorAll('[data-cat]').forEach(b => {
+        b.addEventListener('click', () => { catFilter = b.dataset.cat; render(); });
+      });
       inner.querySelectorAll('[data-fdel2]').forEach(btn => {
         btn.addEventListener('click', () => {
           const list = loadJSON(FOOD_DB_KEY, []).filter(f => f.id !== btn.dataset.fdel2);
