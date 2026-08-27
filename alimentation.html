@@ -306,6 +306,37 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   await pcPullOnce();
 
   // ================================================================
+  // STARTER FOODS — one-time import of foods you'd already catalogued
+  // (label scans / known recipes) before this feature existed. Runs
+  // exactly once (guarded below) and only adds names not already
+  // present, so deleting one later doesn't bring it back on reload.
+  // ================================================================
+  const STARTER_FOODS_SEEDED_KEY = 'po_food_seeded_recap_v1';
+  const STARTER_FOODS = [
+    { name: 'Spaghetti complet bio (Lidl)', kcalPer100g: 336, proteinPer100g: 12, carbsPer100g: 62, fatPer100g: 2, saltPer100g: 0.03 },
+    { name: 'Pain "Pétrie" (estimation)', kcalPer100g: 265, proteinPer100g: 8.5, carbsPer100g: 51, fatPer100g: 1.25, saltPer100g: 0 },
+    { name: 'Patate (Roseval / Amandine)', kcalPer100g: 80, proteinPer100g: 2, carbsPer100g: 17, fatPer100g: 0.1, saltPer100g: 0 },
+    { name: 'Galette de blé noir bio (Bernard Jarnoux)', kcalPer100g: 170, proteinPer100g: 6, carbsPer100g: 31.5, fatPer100g: 1.5, saltPer100g: 1.30, servingGrams: 35, servingLabel: 'galette' },
+    { name: 'Steak haché 5% MG (estimation)', kcalPer100g: 132, proteinPer100g: 20.8, carbsPer100g: 0, fatPer100g: 5.2, saltPer100g: 0, servingGrams: 125, servingLabel: 'steak' },
+    { name: 'Œuf moyen', kcalPer100g: 140, proteinPer100g: 12, carbsPer100g: 0.5, fatPer100g: 10, saltPer100g: 0, servingGrams: 50, servingLabel: 'œuf' },
+    { name: 'Crevettes cuites (estimation)', kcalPer100g: 99, proteinPer100g: 20, carbsPer100g: 0.5, fatPer100g: 1, saltPer100g: 0 },
+    { name: 'Whey isolate Nutrimuscle (vanille)', kcalPer100g: 385, proteinPer100g: 75, carbsPer100g: 10.95, fatPer100g: 3.69, saltPer100g: 1.21, servingGrams: 30, servingLabel: 'scoop' },
+    { name: 'Skyr 0%', kcalPer100g: 52, proteinPer100g: 8.8, carbsPer100g: 3.9, fatPer100g: 0, saltPer100g: 0.10 },
+    { name: 'Emmental (tranches)', kcalPer100g: 380, proteinPer100g: 27, carbsPer100g: 0.5, fatPer100g: 30, saltPer100g: 0.80, servingGrams: 20, servingLabel: 'tranche' },
+    { name: 'Sauce bolognaise Panzani (100% bœuf français)', kcalPer100g: 83, proteinPer100g: 5, carbsPer100g: 7, fatPer100g: 3.6, saltPer100g: 0.96 },
+    { name: 'Eau de coco (Carrefour Bio / Lidl Bio)', kcalPer100g: 15, proteinPer100g: 0, carbsPer100g: 2.9, fatPer100g: 0, saltPer100g: 0 },
+    { name: 'Épinards cuits (estimation)', kcalPer100g: 25, proteinPer100g: 1.3, carbsPer100g: 0.7, fatPer100g: 0, saltPer100g: 0 },
+    { name: 'Biscuits boudoirs', kcalPer100g: 487, proteinPer100g: 5.7, carbsPer100g: 74, fatPer100g: 18, saltPer100g: 0.83 }
+  ];
+  if (!loadJSON(STARTER_FOODS_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const existingNames = new Set(db.map(f => f.name));
+    const toAdd = STARTER_FOODS.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
+    if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
+    saveJSON(STARTER_FOODS_SEEDED_KEY, true);
+  }
+
+  // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
   // taille) so nothing has to be entered twice; weight always follows
   // Fitness's latest weigh-in, same as Eau does.
