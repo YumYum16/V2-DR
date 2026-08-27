@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
-<title>Caféine · Tableau de bord</title>
+<title>Caféine &amp; Énergie · Tableau de bord</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
@@ -82,6 +82,12 @@ body::after {
   -webkit-text-fill-color: transparent; color: transparent;
 }
 @media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+details.info { margin: 0 0 14px; }
+details.info summary { cursor: pointer; padding: 4px 0; color: var(--text-secondary); font-weight: 600; font-size: 12.5px; list-style: none; }
+details.info summary::-webkit-details-marker { display: none; }
+details.info p { margin: 8px 0; font-size: 12.5px; line-height: 1.55; color: var(--text-tertiary); }
+details.info strong { color: var(--text-primary); }
 
 .section { margin-top: 8px; }
 .section-title {
@@ -226,12 +232,17 @@ body::after {
 </div>
 <div class="page">
 
-  <h1 class="dash-title">Caféine</h1>
+  <h1 class="dash-title">Caféine &amp; Énergie</h1>
 
   <!-- ENERGY CURVE -->
   <div class="section">
     <div class="section-title">Votre journée</div>
     <div class="gm-card">
+      <details class="info"><summary>D'où viennent ces chiffres (études citées)</summary>
+        <p><strong>Caféine</strong> : demi-vie de 5h (moyenne de la littérature pharmacocinétique), pic d'effet ~45 min après la prise.</p>
+        <p><strong>Repas → énergie</strong> : chaque aliment enregistré dans <a href="alimentation.html" style="color:var(--text-primary)">Alimentation</a> (avec son heure) influence la courbe. Les glucides nets (glucides − 2×fibres, une approximation de la charge glycémique réelle — les fibres ralentissent l'absorption du glucose, <strong>Jenkins et al.</strong>, travaux fondateurs sur l'index glycémique) donnent un pic d'énergie ~35 min après le repas puis une baisse ~90 min après, un effet dose-dépendant documenté par <strong>Philippou &amp; Constantinou (2014, Nutrition Reviews)</strong> : plus la charge glycémique est élevée, plus la baisse qui suit le pic est marquée. Les lipides ajoutent une somnolence plus lente et plus longue (<strong>Wells et al. 1997, Physiological Behavior</strong> : les repas riches en graisses augmentent la somnolence post-prandiale davantage que les repas riches en glucides). La taille du repas (kcal) ajoute elle-même une petite baisse, indépendamment de sa composition (le "coup de barre" post-repas classique). Les fibres ne fatiguent pas dans cette littérature — elles atténuent le pic-puis-chute des glucides, l'effet inverse de ce qu'on pourrait croire.</p>
+        <p><strong>Limite</strong> : sans repas enregistré à une heure donnée, la courbe ne prévoit aucun effet alimentaire à ce moment — elle ne devine pas les repas non enregistrés.</p>
+      </details>
       <div class="energy-head">
         <div class="ring">
           <svg viewBox="0 0 92 92">
@@ -245,7 +256,7 @@ body::after {
           <span class="energy-when" id="energyWhen">En ce moment</span>
           <span class="energy-hint"><span class="dot"></span>Survolez / glissez la courbe</span>
         </div>
-        <div class="energy-desc">Votre énergie prévue, heure par heure — calculée à partir de votre caféine, de votre horloge biologique et de votre temps d'éveil.</div>
+        <div class="energy-desc">Votre énergie prévue, heure par heure — caféine, horloge biologique, temps d'éveil, et vos repas (Alimentation) avec leur heure.</div>
         <div class="seg-toggle" id="modeToggle">
           <button data-m="line" class="on">LIGNE</button>
           <button data-m="bars">BARRES</button>
@@ -387,6 +398,26 @@ body::after {
       if (kg > 0) bodyKg = kg;
     }
   }
+
+  /* ============ Today's food (from Alimentation) ============ */
+  // Read-only, same pattern as readProfile() above — picks up whatever
+  // Alimentation already synced to this device's localStorage, no sync
+  // of our own needed.
+  const FOOD_LOG_KEY = 'po_food_log_v1';
+  function todayDateKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function timeStrToHour(hm) {
+    if (!hm || hm.indexOf(':') === -1) return null;
+    const [h, m] = hm.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h + m/60;
+  }
+  function todaysFoodEntries() {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    return (log[todayDateKey()] || []).filter(e => timeStrToHour(e.time) != null);
+  }
   function dailyLimit() { if (recovery!=null && recovery<34) return 200; if (recovery!=null && recovery<67) return 300; return FDA_MAX; }
   function moderateTarget() { return bodyKg ? Math.round(3*bodyKg) : 200; }
 
@@ -412,10 +443,29 @@ body::after {
     return { peak, half, cleared: l.ts+clearedH*3600000 };
   }
 
-  /* ============ Energy model (two-process + caffeine) ============ */
+  /* ============ Energy model (two-process + caffeine + food) ============ */
   // circadian alertness, peaks ~16:30, troughs ~04:30
   function circadian(t){ return 50 + 18*Math.cos(2*Math.PI*(t-16.5)/24); }
-  function lunchDip(t){ return 10*gauss(t,14,1.4); }
+  // Per-meal energy effect, driven by what's actually logged in Alimentation
+  // (food + its time), not a generic fixed lunchtime dip. See the "D'où
+  // viennent ces chiffres" note above for the studies behind each term.
+  function foodEffectAt(t){
+    let e = 0;
+    todaysFoodEntries().forEach(entry => {
+      const mealT = timeStrToHour(entry.time);
+      const carbs = entry.carbs || 0, fat = entry.fat || 0, fiber = entry.fiber || 0, kcal = entry.kcal || 0;
+      // Fiber blunts the effective glycemic load rather than adding fatigue
+      // of its own (Jenkins et al.) — approximated as 2g of "blunting" per
+      // gram of fiber.
+      const netCarbs = Math.max(0, carbs - fiber*2);
+      const bump = 0.12*netCarbs*gauss(t, mealT+0.6, 0.5);   // Philippou & Constantinou 2014: early alertness rise
+      const crash = 0.10*netCarbs*gauss(t, mealT+1.6, 0.7);  // ...followed by a dose-dependent dip ~90min later
+      const fatDrag = 0.15*fat*gauss(t, mealT+1.6, 1.1);     // Wells et al. 1997: high-fat meals → more postprandial sleepiness
+      const sizeDip = 0.004*kcal*gauss(t, mealT+1.1, 0.9);   // any large meal costs some energy to digest, regardless of macros
+      e += bump - crash - fatDrag - sizeDip;
+    });
+    return e;
+  }
   function sleepPressure(awakeH){ return clamp(awakeH,0,24)*1.7; }
   function morningBump(t){ const d=t-wakeHour; return (d<0||d>4)?0:10*gauss(d,1.2,0.9); }
   function caffeineBoostAt(t){ const a=totalActiveAt(hToTs(t)); return 34*(1-Math.exp(-a/110)); }
@@ -424,7 +474,7 @@ body::after {
   function energyAt(t, withCaf){
     const C = circadian(t);
     if (asleepAt(t)) return clamp(C-34, 3, 20);
-    let e = C - lunchDip(t) - sleepPressure(t-wakeHour) + morningBump(t);
+    let e = C + foodEffectAt(t) - sleepPressure(t-wakeHour) + morningBump(t);
     if (withCaf !== false) e += caffeineBoostAt(t);
     return clamp(e, 0, 100);
   }

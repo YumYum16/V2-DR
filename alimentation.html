@@ -938,11 +938,13 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
     function renderQuantityForm(food) {
       const useServing = !!food.servingGrams;
+      const nowHM = new Date().toTimeString().slice(0, 5);
       return '<div class="gm-card" style="margin-top:10px;">' +
         '<div class="field-row">' +
         (useServing ?
           '<div class="field-col"><label>Nombre de ' + escapeHtml(food.servingLabel || 'unités') + ' (1 = ' + food.servingGrams + 'g)</label><input type="number" id="qtyUnits" step="0.25" value="1"></div>' :
           '<div class="field-col"><label>Grammes</label><input type="number" id="qtyGrams" step="1" value="100"></div>') +
+        '<div class="field-col"><label>Heure</label><input type="time" id="qtyTime" value="' + nowHM + '"></div>' +
         '</div>' +
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelQty">Annuler</button><button type="button" class="btn-primary" id="saveQty">Ajouter au journal</button></div>' +
         '</div>';
@@ -959,8 +961,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         else grams = parseFloat(gramsEl.value) || 0;
         if (!grams) { alert('Quantité invalide.'); return; }
         const ratio = grams / 100;
+        const timeEl = body.querySelector('#qtyTime');
+        const time = (timeEl && timeEl.value) ? timeEl.value : new Date().toTimeString().slice(0, 5);
         addLogEntry({
-          foodId: f.id, foodName: f.name, grams: Math.round(grams),
+          foodId: f.id, foodName: f.name, grams: Math.round(grams), time: time,
           kcal: f.kcalPer100g * ratio, protein: f.proteinPer100g * ratio,
           carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio,
           salt: (f.saltPer100g || 0) * ratio, potassium: (f.potassiumPer100g || 0) * ratio,
