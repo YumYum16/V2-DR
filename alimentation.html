@@ -118,6 +118,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease, stroke 0.3s; }
 .ring-label-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .ring-num { font-size: 15px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ring-target { font-size: 9px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; margin-top: -1px; }
 .ring-name { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 1px; }
 .kcal-total { text-align: center; font-size: 13px; color: var(--text-secondary); }
 .kcal-total strong { color: var(--text-primary); font-size: 20px; font-variant-numeric: tabular-nums; }
@@ -546,19 +547,33 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     '<a href="health.html">💊 Santé</a>' +
     '</div>';
 
-  function ring(pct, color, value, label) {
+  function ring(pct, color, value, target, label) {
     const r = 38, c = 2 * Math.PI * r;
     const clamped = Math.max(0, Math.min(1, pct));
     const offset = c * (1 - clamped);
     return '<div class="ring-wrap"><svg width="92" height="92" viewBox="0 0 92 92">' +
       '<circle class="ring-track" cx="46" cy="46" r="' + r + '"></circle>' +
       '<circle class="ring-fill" cx="46" cy="46" r="' + r + '" stroke="' + color + '" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"></circle>' +
-      '</svg><div class="ring-label-wrap"><div class="ring-num">' + Math.round(value) + 'g</div><div class="ring-name">' + label + '</div></div></div>';
+      '</svg><div class="ring-label-wrap"><div class="ring-num">' + Math.round(value) + 'g</div><div class="ring-target">/ ' + Math.round(target) + 'g</div><div class="ring-name">' + label + '</div></div></div>';
   }
+  // Was capping at green forever past 100% — 500g of fat looked exactly
+  // as "good" as hitting the target dead-on. Now green is the target
+  // ITSELF (pct≈1), and overshooting fades green→amber→red just like
+  // undershooting fades red→green, instead of a one-way ramp with no
+  // ceiling.
   function ringColor(pct){
-    if (pct >= 1) return '#6BE3A4';
-    // red -> green as pct goes 0 -> 1
-    const r = Math.round(255 - (255-107)*pct), g = Math.round(107 + (227-107)*pct), b = Math.round(107 + (164-107)*pct);
+    if (pct <= 1) {
+      const r = Math.round(255 - (255-107)*pct), g = Math.round(107 + (227-107)*pct), b = Math.round(107 + (164-107)*pct);
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    const over = Math.min(1, (pct - 1) / 0.5); // 0 at target, 1 at 150%+ of target
+    if (over <= 0.5) {
+      const t = over / 0.5;
+      const r = Math.round(107 + (242-107)*t), g = Math.round(227 + (192-227)*t), b = Math.round(164 + (99-164)*t);
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    const t = (over - 0.5) / 0.5;
+    const r = Math.round(242 + (255-242)*t), g = Math.round(192 + (107-192)*t), b = Math.round(99 + (107-99)*t);
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
 
@@ -691,9 +706,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     html += '<div class="gm-card">' +
       '<div class="section-title">Aujourd\'hui</div>' +
       '<div class="ring-row">' +
-      ring(pP, ringColor(pP), totals.protein, 'Protéines') +
-      ring(pC, ringColor(pC), totals.carbs, 'Glucides') +
-      ring(pF, ringColor(pF), totals.fat, 'Lipides') +
+      ring(pP, ringColor(pP), totals.protein, targets.proteinG, 'Protéines') +
+      ring(pC, ringColor(pC), totals.carbs, targets.carbsG, 'Glucides') +
+      ring(pF, ringColor(pF), totals.fat, targets.fatG, 'Lipides') +
       '</div>' +
       '<div class="kcal-total"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal</div>' +
       '<div class="salt-row"><div class="salt-row-head"><span>Sel</span><strong>' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g</strong></div>' +
