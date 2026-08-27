@@ -343,7 +343,19 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       });
       localStorage.setItem(LS_KEY, JSON.stringify(fresh));
       state.logs = fresh.logs;
-    } catch(e){}
+      return true;
+    } catch(e){
+      // Most likely a full localStorage quota (progress photos + exercise
+      // images add up over months) — silently swallowing this was exactly
+      // how a save could look successful while actually losing the data.
+      // Throttled so repeated taps can't stack up repeated alert()s.
+      console.error('saveGym failed', e);
+      if (!window.__lastSaveFailAlert || Date.now() - window.__lastSaveFailAlert > 60000) {
+        window.__lastSaveFailAlert = Date.now();
+        alert('⚠️ Échec de l\'enregistrement (stockage plein ?). Essaie de libérer de la place — par exemple en supprimant d\'anciennes photos de progression dans Fitness — puis réessaie. Rien n\'est perdu tant que tu restes sur cette page.');
+      }
+      return false;
+    }
   }
   function todayStr(){
     const d = new Date();
@@ -602,16 +614,19 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     function saveSession(){
       const date = document.getElementById('seanceDate').value || todayStr();
       const time = document.getElementById('seanceTime').value || nowTimeStr();
+      // Collect into a scratch object first — only touch the real in-memory
+      // state once we know the write actually succeeded, so a failed save
+      // can't leave duplicate entries queued up for the next retry.
+      const newEntries = {};
       let savedSets = 0;
       app.querySelectorAll('.ex-form-card').forEach(card => {
         const exId = card.dataset.exId;
-        state.logs = state.logs || {};
-        state.logs[exId] = state.logs[exId] || [];
+        newEntries[exId] = [];
         card.querySelectorAll('.set-row').forEach(row => {
           const weight = parseFloat(row.querySelector('.set-weight').value);
           const reps = parseInt(row.querySelector('.set-reps').value, 10);
           if (!reps) return; // skip empty rows
-          state.logs[exId].push({
+          newEntries[exId].push({
             id: uid(), date, time, dayId: chosenDay,
             weight: isNaN(weight) ? 0 : weight, reps: reps,
             failed: row.querySelector('.set-fail-btn').classList.contains('active')
@@ -619,14 +634,26 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           savedSets++;
         });
       });
-      saveGym(state);
+      if (!savedSets) { flashMsg = 'Aucune série remplie — rien n\'a été enregistré.'; chosenDay = null; render(); return; }
+
+      state.logs = state.logs || {};
+      Object.keys(newEntries).forEach(exId => {
+        state.logs[exId] = (state.logs[exId] || []).concat(newEntries[exId]);
+      });
+      if (!saveGym(state)) {
+        // Undo the in-memory push so a retry doesn't double the entries
+        // once storage has room again — the form stays exactly as typed.
+        Object.keys(newEntries).forEach(exId => {
+          const ids = new Set(newEntries[exId].map(e => e.id));
+          state.logs[exId] = (state.logs[exId] || []).filter(e => !ids.has(e.id));
+        });
+        return;
+      }
       // Back to the day picker so the filled-in form can't be re-submitted
       // by an accidental second click — a stale form still holding the
       // same numbers was exactly how a duplicate save could happen.
       const dayName = (days.find(d => d.id === chosenDay) || {}).name || '';
-      flashMsg = savedSets
-        ? ('✓ ' + savedSets + ' série(s) enregistrée(s) pour ' + dayName + '.')
-        : 'Aucune série remplie — rien n\'a été enregistré.';
+      flashMsg = '✓ ' + savedSets + ' série(s) enregistrée(s) pour ' + dayName + '.';
       chosenDay = null;
       render();
     }

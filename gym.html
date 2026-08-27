@@ -1565,6 +1565,7 @@ img, video, canvas, svg { max-width: 100%; }
         <button class="po-btn-secondary" id="setReset" style="color:var(--bad);border-color:rgba(255,138,138,0.3)">Tout réinitialiser</button>
       </div>
       <input type="file" id="setImportFile" accept=".json" style="display:none">
+      <div id="setStorageUsage" style="margin-top:10px;font-size:11px;color:var(--text-3);"></div>
     </div>
 
     <div class="po-modal-actions">
@@ -1664,7 +1665,19 @@ img, video, canvas, svg { max-width: 100%; }
       });
       state.logs = mergedLogs;
       localStorage.setItem(LS_KEY, JSON.stringify(state));
-    } catch (e) {}
+      return true;
+    } catch (e) {
+      // Most likely a full localStorage quota (progress photos + exercise
+      // images add up over months) — this used to fail silently, which is
+      // exactly how a save could look fine while actually losing data.
+      // Throttled so a burst of saves can't stack up repeated alert()s.
+      console.error('saveState failed', e);
+      if (!window.__lastSaveFailAlert || Date.now() - window.__lastSaveFailAlert > 60000) {
+        window.__lastSaveFailAlert = Date.now();
+        alert('⚠️ Échec de la sauvegarde (stockage plein ?). Essaie de libérer de la place — par exemple en supprimant d\'anciennes photos de progression — puis réessaie.');
+      }
+      return false;
+    }
   }
   let state = loadState();
   document.getElementById('appTitle').textContent = CONFIG.appTitle || 'Coach de surcharge progressive';
@@ -2260,7 +2273,29 @@ img, video, canvas, svg { max-width: 100%; }
   // ============================================================
   // SETTINGS MODAL (gyms, days, units, data)
   // ============================================================
+  // Rough estimate (chars ≈ bytes for this mostly-ASCII/base64 data) of
+  // everything stored for this origin, not just this app's own key —
+  // localStorage's ~5MB quota is shared across every key, so a page full
+  // of progress/exercise photos elsewhere can silently break saving here.
+  function renderStorageUsage() {
+    const el = $('setStorageUsage');
+    if (!el) return;
+    let bytes = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        bytes += k.length + (localStorage.getItem(k) || '').length;
+      }
+    } catch (e) {}
+    const mb = bytes / (1024 * 1024);
+    const quotaMb = 5; // typical browser floor; some allow more
+    const pct = Math.min(100, Math.round((mb / quotaMb) * 100));
+    el.textContent = 'Stockage utilisé (cet appareil) : ~' + mb.toFixed(2) + ' Mo sur ~' + quotaMb + ' Mo indicatifs.' +
+      (pct >= 70 ? ' Espace limité — pense à supprimer d\'anciennes photos de progression si l\'enregistrement se met à échouer.' : '');
+    el.style.color = pct >= 85 ? 'var(--bad)' : (pct >= 70 ? '#F2C063' : 'var(--text-3)');
+  }
   function renderSettings() {
+    renderStorageUsage();
     $('setUnitsSeg').querySelectorAll('button').forEach(b => {
       b.classList.toggle('active', b.dataset.u === state.units);
     });

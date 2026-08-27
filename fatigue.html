@@ -192,7 +192,12 @@ details.info strong { color: var(--text-primary); }
     try { return JSON.parse(localStorage.getItem(MOOD_KEY)) || {}; } catch(e){ return {}; }
   }
   function saveMood(m){
-    try { localStorage.setItem(MOOD_KEY, JSON.stringify(m)); } catch(e){}
+    try { localStorage.setItem(MOOD_KEY, JSON.stringify(m)); return true; }
+    catch(e){
+      console.error('saveMood failed', e);
+      alert('⚠️ Échec de l\'enregistrement (stockage plein ?). Essaie de libérer de la place — par exemple en supprimant d\'anciennes photos de progression dans Fitness.');
+      return false;
+    }
   }
   function dateStr(d){
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -276,7 +281,7 @@ details.info strong { color: var(--text-primary); }
     const barPct = Math.min(100, (ratio / 2) * 100);
 
     const failRecent = failRateWindow(gym, 0, 7);
-    const failPrior = failRateWindow(gym, 7, 21);
+    const failPrior = failRateWindow(gym, 7, 14); // matching 7-day window, so the comparison is apples-to-apples
     let failNote = '';
     if (failRecent != null && failPrior != null && failRecent - failPrior >= 0.15) {
       failNote = 'Ton taux d\'échec a augmenté cette semaine (' + Math.round(failRecent*100) + '% vs ' + Math.round(failPrior*100) + '% avant) — signe possible de fatigue qui s\'accumule.';
