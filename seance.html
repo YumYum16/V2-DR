@@ -341,7 +341,15 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   }
   function lastLogFor(state, exId){
     const logs = (state.logs && state.logs[exId]) || [];
-    return logs.length ? logs[logs.length - 1] : null;
+    if (!logs.length) return null;
+    // Most recent by actual date/time, not array order — the desktop
+    // form can save a backdated session after today's is already logged.
+    return logs.reduce((best, l) => {
+      if (!best) return l;
+      const bKey = (best.date || '') + 'T' + (best.time || '00:00');
+      const lKey = (l.date || '') + 'T' + (l.time || '00:00');
+      return lKey >= bKey ? l : best;
+    }, null);
   }
   function uid(){ return 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 

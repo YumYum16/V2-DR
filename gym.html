@@ -1661,6 +1661,19 @@ img, video, canvas, svg { max-width: 100%; }
       (e.gym === state.filterGym || e.gym === 'both') && (e.days || []).includes(state.filterDay));
   }
   function getLogsFor(exId) { return (state.logs[exId] || []).slice(); }
+  // Logs are usually appended in chronological order, but Séance's
+  // retroactive desktop form can save a forgotten PAST session after
+  // today's has already been logged — so "most recent" has to be found
+  // by actual date/time, not just the last array entry.
+  function mostRecentLog(logs) {
+    if (!logs.length) return null;
+    return logs.reduce((best, l) => {
+      if (!best) return l;
+      const bKey = (best.date || '') + 'T' + (best.time || '00:00');
+      const lKey = (l.date || '') + 'T' + (l.time || '00:00');
+      return lKey >= bKey ? l : best;
+    }, null);
+  }
 
   // ============================================================
   // RENDER
@@ -1755,7 +1768,7 @@ img, video, canvas, svg { max-width: 100%; }
   function ph(val, suffix) { return (val == null ? '??' : val) + (suffix || ''); }
   function exCardHtml(ex) {
     const logs = getLogsFor(ex.id);
-    const last = logs.length ? logs[logs.length - 1] : null;
+    const last = mostRecentLog(logs);
     const lastStr = last ? (last.weight + unit() + ' × ' + last.reps) : (ph(null, unit()) + ' × ' + ph(null));
     const badge = ex.bodyweight ? 'Poids du corps' : (ex.fixedWeight ? 'Poulie' : 'Poids libre');
     const altEx = ex.alternateId ? state.exercises.find(e => e.id === ex.alternateId) : null;
@@ -3012,6 +3025,18 @@ img, video, canvas, svg { max-width: 100%; }
   renderAll();
   wtRender();
   photosRender();
+
+  // Séance (seance.html) logs sets into this same po_coach_v1 storage,
+  // often from a different tab or after switching apps on mobile — without
+  // this, "Dernière fois" and "Record" on the exercise cards would stay
+  // stale until a manual reload.
+  function refreshFromStorage() {
+    state = loadState();
+    renderAll();
+  }
+  window.addEventListener('storage', (e) => { if (!e.key || e.key === LS_KEY) refreshFromStorage(); });
+  window.addEventListener('focus', refreshFromStorage);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromStorage(); });
 
   // ============================================================
   // CLOUD SYNC via Supabase  (OPTIONAL — leave blank for local-only)
