@@ -441,14 +441,41 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     if (h < 10) return 1.725;
     return 1.9;
   }
+  // Same rotation math as gym.html's todaySplit() — reads the actual
+  // Push/Pull/Legs/Repos calendar instead of guessing, so "rest day" here
+  // means the same thing it means in Fitness.
+  function isRestDayToday(gym) {
+    try {
+      const rot = gym.splitRotation;
+      if (!rot || !rot.length) return false;
+      const a = new Date(gym.splitAnchor.date);
+      const t = new Date();
+      a.setHours(0,0,0,0); t.setHours(0,0,0,0);
+      const diffDays = Math.round((t - a) / DAY_MS);
+      const idx = ((gym.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
+      return /repos|rest/i.test(rot[idx] || '');
+    } catch (e) { return false; }
+  }
   function computeBMR(profile, weightKg) {
     // Mifflin-St Jeor only has male/female constants; "o" uses their
     // midpoint as the least-biased estimate available.
     const s = profile.sex === 'f' ? -161 : (profile.sex === 'm' ? 5 : -78);
     return 10 * weightKg + 6.25 * (profile.heightCm || 175) - 5 * (profile.age || 25) + s;
   }
-  function computeTDEE(profile, weightKg) {
-    return computeBMR(profile, weightKg) * activityMultiplier(profile.activityHrsPerWeek);
+  // Rest days genuinely burn less than the weekly-average multiplier
+  // implies — dropping one activity tier on rest days (floored at
+  // sedentary) is the usual practical approach ("carb cycling") for
+  // matching intake to that day's real expenditure, rather than a fixed
+  // weekly average every day. Not a hard rule backed by an outcome
+  // trial — just aligning input with actual output.
+  function computeTDEE(profile, weightKg, restDay) {
+    const tiers = [1.2, 1.375, 1.55, 1.725, 1.9];
+    let mult = activityMultiplier(profile.activityHrsPerWeek);
+    if (restDay) {
+      const idx = Math.max(0, tiers.indexOf(mult) - 1);
+      mult = tiers[idx];
+    }
+    return computeBMR(profile, weightKg) * mult;
   }
 
   // ---- adaptive weekly program (client-side, recomputed off real weigh-ins) ----
@@ -484,7 +511,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const profile = readProfile();
     const liveWeight = readLiveWeightKg();
     const weightKg = liveWeight || profile.weightKg || 75;
-    const tdee = computeTDEE(profile, weightKg);
+    const gym = loadJSON(GYM_KEY, {});
+    const restDay = isRestDayToday(gym);
+    const tdee = computeTDEE(profile, weightKg, restDay);
     const program = tickProgram(profile);
     const target = tdee * (1 - program.deficitPct / 100);
     const proteinG = Math.round(weightKg * 2.2);
@@ -493,7 +522,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, weightIsLive: !!liveWeight, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, program };
+    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, program };
   }
 
   // ================================================================
@@ -701,6 +730,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<p><strong>Lien avec l\'eau</strong> : la relation sodium→besoin en eau est débattue scientifiquement (revue <strong>Rakova et al., Annals of Nutrition &amp; Metabolism</strong>) — à apport modéré, les reins concentrent simplement l\'urine sans changer le volume d\'eau nécessaire. Mais au-delà d\'un certain seuil, les reins ne peuvent plus concentrer l\'urine davantage et un volume d\'eau supplémentaire est nécessaire pour évacuer l\'excès. C\'est pourquoi Eau n\'ajoute de l\'eau que pour le sel <strong>au-delà</strong> de l\'objectif de 5g/jour, pas proportionnellement à chaque gramme.</p>' +
       '<p><strong>Sucres</strong> : recommandation <strong>OMS (2015, ligne directrice sur les sucres)</strong> — sucres libres &lt; 10% de l\'apport énergétique total. Pertinent pour le débloat aussi : le glycogène (réserve de glucides dans le muscle/foie) retient environ <strong>3g d\'eau par gramme de glycogène stocké</strong> — un excès de sucres/glucides au-delà de ce que la séance du jour consomme se traduit en partie par de l\'eau retenue, pas juste des calories.</p>' +
       '<p><strong>Poids demain</strong> : estimation décomposée, pas un chiffre inventé — graisse/masse maigre via ~7700 kcal/kg (équivalence énergétique standard), eau via le glycogène (<strong>Olsson &amp; Saltin, 1970</strong> — ~3g d\'eau/g de glycogène) et via le sel (même règle que le lien avec l\'eau ci-dessus). Séance (Fitness) réduit l\'effet glycogène du jour puisqu\'une partie sert à recharger ce qui vient d\'être vidé. Le poids d\'un seul jour reste dominé par ces variations d\'eau — la vraie tendance se lit sur plusieurs jours (Fitness → Poids).</p>' +
+      '<p><strong>Jour de repos</strong> : la calendrier de séance de Fitness (Push/Pull/Legs/Repos) est lu directement — un jour de repos fait baisser d\'un cran le facteur d\'activité (plancher sédentaire), au lieu d\'appliquer la même moyenne hebdomadaire tous les jours. C\'est la logique du "carb cycling" — faire correspondre l\'apport à la dépense réelle du jour — une pratique courante en musculation, pas une règle validée par un essai clinique dédié.</p>' +
       '</details>';
 
     html += '<div class="gm-card">' +
@@ -723,8 +753,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     html += '<div class="gm-card">' +
       '<div class="section-title">Programme (sèche adaptative)</div>' +
       '<span class="program-badge">Déficit actuel : -' + targets.program.deficitPct + '%</span>' +
+      (targets.restDay ? ' <span class="program-badge warn">Jour de repos — activité réduite</span>' : '') +
       '<div class="program-row"><span>Poids utilisé</span><span>' + targets.weightKg.toFixed(1) + ' kg' + (targets.weightIsLive ? ' (Fitness, live)' : ' (profil Eau)') + '</span></div>' +
-      '<div class="program-row"><span>TDEE estimé</span><span>' + targets.tdee + ' kcal</span></div>' +
+      '<div class="program-row"><span>TDEE estimé' + (targets.restDay ? ' (repos)' : '') + '</span><span>' + targets.tdee + ' kcal</span></div>' +
       '<div class="program-row"><span>Objectif</span><span>' + targets.target + ' kcal</span></div>' +
       (targets.program.history && targets.program.history.length ?
         '<div class="program-note">' + escapeHtml(targets.program.history[targets.program.history.length-1].note) + '</div>' :

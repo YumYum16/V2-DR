@@ -377,7 +377,24 @@ body.topbar-modal-open {
       }
     } catch (e) {}
     const h = p.activityHrsPerWeek || 0;
-    const mult = h < 2 ? 1.2 : h < 4 ? 1.375 : h < 7 ? 1.55 : h < 10 ? 1.725 : 1.9;
+    const tiers = [1.2, 1.375, 1.55, 1.725, 1.9];
+    let mult = h < 2 ? 1.2 : h < 4 ? 1.375 : h < 7 ? 1.55 : h < 10 ? 1.725 : 1.9;
+    // Same rest-day step-down as alimentation.html, reading Fitness's
+    // own Push/Pull/Legs/Repos rotation.
+    try {
+      const gym = JSON.parse(localStorage.getItem('po_coach_v1'));
+      const rot = gym && gym.splitRotation;
+      if (rot && rot.length && gym.splitAnchor) {
+        const a = new Date(gym.splitAnchor.date);
+        const t = new Date();
+        a.setHours(0,0,0,0); t.setHours(0,0,0,0);
+        const diffDays = Math.round((t - a) / 86400000);
+        const idx = ((gym.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
+        if (/repos|rest/i.test(rot[idx] || '')) {
+          mult = tiers[Math.max(0, tiers.indexOf(mult) - 1)];
+        }
+      }
+    } catch (e) {}
     const s = p.sex === 'f' ? -161 : (p.sex === 'm' ? 5 : -78);
     const bmr = 10 * weightKg + 6.25 * (p.heightCm || 175) - 5 * (p.age || 25) + s;
     const tdee = bmr * mult;
