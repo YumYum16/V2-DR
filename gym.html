@@ -1154,6 +1154,19 @@ img, video, canvas, svg { max-width: 100%; }
 .gym-heat-month { font-size: 12px; color: var(--text-2); font-weight: 600; }
 .gym-heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .gym-heat-cell { aspect-ratio: 1; border-radius: 5px; background: var(--border); }
+
+/* ===== Desktop-only: reclaim the unused side margins ===== */
+@media (min-width: 1100px) {
+  .po-shell { max-width: min(1040px, 94vw); }
+  .po-top-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+  }
+  .po-top-grid .wt-section { margin: 0; }
+  .po-top-grid .card { margin: 0; height: 100%; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1171,6 +1184,10 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="po-day-split" id="dayPillSplit">—</span>
   </button>
 
+  <!-- Desktop-only: weight tracker + attendance heatmap sit side by side
+       to use the extra horizontal space on wide viewports. Mobile keeps
+       the original stacked layout untouched. -->
+  <div class="po-top-grid">
   <!-- WEIGHT + PROGRESS PHOTOS -->
   <div class="wt-section">
     <div class="wt-divider"><span>POIDS</span></div>
@@ -1261,6 +1278,7 @@ img, video, canvas, svg { max-width: 100%; }
       <span class="gym-heat-month" id="gymHeatMonth">—</span>
     </div>
     <div class="gym-heat-grid" id="gymHeatGrid"></div>
+  </div>
   </div>
 
   <!-- Progress photos overlay -->
@@ -1652,19 +1670,24 @@ img, video, canvas, svg { max-width: 100%; }
   // Logging itself moved out of this list — it'll happen on the dedicated
   // "lancer une séance" flow (not built yet). This is a library/reference
   // view: what you have, and how you've been performing on it.
+  // Placeholder-friendly formatter — shows a real value once there's data
+  // to show, otherwise a "??" placeholder in the same spot so the card's
+  // layout (and what it WILL show once you've logged something) is
+  // visible from the start rather than the block just being absent.
+  function ph(val, suffix) { return (val == null ? '??' : val) + (suffix || ''); }
   function exCardHtml(ex) {
     const logs = getLogsFor(ex.id);
     const last = logs.length ? logs[logs.length - 1] : null;
-    const lastStr = last ? (last.weight + unit() + ' × ' + last.reps) : null;
+    const lastStr = last ? (last.weight + unit() + ' × ' + last.reps) : (ph(null, unit()) + ' × ' + ph(null));
     const badge = ex.fixedWeight ? 'Poulie' : 'Poids libre';
     const perf = exercisePerfStats(ex);
-    const perfHtml = !perf ? '' :
+    const perfHtml =
       '<div class="po-stats-row po-ex-perf-row">'
-      + '<div class="po-stat-box"><div class="po-stat-label">Record</div><div class="po-stat-val">' + perf.maxWeight + '<span class="po-unit">' + unit() + '</span></div></div>'
-      + '<div class="po-stat-box"><div class="po-stat-label">Séries au record</div><div class="po-stat-val">' + perf.setsAtMax + '</div></div>'
-      + '<div class="po-stat-box"><div class="po-stat-label">Régularité</div><div class="po-stat-val">' + perf.recentSessions + '<span class="po-unit">/30j</span></div></div>'
+      + '<div class="po-stat-box"><div class="po-stat-label">Record</div><div class="po-stat-val">' + ph(perf && perf.maxWeight, unit()) + '</div></div>'
+      + '<div class="po-stat-box"><div class="po-stat-label">Séries au record</div><div class="po-stat-val">' + ph(perf && perf.setsAtMax) + '</div></div>'
+      + '<div class="po-stat-box"><div class="po-stat-label">Régularité</div><div class="po-stat-val">' + ph(perf && perf.recentSessions, '/30j') + '</div></div>'
       + '</div>'
-      + (perf.score != null ? '<div class="po-ex-perf-score">Capacité estimée (âge/poids) : <strong>' + perf.score + '/10</strong></div>' : '');
+      + '<div class="po-ex-perf-score">Capacité estimée (âge/poids) : <strong>' + ph(perf && perf.score, '/10') + '</strong></div>';
     return '<div class="po-ex-card" data-ex-id="' + ex.id + '">'
       + '<div class="po-ex-card-head">'
       +   '<div class="po-ex-card-name-wrap">'
@@ -1673,7 +1696,7 @@ img, video, canvas, svg { max-width: 100%; }
       +   '</div>'
       +   '<button type="button" class="po-btn-icon po-ex-card-edit" data-action="edit" title="Modifier / supprimer" aria-label="Modifier">' + EX_EDIT_ICON + '</button>'
       + '</div>'
-      + (lastStr ? '<div class="po-last-set show"><span class="po-last-label">Dernière fois</span><span class="po-last-value">' + lastStr + '</span></div>' : '')
+      + '<div class="po-last-set show"><span class="po-last-label">Dernière fois</span><span class="po-last-value">' + lastStr + '</span></div>'
       + perfHtml
       + '</div>';
   }
