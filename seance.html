@@ -322,8 +322,28 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     try { const raw = JSON.parse(localStorage.getItem(LS_KEY)); return (raw && typeof raw === 'object') ? raw : null; }
     catch(e){ return null; }
   }
+  // Merges this page's new log entries into whatever is CURRENTLY in
+  // localStorage, instead of overwriting the whole blob with the
+  // in-memory `state` loaded once at page open. Without this, a stale
+  // tab (Fitness open elsewhere, or another Séance session) saving
+  // afterward would silently wipe out a session that was already
+  // recorded — exactly the "it disappeared" bug this fixes.
+  // Entries logged before this feature existed have no .id, so dedupe
+  // falls back to a content signature for those.
+  function logKey(l){ return l.id || [l.date, l.time, l.weight, l.reps, l.dayId].join('|'); }
   function saveGym(state){
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.logs = fresh.logs || {};
+      Object.keys(state.logs || {}).forEach(exId => {
+        const freshList = fresh.logs[exId] || [];
+        const freshKeys = new Set(freshList.map(logKey));
+        const toAdd = (state.logs[exId] || []).filter(l => !freshKeys.has(logKey(l)));
+        fresh.logs[exId] = freshList.concat(toAdd);
+      });
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      state.logs = fresh.logs;
+    } catch(e){}
   }
   function todayStr(){
     const d = new Date();

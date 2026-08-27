@@ -1641,8 +1641,30 @@ img, video, canvas, svg { max-width: 100%; }
     }
     return s;
   }
+  // Entries logged before Séance existed have no .id, so dedupe falls
+  // back to a content signature for those.
+  function logKey(l) { return l.id || [l.date, l.time, l.weight, l.reps, l.dayId].join('|'); }
+  // Merges log entries from whatever's CURRENTLY in localStorage into
+  // this save, instead of overwriting the whole blob with the in-memory
+  // `state` that may have gone stale while this tab sat open — otherwise
+  // a set logged in Séance from another tab could get silently wiped out
+  // by the next save made here.
   function saveState() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      const freshLogs = (fresh.logs && typeof fresh.logs === 'object') ? fresh.logs : {};
+      const liveExIds = new Set(state.exercises.map(e => e.id));
+      const mergedLogs = {};
+      liveExIds.forEach(exId => {
+        const mine = state.logs[exId] || [];
+        const theirs = freshLogs[exId] || [];
+        const mineKeys = new Set(mine.map(logKey));
+        const extra = theirs.filter(l => !mineKeys.has(logKey(l)));
+        mergedLogs[exId] = mine.concat(extra);
+      });
+      state.logs = mergedLogs;
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    } catch (e) {}
   }
   let state = loadState();
   document.getElementById('appTitle').textContent = CONFIG.appTitle || 'Coach de surcharge progressive';
