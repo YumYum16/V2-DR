@@ -447,12 +447,15 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 
   // ================================================================
   // NEXT-TARGET SUGGESTION — same "double progression" scheme as Fitness
-  // (see gym.html): work a rep range, and once the top set of the last
-  // session reaches the top of it, add load and drop back to the bottom.
-  // 6-12 is a practical anchor, not a hard rule — hypertrophy occurs
-  // across a wide rep spectrum (roughly 5-30) as long as sets are close
-  // to failure (Schoenfeld et al.'s load-comparison meta-analyses; Refalo
-  // et al. 2021's re-examination of the "repetition continuum").
+  // (see gym.html): work a rep range, and once EVERY working set (every
+  // set logged at the heaviest weight used that day — lighter warm-ups
+  // are excluded automatically) reaches the top of it, add load and drop
+  // back to the bottom. A single strong first set doesn't trigger
+  // progression on its own; the weakest set that day is the real
+  // bottleneck. 6-10 is a practical anchor, not a hard rule — hypertrophy
+  // occurs across a wide rep spectrum (roughly 5-30) as long as sets are
+  // close to failure (Schoenfeld et al.'s load-comparison meta-analyses;
+  // Refalo et al. 2021's re-examination of the "repetition continuum").
   // ================================================================
   const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 10;
   function suggestNextTarget(state, ex){
@@ -460,24 +463,28 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     const last = lastLogFor(state, ex.id);
     if (!last) return null;
     const sameDay = logs.filter(l => l.date === last.date);
-    const topSet = sameDay.reduce((best, l) => (l.weight || 0) >= (best.weight || 0) ? l : best, sameDay[0]);
+    const maxWeight = Math.max.apply(null, sameDay.map(l => l.weight || 0));
+    const workingSets = sameDay.filter(l => (l.weight || 0) === maxWeight);
+    const minReps = Math.min.apply(null, workingSets.map(l => l.reps || 0));
+    const anyFailed = workingSets.some(l => l.failed);
+    const allAtTarget = !anyFailed && workingSets.every(l => (l.reps || 0) >= HYPERTROPHY_REP_HIGH);
     const step = ex.fixedWeight ? 2 : 2.5;
-    let weight = topSet.weight || 0, reps, note;
-    if (topSet.reps >= HYPERTROPHY_REP_HIGH) {
+    let weight = maxWeight, reps, note;
+    if (allAtTarget) {
       if (ex.bodyweight) {
         reps = HYPERTROPHY_REP_LOW;
-        note = 'Seuil de ' + HYPERTROPHY_REP_HIGH + ' reps dépassé — envisage d\'ajouter du lest.';
+        note = 'Toutes les séries à ' + HYPERTROPHY_REP_HIGH + '+ reps — envisage d\'ajouter du lest.';
       } else {
         weight = Math.round((weight + step) * 10) / 10;
         reps = HYPERTROPHY_REP_LOW;
-        note = 'Seuil atteint la dernière fois — charge augmentée (+' + step + (state.units || 'kg') + ').';
+        note = 'Toutes les séries ont atteint ' + HYPERTROPHY_REP_HIGH + ' reps — charge augmentée (+' + step + (state.units || 'kg') + ').';
       }
-    } else if (topSet.failed) {
-      reps = topSet.reps;
-      note = 'Échec la dernière fois — reste sur cette charge.';
+    } else if (anyFailed) {
+      reps = minReps;
+      note = 'Échec sur au moins une série — reste sur cette charge, revise ' + minReps + ' reps sur toutes les séries.';
     } else {
-      reps = Math.min(HYPERTROPHY_REP_HIGH, topSet.reps + 1);
-      note = 'Vise une répétition de plus à charge égale.';
+      reps = Math.min(HYPERTROPHY_REP_HIGH, minReps + 1);
+      note = 'Vise ' + reps + ' reps sur TOUTES les séries (la plus faible était à ' + minReps + ') avant d\'augmenter la charge.';
     }
     return { weight, reps, note };
   }

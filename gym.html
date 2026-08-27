@@ -1848,14 +1848,19 @@ img, video, canvas, svg { max-width: 100%; }
   // ============================================================
   // NEXT-TARGET SUGGESTION — classic "double progression" scheme (see
   // e.g. Baechle & Earle, NSCA "Essentials of Strength Training and
-  // Conditioning"): work a rep range, and once EVERY set reaches the top
-  // of it, add load and drop back to the bottom. The 6-12 window is a
-  // practical anchor, not a hard rule — hypertrophy occurs across a wide
-  // rep spectrum (roughly 5-30) as long as sets are taken close to
-  // failure (Schoenfeld et al.'s load-comparison meta-analyses; Refalo et
-  // al. 2021's re-examination of the "repetition continuum"). Progression
-  // is judged off the TOP set of the last session actually logged, not
-  // just the last row entered.
+  // Conditioning"): work a rep range, and once EVERY working set reaches
+  // the top of it, add load and drop back to the bottom. This is the
+  // actual definition of progressive overload used here — a single
+  // strong first set doesn't count, because fatigue across the session
+  // is exactly what tells you whether the load is still appropriate.
+  // "Working sets" = every set logged at the heaviest weight used that
+  // day (lighter warm-up sets, logged at a lower weight, are excluded
+  // automatically rather than dragging the average down).
+  // The 6-10 window is a practical anchor, not a hard rule — hypertrophy
+  // occurs across a wide rep spectrum (roughly 5-30) as long as sets are
+  // taken close to failure (Schoenfeld et al.'s load-comparison
+  // meta-analyses; Refalo et al. 2021's re-examination of the
+  // "repetition continuum").
   // ============================================================
   const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 10;
   function suggestNextTarget(ex) {
@@ -1863,24 +1868,28 @@ img, video, canvas, svg { max-width: 100%; }
     const last = mostRecentLog(logs);
     if (!last) return null;
     const sameDay = logs.filter(l => l.date === last.date);
-    const topSet = sameDay.reduce((best, l) => (l.weight || 0) >= (best.weight || 0) ? l : best, sameDay[0]);
+    const maxWeight = Math.max.apply(null, sameDay.map(l => l.weight || 0));
+    const workingSets = sameDay.filter(l => (l.weight || 0) === maxWeight);
+    const minReps = Math.min.apply(null, workingSets.map(l => l.reps || 0));
+    const anyFailed = workingSets.some(l => l.failed);
+    const allAtTarget = !anyFailed && workingSets.every(l => (l.reps || 0) >= HYPERTROPHY_REP_HIGH);
     const step = ex.fixedWeight ? 2 : 2.5;
-    let weight = topSet.weight || 0, reps, note;
-    if (topSet.reps >= HYPERTROPHY_REP_HIGH) {
+    let weight = maxWeight, reps, note;
+    if (allAtTarget) {
       if (ex.bodyweight) {
         reps = HYPERTROPHY_REP_LOW;
-        note = 'Seuil de ' + HYPERTROPHY_REP_HIGH + ' reps dépassé — envisage d\'ajouter du lest.';
+        note = 'Toutes les séries à ' + HYPERTROPHY_REP_HIGH + '+ reps — envisage d\'ajouter du lest.';
       } else {
         weight = Math.round((weight + step) * 10) / 10;
         reps = HYPERTROPHY_REP_LOW;
-        note = 'Seuil de ' + HYPERTROPHY_REP_HIGH + ' reps atteint — charge augmentée (+' + step + unit() + ').';
+        note = 'Toutes les séries ont atteint ' + HYPERTROPHY_REP_HIGH + ' reps — charge augmentée (+' + step + unit() + ').';
       }
-    } else if (topSet.failed) {
-      reps = topSet.reps;
-      note = 'Échec la dernière fois — reste sur cette charge.';
+    } else if (anyFailed) {
+      reps = minReps;
+      note = 'Échec sur au moins une série — reste sur cette charge, revise ' + minReps + ' reps sur toutes les séries.';
     } else {
-      reps = Math.min(HYPERTROPHY_REP_HIGH, topSet.reps + 1);
-      note = 'Vise une répétition de plus à charge égale.';
+      reps = Math.min(HYPERTROPHY_REP_HIGH, minReps + 1);
+      note = 'Vise ' + reps + ' reps sur TOUTES les séries (la plus faible était à ' + minReps + ') avant d\'augmenter la charge.';
     }
     return { weight, reps, note };
   }
@@ -1908,7 +1917,7 @@ img, video, canvas, svg { max-width: 100%; }
     const perf = exercisePerfStats(ex);
     const target = suggestNextTarget(ex);
     const targetHtml = target
-      ? '<div class="po-ex-target" title="Double progression (6-' + HYPERTROPHY_REP_HIGH + ' reps) : une fois le haut de la fourchette atteint sur toutes les séries, la charge augmente et les reps repartent en bas — sinon, vise une répétition de plus à charge égale.">🎯 Objectif suggéré : <strong>' + target.weight + unit() + ' × ' + target.reps + '</strong><span class="po-ex-target-note">' + escape(target.note) + '</span></div>'
+      ? '<div class="po-ex-target" title="Double progression (6-' + HYPERTROPHY_REP_HIGH + ' reps) : une fois le haut de la fourchette atteint sur TOUTES les séries de travail, la charge augmente et les reps repartent en bas — sinon, l\'objectif vise la série la plus faible, pas la plus forte.">🎯 Objectif suggéré : <strong>' + target.weight + unit() + ' × ' + target.reps + '</strong><span class="po-ex-target-note">' + escape(target.note) + '</span></div>'
       : '';
     const perfHtml =
       '<div class="po-stats-row po-ex-perf-row">'
