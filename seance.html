@@ -166,6 +166,11 @@ body::after {
 .ex-form-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .ex-form-thumb { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; flex-shrink: 0; }
 .ex-form-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.ex-target-note {
+  font-size: 11.5px; color: var(--text-secondary); margin-bottom: 10px;
+  padding: 8px 10px; border-radius: 10px; background: rgba(107,227,164,0.06);
+  border: 1px solid rgba(107,227,164,0.16);
+}
 .set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .set-idx {
   width: 22px; flex-shrink: 0; text-align: center; font-family: var(--font-mono);
@@ -221,6 +226,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 }
 .live-ex-name { font-size: 19px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px; }
 .live-set-label { font-size: 12.5px; color: var(--text-tertiary); }
+.live-target-note {
+  display: inline-block; margin-top: 10px; padding: 8px 12px; border-radius: 12px;
+  font-size: 13px; font-weight: 700; color: var(--text-primary);
+  background: rgba(107,227,164,0.08); border: 1px solid rgba(107,227,184,0.2);
+}
+.live-target-note span { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--text-tertiary); }
 .wakelock-pill {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
   font-size: 10.5px; color: var(--text-tertiary); background: rgba(255,255,255,0.04);
@@ -384,6 +395,43 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     }, null);
   }
   function uid(){ return 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
+
+  // ================================================================
+  // NEXT-TARGET SUGGESTION — same "double progression" scheme as Fitness
+  // (see gym.html): work a rep range, and once the top set of the last
+  // session reaches the top of it, add load and drop back to the bottom.
+  // 6-12 is a practical anchor, not a hard rule — hypertrophy occurs
+  // across a wide rep spectrum (roughly 5-30) as long as sets are close
+  // to failure (Schoenfeld et al.'s load-comparison meta-analyses; Refalo
+  // et al. 2021's re-examination of the "repetition continuum").
+  // ================================================================
+  const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 12;
+  function suggestNextTarget(state, ex){
+    const logs = (state.logs && state.logs[ex.id]) || [];
+    const last = lastLogFor(state, ex.id);
+    if (!last) return null;
+    const sameDay = logs.filter(l => l.date === last.date);
+    const topSet = sameDay.reduce((best, l) => (l.weight || 0) >= (best.weight || 0) ? l : best, sameDay[0]);
+    const step = ex.fixedWeight ? 2 : 2.5;
+    let weight = topSet.weight || 0, reps, note;
+    if (topSet.reps >= HYPERTROPHY_REP_HIGH) {
+      if (ex.bodyweight) {
+        reps = HYPERTROPHY_REP_LOW;
+        note = 'Seuil de ' + HYPERTROPHY_REP_HIGH + ' reps dépassé — envisage d\'ajouter du lest.';
+      } else {
+        weight = Math.round((weight + step) * 10) / 10;
+        reps = HYPERTROPHY_REP_LOW;
+        note = 'Seuil atteint la dernière fois — charge augmentée (+' + step + (state.units || 'kg') + ').';
+      }
+    } else if (topSet.failed) {
+      reps = topSet.reps;
+      note = 'Échec la dernière fois — reste sur cette charge.';
+    } else {
+      reps = Math.min(HYPERTROPHY_REP_HIGH, topSet.reps + 1);
+      note = 'Vise une répétition de plus à charge égale.';
+    }
+    return { weight, reps, note };
+  }
 
   // ================================================================
   // SESSION HISTORY — logs are stored per exercise, so a "session" is
@@ -562,14 +610,17 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         html += '<div class="gm-card"><p class="empty-note">Aucun exercice assigné à cette séance pour l\'instant. Ajoute-les depuis Fitness.</p></div>';
       } else {
         exList.forEach(ex => {
-          const last = lastLogFor(state, ex.id);
+          const target = suggestNextTarget(state, ex);
+          const prefillWeight = target ? target.weight : '';
+          const prefillReps = target ? target.reps : '';
           html +=
             '<div class="gm-card ex-form-card" data-ex-id="' + ex.id + '">' +
             '<div class="ex-form-head">' +
             (ex.image ? '<img class="ex-form-thumb" src="' + ex.image + '" alt="">' : '') +
             '<span class="ex-form-name">' + escapeHtml(ex.name) + '</span>' +
             '</div>' +
-            '<div class="set-rows" id="rows-' + ex.id + '" data-last-weight="' + (last ? last.weight : '') + '" data-last-reps="' + (last ? last.reps : '') + '"></div>' +
+            (target ? '<div class="ex-target-note">🎯 ' + target.weight + (state.units || 'kg') + ' × ' + target.reps + ' — ' + escapeHtml(target.note) + '</div>' : '') +
+            '<div class="set-rows" id="rows-' + ex.id + '" data-last-weight="' + prefillWeight + '" data-last-reps="' + prefillReps + '"></div>' +
             '<button type="button" class="add-set-btn" data-ex="' + ex.id + '">+ Série</button>' +
             '</div>';
         });
@@ -669,6 +720,11 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     let queue = [];       // exercises for the chosen day, in order
     let currentIdx = 0;
     const setCounts = {}; // exId -> next set number this session
+    // Computed once per exercise the first time it comes up live, from
+    // whatever was logged BEFORE this session started — otherwise a set
+    // validated a minute ago would count as "last session" for the next
+    // set and nudge the weight up mid-workout, which isn't the intent.
+    const targetCache = {};
     let wakeLock = null;
 
     renderDayPick();
@@ -792,8 +848,10 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       const day = days.find(d => d.id === chosenDay);
       const last = lastLogFor(state, ex.id);
       if (!(ex.id in setCounts)) setCounts[ex.id] = 1;
-      const prefWeight = last ? last.weight : '';
-      const prefReps = last ? last.reps : '';
+      if (!(ex.id in targetCache)) targetCache[ex.id] = suggestNextTarget(state, ex);
+      const target = targetCache[ex.id];
+      const prefWeight = target ? target.weight : (last ? last.weight : '');
+      const prefReps = target ? target.reps : (last ? last.reps : '');
 
       app.innerHTML =
         '<div class="live-view">' +
@@ -803,6 +861,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         (ex.image ? '<img class="live-ex-img" src="' + ex.image + '" alt="">' : '<div class="live-ex-img-placeholder">🏋️</div>') +
         '<h2 class="live-ex-name">' + escapeHtml(ex.name) + '</h2>' +
         '<div class="live-set-label">Série <span id="liveSetNum">' + setCounts[ex.id] + '</span></div>' +
+        (target ? '<div class="live-target-note">🎯 ' + target.weight + (state.units || 'kg') + ' × ' + target.reps + '<span>' + escapeHtml(target.note) + '</span></div>' : '') +
         '<div class="wakelock-pill" id="wakeLockPill">—</div>' +
         '</div>' +
         '<div class="gm-card timer-card">' +

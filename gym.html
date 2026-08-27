@@ -331,6 +331,13 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 11.5px; color: var(--text-2); margin-bottom: 14px;
 }
 .po-ex-perf-score strong { color: var(--good); }
+.po-ex-target {
+  font-size: 11.5px; color: var(--text-2); margin-bottom: 10px;
+  padding: 8px 10px; border-radius: 10px; background: rgba(110,231,183,0.06);
+  border: 1px solid rgba(110,231,183,0.16);
+}
+.po-ex-target strong { color: var(--good); }
+.po-ex-target-note { display: block; margin-top: 2px; color: var(--text-3); font-size: 10.5px; }
 .po-ex-card-thumb {
   width: 38px; height: 38px; border-radius: 9px; object-fit: cover;
   flex-shrink: 0; margin-right: 10px;
@@ -1788,6 +1795,46 @@ img, video, canvas, svg { max-width: 100%; }
     return { maxWeight, setsAtMax, recentSessions: recentDays.size, score };
   }
 
+  // ============================================================
+  // NEXT-TARGET SUGGESTION — classic "double progression" scheme (see
+  // e.g. Baechle & Earle, NSCA "Essentials of Strength Training and
+  // Conditioning"): work a rep range, and once EVERY set reaches the top
+  // of it, add load and drop back to the bottom. The 6-12 window is a
+  // practical anchor, not a hard rule — hypertrophy occurs across a wide
+  // rep spectrum (roughly 5-30) as long as sets are taken close to
+  // failure (Schoenfeld et al.'s load-comparison meta-analyses; Refalo et
+  // al. 2021's re-examination of the "repetition continuum"). Progression
+  // is judged off the TOP set of the last session actually logged, not
+  // just the last row entered.
+  // ============================================================
+  const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 12;
+  function suggestNextTarget(ex) {
+    const logs = getLogsFor(ex.id);
+    const last = mostRecentLog(logs);
+    if (!last) return null;
+    const sameDay = logs.filter(l => l.date === last.date);
+    const topSet = sameDay.reduce((best, l) => (l.weight || 0) >= (best.weight || 0) ? l : best, sameDay[0]);
+    const step = ex.fixedWeight ? 2 : 2.5;
+    let weight = topSet.weight || 0, reps, note;
+    if (topSet.reps >= HYPERTROPHY_REP_HIGH) {
+      if (ex.bodyweight) {
+        reps = HYPERTROPHY_REP_LOW;
+        note = 'Seuil de ' + HYPERTROPHY_REP_HIGH + ' reps dépassé — envisage d\'ajouter du lest.';
+      } else {
+        weight = Math.round((weight + step) * 10) / 10;
+        reps = HYPERTROPHY_REP_LOW;
+        note = 'Seuil de ' + HYPERTROPHY_REP_HIGH + ' reps atteint — charge augmentée (+' + step + unit() + ').';
+      }
+    } else if (topSet.failed) {
+      reps = topSet.reps;
+      note = 'Échec la dernière fois — reste sur cette charge.';
+    } else {
+      reps = Math.min(HYPERTROPHY_REP_HIGH, topSet.reps + 1);
+      note = 'Vise une répétition de plus à charge égale.';
+    }
+    return { weight, reps, note };
+  }
+
   // One card per exercise in the current Salle, each with its own inline
   // weight/reps log form — no separate "pick an exercise first" step.
   // Exercises no longer carry a rep-range/step/start-weight of their own
@@ -1809,12 +1856,17 @@ img, video, canvas, svg { max-width: 100%; }
     const altEx = ex.alternateId ? state.exercises.find(e => e.id === ex.alternateId) : null;
     const altHtml = altEx ? '<span class="po-ex-alt">🔁 ' + escape(altEx.name) + '</span>' : '';
     const perf = exercisePerfStats(ex);
+    const target = suggestNextTarget(ex);
+    const targetHtml = target
+      ? '<div class="po-ex-target" title="Double progression (6-' + HYPERTROPHY_REP_HIGH + ' reps) : une fois le haut de la fourchette atteint sur toutes les séries, la charge augmente et les reps repartent en bas — sinon, vise une répétition de plus à charge égale.">🎯 Objectif suggéré : <strong>' + target.weight + unit() + ' × ' + target.reps + '</strong><span class="po-ex-target-note">' + escape(target.note) + '</span></div>'
+      : '';
     const perfHtml =
       '<div class="po-stats-row po-ex-perf-row">'
       + '<div class="po-stat-box"><div class="po-stat-label">Record</div><div class="po-stat-val">' + ph(perf && perf.maxWeight, unit()) + '</div></div>'
       + '<div class="po-stat-box"><div class="po-stat-label">Séries au record</div><div class="po-stat-val">' + ph(perf && perf.setsAtMax) + '</div></div>'
       + '<div class="po-stat-box"><div class="po-stat-label">Régularité</div><div class="po-stat-val">' + ph(perf && perf.recentSessions, '/30j') + '</div></div>'
       + '</div>'
+      + targetHtml
       + '<div class="po-ex-perf-score">Capacité estimée (âge/poids) : <strong>' + ph(perf && perf.score, '/10') + '</strong></div>';
     return '<div class="po-ex-card" data-ex-id="' + ex.id + '">'
       + '<div class="po-ex-card-head">'
