@@ -1233,9 +1233,15 @@ document.addEventListener('DOMContentLoaded', function () {
   // row — running our own sync here would race and wipe sibling keys.
   try { if (window.self !== window.top) return; } catch (e) { return; }
   if (typeof initCloudSync !== 'function') return;
+  // Same key set as health.html's own sync call for this row — a push
+  // from here only listing po_water_v1 would replace the whole remote
+  // "health" row's data and wipe out health.html's stack/supplements
+  // keys for anyone who's ever synced them (Supabase upsert replaces the
+  // JSON column wholesale, it doesn't merge).
   initCloudSync({
     appKey: 'health',
-    syncedKeys: ['po_water_v1'],
+    syncedKeys: ['po_water_v1', 'stack:items', 'stack:version', 'stack:low'],
+    syncedPrefixes: ['stack:taken:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
     }

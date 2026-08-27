@@ -691,10 +691,16 @@ body::after {
   setInterval(()=>{ if(scrubT==null) renderAll(); }, 60000);
 
   /* ============ Cloud sync ============ */
-  if(window.initCloudSync){
-    window.initCloudSync({ appKey:'caffeine', syncedKeys:[LOGS_KEY,CUSTOM_KEY],
+  // sync.js is loaded with `defer`, so it hasn't run yet at this point in
+  // a synchronous inline script — window.initCloudSync would still be
+  // undefined here, silently skipping sync forever. Wait for
+  // DOMContentLoaded (which always fires after deferred scripts run),
+  // matching the pattern the other pages already use correctly.
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initCloudSync !== 'function') return;
+    initCloudSync({ appKey:'caffeine', syncedKeys:[LOGS_KEY,CUSTOM_KEY],
       onApplied:function(){ logs=loadJSON(LOGS_KEY,[]); custom=loadJSON(CUSTOM_KEY,[]); renderResults($('search').value); renderAll(); } });
-  }
+  });
 })();
 </script>
 <script id="atmo-backdrop-js">
