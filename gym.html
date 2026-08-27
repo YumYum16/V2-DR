@@ -1454,6 +1454,10 @@ img, video, canvas, svg { max-width: 100%; }
       <input type="checkbox" id="exFixedWeight">
       Poids fixe (poulie / machine) — sinon poids libre
     </label>
+    <label class="po-bw-toggle">
+      <input type="checkbox" id="exBodyweight">
+      Poids du corps (tractions, pompes, dips…)
+    </label>
     <div class="po-modal-actions">
       <button class="po-btn-secondary" id="exModalCancel">Annuler</button>
       <button class="po-btn-primary" id="exModalSave">Enregistrer</button>
@@ -1704,7 +1708,7 @@ img, video, canvas, svg { max-width: 100%; }
     const logs = getLogsFor(ex.id);
     const last = logs.length ? logs[logs.length - 1] : null;
     const lastStr = last ? (last.weight + unit() + ' × ' + last.reps) : (ph(null, unit()) + ' × ' + ph(null));
-    const badge = ex.fixedWeight ? 'Poulie' : 'Poids libre';
+    const badge = ex.bodyweight ? 'Poids du corps' : (ex.fixedWeight ? 'Poulie' : 'Poids libre');
     const perf = exercisePerfStats(ex);
     const perfHtml =
       '<div class="po-stats-row po-ex-perf-row">'
@@ -1927,12 +1931,14 @@ img, video, canvas, svg { max-width: 100%; }
       modalImage = ex.image || null;
       modalDays = (ex.days || []).slice();
       $('exFixedWeight').checked = !!ex.fixedWeight;
+      $('exBodyweight').checked = !!ex.bodyweight;
     } else {
       $('exName').value = '';
       modalGym = state.filterGym;
       modalImage = null;
       modalDays = state.filterDay ? [state.filterDay] : [];
       $('exFixedWeight').checked = false;
+      $('exBodyweight').checked = false;
     }
     renderModalSegs();
     renderDaysGrid();
@@ -1995,6 +2001,7 @@ img, video, canvas, svg { max-width: 100%; }
       name, gym: modalGym,
       image: modalImage || null,
       fixedWeight: $('exFixedWeight').checked,
+      bodyweight: $('exBodyweight').checked,
       days: modalDays.slice()
     };
     if (editingExId) {
