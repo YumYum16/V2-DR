@@ -294,17 +294,44 @@ details.info strong { color: var(--text-primary); }
   // 7 days) / (avg daily load, last 28 days) as a practical proxy —
   // ~0.8-1.3 is the "sweet spot", >=1.5 is associated with a sharp rise
   // in injury/overreaching risk in the sports-science literature.
-  // Load here = volume-load (kg lifted x reps, summed per day) since
-  // that's what's actually logged — not heart-rate or session-RPE
-  // (Foster et al. 2001), which this app doesn't collect.
+  //
+  // Load: session-RPE (Foster et al., 2001 — load = RPE x session
+  // duration in minutes) once Séance has both a duration and RIR logged
+  // for a session; RPE itself comes from RIR via Zourdos et al. (2016)'s
+  // resistance-training RPE scale (RPE = 10 - RIR). This only switches on
+  // once EVERY active day in both windows has that data — mixing
+  // RPE-load days with raw-tonnage days in the same average would be
+  // comparing different units, so until there's enough RIR/duration
+  // history this stays on the original tonnage (kg x reps) proxy, same
+  // as before. No value is ever invented for a day missing data.
   // ================================================================
-  function dailyLoads(gym){
-    const loads = {};
+  function sessionsFromGym(gym){
+    const map = {};
     (gym.exercises || []).forEach(ex => {
       ((gym.logs && gym.logs[ex.id]) || []).forEach(l => {
-        if (!l.date) return;
-        loads[l.date] = (loads[l.date] || 0) + (l.weight || 0) * (l.reps || 0);
+        if (!l.date || !l.dayId) return;
+        const key = l.date + '|' + l.dayId;
+        const s = map[key] = map[key] || { date: l.date, tonnage: 0, rirs: [] };
+        s.tonnage += (l.weight || 0) * (l.reps || 0);
+        if (l.rir != null) s.rirs.push(l.rir);
       });
+    });
+    const meta = gym.sessionMeta || {};
+    Object.keys(map).forEach(key => {
+      const s = map[key];
+      const m = meta[key];
+      s.rpeLoad = (s.rirs.length && m && m.durationMin)
+        ? Math.max(1, 10 - (s.rirs.reduce((a, b) => a + b, 0) / s.rirs.length)) * m.durationMin
+        : null;
+    });
+    return Object.values(map);
+  }
+  function dailyLoads(sessions, useRpe){
+    const loads = {};
+    sessions.forEach(s => {
+      const v = useRpe ? s.rpeLoad : s.tonnage;
+      if (v == null) return;
+      loads[s.date] = (loads[s.date] || 0) + v;
     });
     return loads;
   }
@@ -328,17 +355,26 @@ details.info strong { color: var(--text-primary); }
     });
     return total ? failed / total : null;
   }
+  function avgRirWindow(gym, startAgo, endAgo){
+    let sum = 0, n = 0;
+    (gym.exercises || []).forEach(ex => {
+      ((gym.logs && gym.logs[ex.id]) || []).forEach(l => {
+        if (!l.date || l.rir == null) return;
+        const days = (Date.now() - new Date(l.date).getTime()) / DAY_MS;
+        if (days >= startAgo && days < endAgo) { sum += l.rir; n++; }
+      });
+    });
+    return n ? sum / n : null;
+  }
 
-  function renderFatigueCard(gym){
-    const loads = dailyLoads(gym);
+  function computeFatigue(gym){
+    const sessions = sessionsFromGym(gym);
+    const activeDates = new Set(sessions.filter(s => (Date.now() - new Date(s.date).getTime()) / DAY_MS < 28).map(s => s.date));
+    const useRpe = activeDates.size > 0 && sessions.filter(s => activeDates.has(s.date)).every(s => s.rpeLoad != null);
+    const loads = dailyLoads(sessions, useRpe);
     const acute = windowStats(loads, 7);
     const chronic = windowStats(loads, 28);
-
-    if (chronic.activeDays < 4) {
-      return '<div class="gm-card"><div class="section-title">Fatigue (charge d\'entraînement)</div>' +
-        '<p class="empty-note">Pas encore assez d\'historique pour un ratio fiable (il faut au moins quelques séances loguées sur les 4 dernières semaines). Continue à enregistrer tes séances dans Séance et reviens ici.</p></div>';
-    }
-
+    if (chronic.activeDays < 4) return { ready: false };
     const ratio = chronic.avg > 0 ? acute.avg / chronic.avg : (acute.avg > 0 ? 2 : 0);
     let cls, label;
     if (chronic.avg === 0) { cls = 'low'; label = 'Reprise — pas de charge chronique établie'; }
@@ -346,16 +382,33 @@ details.info strong { color: var(--text-primary); }
     else if (ratio <= 1.3) { cls = 'good'; label = 'Zone d\'entraînement optimale'; }
     else if (ratio < 1.5) { cls = 'warn'; label = 'Charge élevée — surveille ta récupération'; }
     else { cls = 'bad'; label = 'Risque de surcharge (littérature ACWR ≥ 1.5)'; }
+    return { ready: true, ratio, cls, label, acute, chronic, useRpe };
+  }
 
+  function renderFatigueCard(gym, fatigue){
+    if (!fatigue.ready) {
+      return '<div class="gm-card"><div class="section-title">Fatigue (charge d\'entraînement)</div>' +
+        '<p class="empty-note">Pas encore assez d\'historique pour un ratio fiable (il faut au moins quelques séances loguées sur les 4 dernières semaines). Continue à enregistrer tes séances dans Séance et reviens ici.</p></div>';
+    }
+    const { ratio, cls, label, acute, chronic, useRpe } = fatigue;
     const barPct = Math.min(100, (ratio / 2) * 100);
+    const unitLabel = useRpe ? ' (UA — RPE × durée)' : ' (kg × reps)';
 
+    // RIR trend is a sharper overreaching signal than raw échec once it's
+    // logged — a lower RIR average means training closer to failure, not
+    // just occasionally missing a rep.
+    const rirRecent = avgRirWindow(gym, 0, 7);
+    const rirPrior = avgRirWindow(gym, 7, 14);
     const failRecent = failRateWindow(gym, 0, 7);
-    const failPrior = failRateWindow(gym, 7, 14); // matching 7-day window, so the comparison is apples-to-apples
-    let failNote = '';
-    if (failRecent != null && failPrior != null && failRecent - failPrior >= 0.15) {
-      failNote = 'Ton taux d\'échec a augmenté cette semaine (' + Math.round(failRecent*100) + '% vs ' + Math.round(failPrior*100) + '% avant) — signe possible de fatigue qui s\'accumule.';
-    } else if (failRecent === 0 && acute.activeDays >= 2) {
-      failNote = 'Aucune série à l\'échec cette semaine — la marge de progression est probablement encore là.';
+    const failPrior = failRateWindow(gym, 7, 14);
+    let intensityNote = '';
+    if (rirRecent != null && rirPrior != null) {
+      if (rirPrior - rirRecent >= 0.7) intensityNote = 'Ton RIR moyen a baissé cette semaine (' + rirRecent.toFixed(1) + ' vs ' + rirPrior.toFixed(1) + ' avant) — tu t\'entraînes plus proche de l\'échec, la fatigue réelle est probablement plus haute que ce que l\'ACWR seul indique.';
+      else if (rirRecent - rirPrior >= 0.7) intensityNote = 'Ton RIR moyen a augmenté cette semaine (' + rirRecent.toFixed(1) + ' vs ' + rirPrior.toFixed(1) + ' avant) — plus de marge laissée sur tes séries, cohérent avec une charge qui redescend.';
+    } else if (failRecent != null && failPrior != null && failRecent - failPrior >= 0.15) {
+      intensityNote = 'Ton taux d\'échec a augmenté cette semaine (' + Math.round(failRecent * 100) + '% vs ' + Math.round(failPrior * 100) + '% avant) — signe possible de fatigue qui s\'accumule.';
+    } else if (failRecent === 0 && rirRecent == null && acute.activeDays >= 2) {
+      intensityNote = 'Aucune série à l\'échec cette semaine — la marge de progression est probablement encore là.';
     }
 
     return '<div class="gm-card">' +
@@ -366,10 +419,37 @@ details.info strong { color: var(--text-primary); }
       '<div class="acwr-bar-wrap"><div class="acwr-bar-zone" style="left:40%;width:25%;"></div><div class="acwr-bar-fill" style="width:' + barPct + '%; background:' + (cls==='bad'?'var(--danger)':cls==='warn'?'var(--warning)':cls==='low'?'#7DD3FC':'var(--success)') + ';"></div></div>' +
       '<div class="acwr-scale"><span>0</span><span>0.8-1.3</span><span>2.0+</span></div>' +
       '<div class="acwr-stats">' +
-      '<div class="acwr-stat"><div class="acwr-stat-num">' + Math.round(acute.avg) + '</div><div class="acwr-stat-label">Charge/jour · 7j</div></div>' +
-      '<div class="acwr-stat"><div class="acwr-stat-num">' + Math.round(chronic.avg) + '</div><div class="acwr-stat-label">Charge/jour · 28j</div></div>' +
+      '<div class="acwr-stat"><div class="acwr-stat-num">' + Math.round(acute.avg) + '</div><div class="acwr-stat-label">Charge/jour · 7j' + unitLabel + '</div></div>' +
+      '<div class="acwr-stat"><div class="acwr-stat-num">' + Math.round(chronic.avg) + '</div><div class="acwr-stat-label">Charge/jour · 28j' + unitLabel + '</div></div>' +
       '</div>' +
-      (failNote ? '<div class="fatigue-note">' + escapeHtml(failNote) + '</div>' : '') +
+      (intensityNote ? '<div class="fatigue-note">' + escapeHtml(intensityNote) + '</div>' : '') +
+      (!useRpe ? '<div class="fatigue-note">Basé sur le tonnage brut pour l\'instant — logue le RIR et la durée de tes séances dans Séance quelques semaines pour passer à une charge type RPE de séance (Foster et al., 2001), plus fidèle à la fatigue réelle.</div>' : '') +
+      '</div>';
+  }
+
+  // ================================================================
+  // FATIGUE <-> MOTIVATION — shown as two separate cards below, but a
+  // high ACWR and a dropping mood together are exactly the pattern the
+  // overtraining/overreaching literature (Meeusen et al., 2013, ECSS/ACSM
+  // consensus statement) flags as unrecovered fatigue, not a motivation
+  // problem to push through. Only surfaces when both signals actually
+  // point the same way — never invented from one alone.
+  // ================================================================
+  function recentMoodAvg(mood, startAgo, endAgo){
+    let sum = 0, n = 0;
+    for (let i = startAgo; i < endAgo; i++){
+      const m = mood[daysAgoStr(i)];
+      if (m) { sum += m.mood; n++; }
+    }
+    return n ? sum / n : null;
+  }
+  function renderFatigueMotivationLink(fatigue, mood){
+    if (!fatigue.ready || fatigue.ratio < 1.3) return '';
+    const recent = recentMoodAvg(mood, 0, 3), prior = recentMoodAvg(mood, 3, 7);
+    if (recent == null || prior == null || prior - recent < 0.5) return '';
+    return '<div class="gm-card">' +
+      '<div class="section-title">Fatigue et motivation, reliées</div>' +
+      '<p style="font-size:13px;line-height:1.55;color:var(--text-secondary);">Charge d\'entraînement élevée (ACWR ' + fatigue.ratio.toFixed(2) + ') <em>et</em> ressenti en baisse ces derniers jours (' + recent.toFixed(1) + '/5 vs ' + prior.toFixed(1) + '/5 avant) — cette combinaison est précisément ce que la littérature sur le surentraînement (<strong>Meeusen et al., 2013</strong>, consensus ECSS/ACSM) associe à une fatigue non récupérée, pas à un manque de motivation en soi. Une séance plus légère ou un jour de repos de plus cette semaine est probablement plus utile qu\'un effort de volonté.</p>' +
       '</div>';
   }
 
@@ -449,16 +529,19 @@ details.info strong { color: var(--text-primary); }
 
   function render(){
     const mood = loadMood();
+    const fatigue = computeFatigue(gym);
     app.innerHTML =
       '<h1 class="dash-title">Fatigue et Motivation</h1>' +
       '<p class="dash-sub">Calculé à partir de tes vraies séances (Fitness / Séance / Muscle partagent la même donnée) — rien d\'inventé.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
       '<p><strong>Fatigue</strong> : ratio charge aiguë/chronique (ACWR), construit sur le modèle fitness-fatigue de <strong>Banister et al. (1975)</strong> — l\'entraînement produit une réponse "fitness" et une réponse "fatigue", chacune se dissipant avec le temps. Popularisé par les travaux de <strong>Gabbett</strong> en sciences du sport : une charge aiguë (7 jours) entre <strong>0.8 et 1.3</strong> fois la charge chronique (28 jours) est associée au risque de blessure/surcharge le plus faible ; un ratio <strong>≥ 1.5</strong> est associé à un risque nettement accru.</p>' +
-      '<p>La "charge" utilisée ici est le <strong>volume-charge</strong> (poids × répétitions, cumulé par jour) — pas la fréquence cardiaque ni le RPE de séance (méthode de <strong>Foster et al., 2001</strong>), que cette app ne collecte pas. C\'est une simplification assumée, pas une mesure de laboratoire.</p>' +
+      '<p>La "charge" utilisée ici est le <strong>volume-charge</strong> (poids × répétitions, cumulé par jour) par défaut. Une fois que tu as loggé le <strong>RIR</strong> et la <strong>durée</strong> de tes séances dans Séance pendant quelques semaines, elle bascule automatiquement sur une charge <strong>type RPE de séance</strong> (RPE × durée en minutes — méthode de <strong>Foster et al., 2001</strong>), le RPE étant dérivé du RIR via l\'échelle de <strong>Zourdos et al. (2016)</strong> (RPE = 10 − RIR) : plus fidèle à la fatigue réelle qu\'un simple volume, puisqu\'elle capture la proximité à l\'échec et pas juste le poids déplacé. Le passage se fait seulement quand TOUTES les séances actives des deux fenêtres ont cette donnée — jamais un mélange de deux unités différentes dans le même ratio.</p>' +
       '<p><strong>Motivation</strong> : la théorie de l\'autodétermination (<strong>Teixeira et al., 2012</strong>, revue systématique) montre que la motivation autonome et la satisfaction de compétence prédisent l\'adhésion à long terme à l\'exercice — pas un score inventé. Donc : ton ressenti est auto-rapporté (c\'est toi qui le sais), et les seuls "indicateurs" affichés sont des faits tirés de tes séances (records, régularité).</p>' +
+      '<p><strong>Fatigue et motivation reliées</strong> : le consensus <strong>ECSS/ACSM sur le surentraînement (Meeusen et al., 2013)</strong> associe une charge élevée non récupérée à une perturbation de l\'humeur — donc quand l\'ACWR est élevé ET le ressenti baisse en même temps, l\'app le signale comme un seul phénomène plutôt que deux chiffres isolés.</p>' +
       '<p>Volume d\'entraînement et hypertrophie : voir aussi le panneau du <strong>suivi musculaire</strong> (Schoenfeld, Grgic, Krieger).</p>' +
       '</details>' +
-      renderFatigueCard(gym) +
+      renderFatigueCard(gym, fatigue) +
+      renderFatigueMotivationLink(fatigue, mood) +
       renderMotivationCard(gym, mood) +
       CROSS_NAV;
 

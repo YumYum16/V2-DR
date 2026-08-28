@@ -276,6 +276,19 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   font-size: 13px; font-weight: 700; cursor: pointer;
 }
 .live-fail-toggle.active { background: rgba(255,107,107,0.16); color: var(--danger); border-color: rgba(255,107,107,0.4); }
+.live-fail-toggle.small { padding: 8px 12px; font-size: 11.5px; margin-left: auto; }
+.live-rir-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.live-rir-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.live-rir-input {
+  width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 15px; text-align: center;
+}
+.live-rir-btn {
+  padding: 8px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-secondary); font-family: inherit;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.live-rir-btn.active { background: rgba(107,227,164,0.16); color: var(--success); border-color: rgba(107,227,164,0.4); }
 .live-validate-btn {
   padding: 16px; border: 0; border-radius: 14px;
   background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
@@ -446,6 +459,22 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       return false;
     }
   }
+  // Session duration — captured automatically (exact) by the live flow's
+  // start/"Terminer" tap, or filled in manually (approximate is fine, it's
+  // optional) on the desktop retroactive form. Used for the session-RPE
+  // training-load Fatigue reads (Foster et al., 2001: load = RPE x
+  // duration) — without a duration, that method can't run and Fatigue
+  // falls back to plain tonnage.
+  function saveSessionDuration(date, dayId, durationMin) {
+    if (!dayId) return;
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.sessionMeta = fresh.sessionMeta || {};
+      fresh.sessionMeta[date + '|' + dayId] = { durationMin };
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      pcPushNow();
+    } catch (e) { console.error('saveSessionDuration failed', e); }
+  }
   function fmtRestSec(sec) {
     const m = Math.floor(sec / 60), s = sec % 60;
     return m ? (m + 'min' + (s ? String(s).padStart(2, '0') : '')) : (s + 's');
@@ -557,10 +586,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         if (!l.dayId || !l.date) return; // older/manual entries without a séance context are skipped
         const key = l.date + '|' + l.dayId;
         const s = map[key] = map[key] || { date: l.date, dayId: l.dayId, lastTime: '', sets: [] };
-        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side });
+        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side, rir: (l.rir != null ? l.rir : null) });
         if (l.time && l.time > s.lastTime) s.lastTime = l.time;
       });
     });
+    const meta = state.sessionMeta || {};
+    Object.keys(map).forEach(key => { map[key].durationMin = (meta[key] && meta[key].durationMin) || null; });
     return Object.values(map).sort((a, b) => b.date === a.date ? b.lastTime.localeCompare(a.lastTime) : b.date.localeCompare(a.date));
   }
   function analyzeSession(state, session){
@@ -573,15 +604,28 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     const tonnage = session.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
 
     const completionScore = planned.length ? Math.min(1, doneIds.size / planned.length) : (doneIds.size ? 1 : 0);
-    // Healthy failure-rate window ~10-30%: enough sets pushed close to
-    // failure without every set grinding to failure (RPE/RIR-based
-    // programming, e.g. Helms et al.) — too low suggests unused margin,
-    // too high suggests overreaching for a single session.
+    // RIR (reps in reserve) is the real proximity-to-failure signal when
+    // it's been logged — a set can hit "échec" (missed a rep) or not, but
+    // RIR tells you how close every OTHER set got, which échec alone can't.
+    // Target window ~0.5-2.5 RIR average: enough sets pushed close to
+    // failure to drive adaptation without grinding everything to 0 RIR
+    // every time (RIR-based programming, e.g. Helms, Zourdos et al.) —
+    // too high suggests unused margin, too low suggests overreaching for
+    // a single session. Falls back to the cruder échec rate when a
+    // session has no RIR logged at all (older entries, or the desktop
+    // form used without filling it in).
+    const ratedSets = session.sets.filter(s => s.rir != null);
+    const avgRir = ratedSets.length ? ratedSets.reduce((sum, s) => sum + s.rir, 0) / ratedSets.length : null;
     let intensityScore;
-    if (!totalSets) intensityScore = 0;
-    else if (failRate >= 0.10 && failRate <= 0.30) intensityScore = 1;
-    else if (failRate < 0.10) intensityScore = 0.6 + (failRate / 0.10) * 0.4;
-    else intensityScore = Math.max(0, 1 - (failRate - 0.30) / 0.5);
+    if (avgRir != null) {
+      if (avgRir >= 0.5 && avgRir <= 2.5) intensityScore = 1;
+      else if (avgRir < 0.5) intensityScore = Math.max(0, 1 - (0.5 - avgRir) / 0.5);
+      else intensityScore = Math.max(0, 1 - (avgRir - 2.5) / 3);
+    } else if (totalSets) {
+      if (failRate >= 0.10 && failRate <= 0.30) intensityScore = 1;
+      else if (failRate < 0.10) intensityScore = 0.6 + (failRate / 0.10) * 0.4;
+      else intensityScore = Math.max(0, 1 - (failRate - 0.30) / 0.5);
+    } else intensityScore = 0;
     // Volume relative to this séance's own exercise count (~3 sets/exercise
     // baseline, in line with the 10-20 sets/muscle/week hypertrophy range
     // — Schoenfeld/Grgic — spread across a handful of exercises).
@@ -591,12 +635,15 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 
     const critique = [];
     if (missing.length) critique.push('Pas fait : ' + missing.map(e => e.name).join(', ') + '.');
-    if (failRate > 0.30) critique.push('Taux d\'échec élevé (' + Math.round(failRate * 100) + '%) — la charge était sans doute trop lourde pour cette séance.');
+    if (avgRir != null) {
+      if (avgRir < 0.5) critique.push('RIR moyen très bas (' + avgRir.toFixed(1) + ') — beaucoup de séries proches de l\'échec, la fatigue générée était sans doute élevée.');
+      else if (avgRir > 2.5) critique.push('RIR moyen élevé (' + avgRir.toFixed(1) + ') — de la marge est probablement restée sur la table, tu peux sans doute pousser un peu plus la prochaine fois.');
+    } else if (failRate > 0.30) critique.push('Taux d\'échec élevé (' + Math.round(failRate * 100) + '%) — la charge était sans doute trop lourde pour cette séance.');
     else if (failRate === 0 && totalSets >= 4) critique.push('Aucune série à l\'échec — tu as sans doute de la marge, essaie d\'augmenter la charge la prochaine fois.');
     if (volumeScore < 0.6) critique.push('Volume un peu faible par rapport aux exercices prévus pour cette séance.');
     if (!critique.length) critique.push('Séance complète et équilibrée.');
 
-    return { planned, missing, totalSets, failedSets, failRate, tonnage, score, critique };
+    return { planned, missing, totalSets, failedSets, failRate, avgRir, tonnage, score, critique };
   }
   function formatHistDate(dateStr){
     const parts = dateStr.split('-').map(Number);
@@ -760,9 +807,9 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
             '<span class="hist-date">' + formatHistDate(s.date) + '</span>' +
             '<span class="hist-score ' + scoreCls + '">' + a.score.toFixed(1) + '</span>' +
           '</div>' +
-          '<div class="hist-row-meta">' + a.totalSets + ' série(s) · ' + Math.round(a.tonnage) + ' ' + unit + ' de tonnage · ' + Math.round(a.failRate * 100) + '% échec</div>' +
+          '<div class="hist-row-meta">' + a.totalSets + ' série(s) · ' + Math.round(a.tonnage) + ' ' + unit + ' de tonnage · ' + (a.avgRir != null ? 'RIR moyen ' + a.avgRir.toFixed(1) : Math.round(a.failRate * 100) + '% échec') + (s.durationMin ? ' · ' + s.durationMin + ' min' : '') + '</div>' +
           '<div class="hist-detail hidden" id="histDetail-' + i + '">' +
-            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + '</li>').join('') + '</ul>' +
+            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.rir != null ? ' <span class="hist-rest-tag">RIR ' + x.rir + '</span>' : '') + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + '</li>').join('') + '</ul>' +
             '<div class="hist-critique">' + a.critique.map(c => '<p>' + escapeHtml(c) + '</p>').join('') + '</div>' +
           '</div>' +
         '</div>';
@@ -853,6 +900,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<button type="button" class="day-change-link" id="changeDayBtn">Changer</button></div>' +
         '<div class="field-row">' +
         '<div class="field-col"><label>Date</label><input type="date" id="seanceDate" value="' + todayStr() + '"></div>' +
+        '<div class="field-col"><label>Début (optionnel)</label><input type="time" id="seanceStartTime" value=""></div>' +
         '<div class="field-col"><label>Fin de séance</label><input type="time" id="seanceTime" value="' + nowTimeStr() + '"></div>' +
         '</div></div>';
 
@@ -902,6 +950,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<span class="set-idx">' + idx + '</span>' +
         '<input type="number" step="0.1" inputmode="decimal" class="set-weight" placeholder="' + unit + '" value="' + (prevWeight || '') + '">' +
         '<input type="number" inputmode="numeric" class="set-reps" placeholder="reps" value="' + (prevReps || '') + '">' +
+        '<input type="number" min="0" inputmode="numeric" class="set-rir" placeholder="RIR" title="Reps en réserve (0 = dernière répétition terminée, pas ratée)">' +
         '<button type="button" class="set-fail-btn">Échec</button>' +
         '<button type="button" class="set-del-btn" aria-label="Supprimer">×</button>';
       row.querySelector('.set-fail-btn').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
@@ -915,6 +964,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     function saveSession(){
       const date = document.getElementById('seanceDate').value || todayStr();
       const time = document.getElementById('seanceTime').value || nowTimeStr();
+      const startTime = document.getElementById('seanceStartTime').value || null;
       // Collect into a scratch object first — only touch the real in-memory
       // state once we know the write actually succeeded, so a failed save
       // can't leave duplicate entries queued up for the next retry.
@@ -927,10 +977,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           const weight = parseFloat(row.querySelector('.set-weight').value);
           const reps = parseInt(row.querySelector('.set-reps').value, 10);
           if (!reps) return; // skip empty rows
+          const rirRaw = row.querySelector('.set-rir').value;
           newEntries[exId].push({
             id: uid(), date, time, dayId: chosenDay,
             weight: isNaN(weight) ? 0 : weight, reps: reps,
-            failed: row.querySelector('.set-fail-btn').classList.contains('active')
+            failed: row.querySelector('.set-fail-btn').classList.contains('active'),
+            rir: rirRaw === '' ? null : Math.max(0, parseInt(rirRaw, 10) || 0)
           });
           savedSets++;
         });
@@ -941,6 +993,11 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       Object.keys(newEntries).forEach(exId => {
         state.logs[exId] = (state.logs[exId] || []).concat(newEntries[exId]);
       });
+      if (startTime) {
+        const [sh, sm] = startTime.split(':').map(Number), [eh, em] = time.split(':').map(Number);
+        const durationMin = (eh * 60 + em) - (sh * 60 + sm);
+        if (durationMin > 0) saveSessionDuration(date, chosenDay, durationMin);
+      }
       if (!saveGym(state)) {
         // Undo the in-memory push so a retry doesn't double the entries
         // once storage has room again — the form stays exactly as typed.
@@ -1081,13 +1138,20 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       }
     });
 
+    let liveSessionStartTs = null;
     function startLive(){
       document.body.classList.add('seance-live');
+      liveSessionStartTs = Date.now();
       timerReset();
       renderLive();
       acquireWakeLock();
     }
     function endLive(){
+      if (liveSessionStartTs) {
+        const durationMin = Math.round((Date.now() - liveSessionStartTs) / 60000);
+        if (durationMin > 0) saveSessionDuration(todayStr(), chosenDay, durationMin);
+        liveSessionStartTs = null;
+      }
       releaseWakeLock();
       clearInterval(timerInterval);
       document.body.classList.remove('seance-live');
@@ -1095,6 +1159,27 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       renderDayPick();
     }
 
+    // One side's input block (weight/reps/RIR/échec) — used twice for a
+    // unilateral exercise (suffix 'G'/'D'), once for a normal one (suffix '').
+    // RIR (reps in reserve) gets quick 0/1 buttons — per Zourdos et al.
+    // (2016)'s RIR-based RPE scale, 0-1 RIR is where an estimate is still
+    // reliable; beyond that self-rating gets noisy fast, so higher values
+    // stay a free-typed number rather than more buttons. RIR 0 is kept
+    // explicitly separate from Échec (true failure, missing the rep
+    // entirely) — they measure different things and get conflated a lot.
+    function sideBlockHtml(suffix, labelPrefix, weight, reps){
+      return '<div class="live-input-row">' +
+        '<div class="live-input-col"><label>' + labelPrefix + 'Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeight' + suffix + '" value="' + weight + '"></div>' +
+        '<div class="live-input-col"><label>' + labelPrefix + 'Reps</label><input type="number" inputmode="numeric" id="liveReps' + suffix + '" value="' + reps + '"></div>' +
+        '</div>' +
+        '<div class="live-rir-row">' +
+        '<span class="live-rir-label">RIR</span>' +
+        '<input type="number" min="0" inputmode="numeric" class="live-rir-input" id="liveRir' + suffix + '" placeholder="—">' +
+        '<button type="button" class="live-rir-btn" data-rir-target="' + suffix + '" data-rir-val="0">0</button>' +
+        '<button type="button" class="live-rir-btn" data-rir-target="' + suffix + '" data-rir-val="1">1</button>' +
+        '<button type="button" class="live-fail-toggle small" id="liveFailToggle' + suffix + '">Échec</button>' +
+        '</div>';
+    }
     function renderLive(){
       const ex = queue[currentIdx];
       const day = days.find(d => d.id === chosenDay);
@@ -1125,26 +1210,14 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<div class="gm-card">' +
         (ex.unilateral ?
           '<div class="live-set-form">' +
-          '<div class="live-input-row">' +
-          '<div class="live-input-col"><label>Gauche — Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeightG" value="' + prefWeight + '"></div>' +
-          '<div class="live-input-col"><label>Gauche — Reps</label><input type="number" inputmode="numeric" id="liveRepsG" value="' + prefReps + '"></div>' +
-          '</div>' +
-          '<button type="button" class="live-fail-toggle" id="liveFailToggleG">Échec (gauche)</button>' +
-          '<div class="live-input-row" style="margin-top:10px;">' +
-          '<div class="live-input-col"><label>Droite — Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeightD" value="' + prefWeight + '"></div>' +
-          '<div class="live-input-col"><label>Droite — Reps</label><input type="number" inputmode="numeric" id="liveRepsD" value="' + prefReps + '"></div>' +
-          '</div>' +
-          '<button type="button" class="live-fail-toggle" id="liveFailToggleD">Échec (droite)</button>' +
-          '<button type="button" class="live-validate-btn" id="liveValidateSet">✓ Valider la série</button>' +
+          sideBlockHtml('G', 'Gauche — ', prefWeight, prefReps) +
+          '<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">' + sideBlockHtml('D', 'Droite — ', prefWeight, prefReps) + '</div>' +
+          '<button type="button" class="live-validate-btn" id="liveValidateSet" style="margin-top:10px;">✓ Valider la série</button>' +
           '</div>'
         :
           '<div class="live-set-form">' +
-          '<div class="live-input-row">' +
-          '<div class="live-input-col"><label>Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeight" value="' + prefWeight + '"></div>' +
-          '<div class="live-input-col"><label>Reps</label><input type="number" inputmode="numeric" id="liveReps" value="' + prefReps + '"></div>' +
-          '</div>' +
-          '<button type="button" class="live-fail-toggle" id="liveFailToggle">Marquer échec</button>' +
-          '<button type="button" class="live-validate-btn" id="liveValidateSet">✓ Valider la série</button>' +
+          sideBlockHtml('', '', prefWeight, prefReps) +
+          '<button type="button" class="live-validate-btn" id="liveValidateSet" style="margin-top:10px;">✓ Valider la série</button>' +
           '</div>'
         ) + '</div>' +
         '<div class="live-queue-title">File d\'attente — ' + escapeHtml(day ? day.name : '') + '</div>' +
@@ -1160,12 +1233,17 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       document.getElementById('liveEndBtn').addEventListener('click', endLive);
       spBtn.addEventListener('click', timerStartPause);
       document.getElementById('timerReset').addEventListener('click', timerReset);
-      if (ex.unilateral) {
-        document.getElementById('liveFailToggleG').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
-        document.getElementById('liveFailToggleD').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
-      } else {
-        document.getElementById('liveFailToggle').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
-      }
+      const sides = ex.unilateral ? ['G', 'D'] : [''];
+      sides.forEach(suffix => {
+        document.getElementById('liveFailToggle' + suffix).addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+      });
+      app.querySelectorAll('.live-rir-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const suffix = btn.dataset.rirTarget, val = btn.dataset.rirVal;
+          document.getElementById('liveRir' + suffix).value = val;
+          app.querySelectorAll('.live-rir-btn[data-rir-target="' + suffix + '"]').forEach(b => b.classList.toggle('active', b === btn));
+        });
+      });
       document.getElementById('liveValidateSet').addEventListener('click', validateSet);
     }
 
@@ -1201,6 +1279,10 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       state.logs[ex.id] = state.logs[ex.id] || [];
       const base = { date: todayStr(), time: nowTimeStr(), dayId: chosenDay, restSec: restSec };
 
+      function readRir(suffix) {
+        const raw = document.getElementById('liveRir' + suffix).value;
+        return raw === '' ? null : Math.max(0, parseInt(raw, 10) || 0);
+      }
       if (ex.unilateral) {
         const wG = parseFloat(document.getElementById('liveWeightG').value);
         const rG = parseInt(document.getElementById('liveRepsG').value, 10);
@@ -1209,14 +1291,14 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         if (!rG && !rD) return;
         const failG = document.getElementById('liveFailToggleG').classList.contains('active');
         const failD = document.getElementById('liveFailToggleD').classList.contains('active');
-        if (rG) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wG) ? 0 : wG, reps: rG, failed: failG, side: 'G' }));
-        if (rD) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wD) ? 0 : wD, reps: rD, failed: failD, side: 'D' }));
+        if (rG) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wG) ? 0 : wG, reps: rG, failed: failG, rir: readRir('G'), side: 'G' }));
+        if (rD) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wD) ? 0 : wD, reps: rD, failed: failD, rir: readRir('D'), side: 'D' }));
       } else {
         const weight = parseFloat(document.getElementById('liveWeight').value);
         const reps = parseInt(document.getElementById('liveReps').value, 10);
         if (!reps) return;
         const failed = document.getElementById('liveFailToggle').classList.contains('active');
-        state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed }));
+        state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed, rir: readRir('') }));
       }
 
       saveGym(state);
