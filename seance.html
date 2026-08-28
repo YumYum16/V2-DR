@@ -158,10 +158,17 @@ body::after {
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-tertiary);
 }
-.field-col input {
+.field-col input, .field-col select {
   padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
   background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
 }
+.cardio-card { padding: 16px; }
+.cardio-result { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(107,227,164,0.06); border: 1px solid rgba(107,227,164,0.16); font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.cardio-hist-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12.5px; }
+.cardio-hist-row:first-child { border-top: 0; }
+.cardio-hist-meta { color: var(--text-tertiary); font-size: 11.5px; margin-top: 2px; }
+.cardio-del { flex-shrink: 0; border: 0; background: transparent; color: var(--text-tertiary); font-size: 17px; cursor: pointer; opacity: .5; }
+.cardio-del:hover { opacity: 1; color: var(--danger); }
 .ex-form-card { padding: 16px; }
 .ex-form-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .ex-form-thumb { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; flex-shrink: 0; }
@@ -592,6 +599,147 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     const mons = ['jan','fév','mars','avr','mai','juin','juil','août','sep','oct','nov','déc'];
     return dt.getDate() + ' ' + mons[dt.getMonth()];
   }
+  // ================================================================
+  // CARDIO — logs a cardio session (treadmill walk/run with speed+incline,
+  // or MET-based for machines without a grade) and turns it into an
+  // actual kcal figure instead of a generic "you did cardio" flag.
+  // Stored alongside strength logs in the same po_coach_v1 blob (already
+  // synced via PC_SYNCED_KEYS) so Alimentation/Énergie can read it.
+  //
+  // Treadmill kcal uses ACSM's Metabolic Equations (ACSM's Guidelines for
+  // Exercise Testing and Prescription) — the standard formula for
+  // walking/running VO2 as a function of speed AND grade, which is the
+  // whole reason it's used here instead of a flat MET table: it's the one
+  // formula that actually consumes the incline%/speed inputs. Walk vs run
+  // is the equations' own validity split (~6.4 km/h / 4mph). Non-treadmill
+  // cardio (no grade to speak of) falls back to standard MET values from
+  // the Compendium of Physical Activities (Ainsworth et al., 2011).
+  // kcal/min = VO2(ml/kg/min) * weight(kg) / 200 — from 1 L O2 ≈ 5 kcal.
+  // ================================================================
+  const CARDIO_TYPES = [
+    { id: 'marche', label: 'Marche (tapis)', mode: 'treadmill', kind: 'walk' },
+    { id: 'course', label: 'Course (tapis)', mode: 'treadmill', kind: 'run' },
+    { id: 'velo', label: 'Vélo', mode: 'met', met: 7.5 },
+    { id: 'elliptique', label: 'Elliptique', mode: 'met', met: 5.0 },
+    { id: 'rameur', label: 'Rameur', mode: 'met', met: 7.0 },
+    { id: 'natation', label: 'Natation', mode: 'met', met: 6.0 }
+  ];
+  function readBodyKgForCardio() {
+    try {
+      const entries = JSON.parse(localStorage.getItem('po_coach_weights'));
+      if (Array.isArray(entries) && entries.length) {
+        const latest = entries[entries.length - 1];
+        const kg = unit === 'lb' ? latest.weight / 2.20462 : latest.weight;
+        if (kg > 0) return kg;
+      }
+    } catch (e) {}
+    try {
+      const w = JSON.parse(localStorage.getItem('po_water_v1'));
+      if (w && w.profile && w.profile.weightKg) {
+        const kg = w.weightUnit === 'lb' ? w.profile.weightKg / 2.20462 : w.profile.weightKg;
+        if (kg > 0) return kg;
+      }
+    } catch (e) {}
+    return 75;
+  }
+  function cardioVO2(type, speedKmh, inclinePct) {
+    const speedM = speedKmh * 1000 / 60; // km/h -> m/min
+    const grade = inclinePct / 100;
+    return type.kind === 'run'
+      ? 0.2 * speedM + 0.9 * speedM * grade + 3.5
+      : 0.1 * speedM + 1.8 * speedM * grade + 3.5;
+  }
+  function computeCardioKcal(typeId, inclinePct, speedKmh, durationMin, weightKg) {
+    const type = CARDIO_TYPES.find(t => t.id === typeId);
+    if (!type) return null;
+    const vo2 = type.mode === 'treadmill' ? cardioVO2(type, speedKmh || 0, inclinePct || 0) : type.met * 3.5;
+    const kcalPerMin = vo2 * weightKg / 200;
+    return { vo2, kcalPerMin, kcal: kcalPerMin * (durationMin || 0) };
+  }
+  function loadCardioEntries() {
+    const g = loadGym() || {};
+    return Array.isArray(g.cardio) ? g.cardio : [];
+  }
+  function saveCardioEntry(entry) {
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.cardio = Array.isArray(fresh.cardio) ? fresh.cardio : [];
+      fresh.cardio.push(entry);
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      pcPushNow();
+      return true;
+    } catch (e) {
+      console.error('saveCardioEntry failed', e);
+      alert('⚠️ Échec de l\'enregistrement (stockage plein ?).');
+      return false;
+    }
+  }
+  function deleteCardioEntry(id) {
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.cardio = (Array.isArray(fresh.cardio) ? fresh.cardio : []).filter(c => c.id !== id);
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      pcPushNow();
+    } catch (e) { console.error('deleteCardioEntry failed', e); }
+  }
+  function cardioTypeLabel(id) { const t = CARDIO_TYPES.find(x => x.id === id); return t ? t.label : id; }
+  function cardioHistRow(e) {
+    const meta = e.mode === 'treadmill'
+      ? (e.inclinePct || 0) + '% · ' + e.speedKmh + ' km/h · ' + e.durationMin + ' min'
+      : e.durationMin + ' min';
+    return '<div class="cardio-hist-row"><div><div>' + escapeHtml(cardioTypeLabel(e.type)) + '</div><div class="cardio-hist-meta">' + formatHistDate(e.date) + ' · ' + meta + '</div></div>' +
+      '<div style="display:flex;align-items:center;gap:10px;"><strong>' + Math.round(e.kcal) + ' kcal</strong><button type="button" class="cardio-del" data-cardio-del="' + e.id + '" aria-label="Supprimer">×</button></div></div>';
+  }
+  function renderCardioCard() {
+    const recent = loadCardioEntries().slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).slice(0, 6);
+    const optionsHtml = CARDIO_TYPES.map(t => '<option value="' + t.id + '">' + escapeHtml(t.label) + '</option>').join('');
+    return '<div class="gm-card cardio-card"><div class="section-title">Cardio</div>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>Type</label><select id="cardioType">' + optionsHtml + '</select></div>' +
+      '<div class="field-col" id="cardioInclineCol"><label>Pente (%)</label><input type="number" id="cardioIncline" step="0.5" min="0" value="0"></div>' +
+      '<div class="field-col" id="cardioSpeedCol"><label>Vitesse (km/h)</label><input type="number" id="cardioSpeed" step="0.1" min="0" value="5"></div>' +
+      '<div class="field-col"><label>Durée (min)</label><input type="number" id="cardioDuration" step="1" min="0" value="30"></div>' +
+      '</div>' +
+      '<div class="cardio-result" id="cardioResult"></div>' +
+      '<button type="button" class="gm-add" id="addCardioBtn" style="margin-top:10px;">+ Ajouter la séance cardio</button>' +
+      (recent.length ? '<div style="margin-top:14px;">' + recent.map(cardioHistRow).join('') + '</div>' : '') +
+      '</div>';
+  }
+  function wireCardioCard(onChange) {
+    const typeEl = document.getElementById('cardioType');
+    if (!typeEl) return;
+    const inclineCol = document.getElementById('cardioInclineCol'), speedCol = document.getElementById('cardioSpeedCol');
+    const inclineEl = document.getElementById('cardioIncline'), speedEl = document.getElementById('cardioSpeed'), durationEl = document.getElementById('cardioDuration');
+    const resultEl = document.getElementById('cardioResult');
+    function currentType() { return CARDIO_TYPES.find(t => t.id === typeEl.value) || CARDIO_TYPES[0]; }
+    function refresh() {
+      const t = currentType(), isTread = t.mode === 'treadmill';
+      inclineCol.style.display = isTread ? '' : 'none';
+      speedCol.style.display = isTread ? '' : 'none';
+      const weightKg = readBodyKgForCardio();
+      const r = computeCardioKcal(t.id, parseFloat(inclineEl.value) || 0, parseFloat(speedEl.value) || 0, parseFloat(durationEl.value) || 0, weightKg);
+      resultEl.textContent = r ? ('≈ ' + Math.round(r.kcal) + ' kcal (VO2 ' + r.vo2.toFixed(1) + ' ml/kg/min pour ' + weightKg.toFixed(0) + ' kg) — formule ACSM ' + (isTread ? '(vitesse + pente)' : '(MET ' + t.met + ')') + '.') : '';
+    }
+    [typeEl, inclineEl, speedEl, durationEl].forEach(el => el.addEventListener('input', refresh));
+    refresh();
+    document.getElementById('addCardioBtn').addEventListener('click', () => {
+      const t = currentType(), weightKg = readBodyKgForCardio(), durationMin = parseFloat(durationEl.value) || 0;
+      if (!durationMin) { alert('Durée requise.'); return; }
+      const r = computeCardioKcal(t.id, parseFloat(inclineEl.value) || 0, parseFloat(speedEl.value) || 0, durationMin, weightKg);
+      const entry = {
+        id: 'cx' + Date.now() + Math.floor(Math.random() * 1000), date: todayStr(), time: nowTimeStr(),
+        type: t.id, mode: t.mode,
+        inclinePct: t.mode === 'treadmill' ? (parseFloat(inclineEl.value) || 0) : null,
+        speedKmh: t.mode === 'treadmill' ? (parseFloat(speedEl.value) || 0) : null,
+        durationMin, vo2: r.vo2, kcal: r.kcal
+      };
+      if (saveCardioEntry(entry) && onChange) onChange();
+    });
+    app.querySelectorAll('[data-cardio-del]').forEach(btn => {
+      btn.addEventListener('click', () => { deleteCardioEntry(btn.dataset.cardioDel); if (onChange) onChange(); });
+    });
+  }
+
   function renderHistoryCard(state, unit){
     const sessions = buildSessionsHistory(state).slice(0, 8);
     if (!sessions.length) return '';
@@ -676,12 +824,14 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<h1 class="dash-title">Séance</h1>' +
         banner +
         renderHistoryCard(state, unit) +
+        renderCardioCard() +
         '<p class="dash-sub">Choisis la séance à remplir — aujourd\'hui ou en retard, la date reste modifiable.</p>' +
         '<div class="gm-card"><div class="section-title">Quelle séance ?</div>' +
         '<div class="day-grid">' + days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '">' + escapeHtml(d.name) + '</button>').join('') + '</div>' +
         '</div>' +
         CROSS_NAV;
       wireHistoryToggles();
+      wireCardioCard(renderDayPick);
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; render(); });
       });
@@ -828,12 +978,14 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       app.innerHTML =
         '<h1 class="dash-title">Séance</h1>' +
         renderHistoryCard(state, unit) +
+        renderCardioCard() +
         '<p class="dash-sub">Quelle séance veux-tu lancer ?</p>' +
         '<div class="day-grid" style="flex-direction:column">' +
         days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '" style="padding:18px;">' + escapeHtml(d.name) + '</button>').join('') +
         '</div>' +
         CROSS_NAV;
       wireHistoryToggles();
+      wireCardioCard(renderDayPick);
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; startExercisePick(); });
       });

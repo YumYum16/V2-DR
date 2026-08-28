@@ -628,21 +628,35 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(PROGRAM_KEY, program);
     return program;
   }
+  // Actual measured cardio burn (Séance's ACSM-formula kcal, from
+  // speed+incline or MET) for a given date, on top of the TDEE estimate —
+  // the weekly-hours activity factor below models a typical/average load,
+  // not what a specific tracked session actually burned that day. Same
+  // logic wearables use for "active calories" added on top of a resting
+  // estimate, not a replacement for it.
+  function cardioKcalOn(dateKey) {
+    const gym = loadJSON(GYM_KEY, {});
+    return (Array.isArray(gym.cardio) ? gym.cardio : [])
+      .filter(c => c.date === dateKey)
+      .reduce((sum, c) => sum + (c.kcal || 0), 0);
+  }
   function computeTargets() {
     const profile = readProfile();
     const liveWeight = readLiveWeightKg();
     const weightKg = liveWeight || profile.weightKg || 75;
     const restDay = isRestDayToday();
     const tdee = computeTDEE(profile, weightKg, restDay);
+    const cardioKcal = cardioKcalOn(todayStr());
+    const tdeeWithCardio = tdee + cardioKcal;
     const program = tickProgram(profile);
-    const target = tdee * (1 - program.deficitPct / 100);
+    const target = tdeeWithCardio * (1 - program.deficitPct / 100);
     const proteinG = Math.round(weightKg * 2.2);
     const proteinKcal = proteinG * 4;
     const fatKcal = Math.max(target * 0.25, weightKg * 0.6 * 9); // floor ~0.6g/kg
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, program, profile };
+    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), cardioKcal: Math.round(cardioKcal), target: Math.round(target), proteinG, fatG, carbsG, program, profile };
   }
 
   // ================================================================
@@ -684,7 +698,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const dateObj = new Date(dateKey + 'T00:00:00');
     const weightKg = weightKgOnOrBefore(dateKey) || profile.weightKg || 75;
     const restDay = isRestDayOn(dateKey);
-    const tdee = computeTDEE(profile, weightKg, restDay);
+    const tdee = computeTDEE(profile, weightKg, restDay) + cardioKcalOn(dateKey);
     const program = loadProgram();
     const deficitPct = deficitPctOn(program, dateObj);
     const target = tdee * (1 - deficitPct / 100);
@@ -1113,7 +1127,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     let html = '<h1 class="dash-title">Alimentation</h1>' +
       '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta vraie perte de poids.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
-      '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau).</p>' +
+      '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau). Une séance de cardio enregistrée dans <a href="seance.html" style="color:var(--text-primary)">Séance</a> (marche/course sur tapis avec vitesse+pente, formule ACSM ; ou vélo/elliptique/rameur/natation via MET, Ainsworth et al. 2011) s\'ajoute par-dessus, en kcal réellement calculées — le facteur d\'activité hebdomadaire reste une moyenne, ça, c\'est la dépense mesurée du jour.</p>' +
       '<p><strong>Déficit adaptatif</strong> : <strong>Garthe et al. (2011)</strong> ont montré que des athlètes perdant du poids à <strong>0.7%/semaine</strong> gagnaient de la masse maigre et de la force pendant leur sèche, contrairement à ceux perdant 1.4%/semaine. Ce programme vise 0.5-0.7%/semaine et ajuste ton déficit chaque semaine selon ta perte réelle (Fitness → Poids), pas une estimation figée.</p>' +
       '<p><strong>Protéines</strong> : <strong>Helms, Aragon &amp; Fitschen (2014)</strong>, revue systématique — 1.8 à 2.7 g/kg de poids de corps pendant une restriction calorique chez les athlètes entraînés en résistance ; 2.2 g/kg utilisé ici. Le reste des calories est réparti entre lipides (plancher ~25% pour la santé hormonale) et glucides (le reste, pour soutenir l\'intensité à l\'entraînement).</p>' +
       '<p><strong>Débloat (sodium/potassium)</strong> : l\'<strong>OMS</strong> recommande &lt; 2000 mg de sodium (5g de sel) et ≥ 3510 mg de potassium par jour — ces deux seuils donnent, une fois atteints, un ratio sodium:potassium molaire d\'environ 1.0, que l\'OMS cite explicitement comme objectif. Un ratio élevé (sodium dominant, potassium faible) est associé à la rétention d\'eau dans la littérature physiologique — pas juste "trop de sel" isolément. Le sodium ici vient de tes aliments (Alimentation), pas d\'une estimation séparée.</p>' +
@@ -1163,6 +1177,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       (targets.restDay ? ' <span class="program-badge warn">Jour de repos — activité réduite</span>' : '') +
       '<div class="program-row"><span>Poids utilisé</span><span>' + targets.weightKg.toFixed(1) + ' kg' + (targets.weightIsLive ? ' (Fitness, live)' : ' (profil Eau)') + '</span></div>' +
       '<div class="program-row"><span>TDEE estimé' + (targets.restDay ? ' (repos)' : '') + '</span><span>' + targets.tdee + ' kcal</span></div>' +
+      (targets.cardioKcal > 0 ? '<div class="program-row"><span>🏃 Cardio (Séance)</span><span>+' + targets.cardioKcal + ' kcal</span></div>' : '') +
       '<div class="program-row"><span>Objectif</span><span>' + targets.target + ' kcal</span></div>' +
       (targets.program.history && targets.program.history.length ?
         '<div class="program-note">' + escapeHtml(targets.program.history[targets.program.history.length-1].note) + '</div>' :
