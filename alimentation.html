@@ -347,10 +347,30 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       }
     } catch (e) {}
   }
-  async function pcPushNow() {
+  // changedKey: which single key this push is actually for. Pushing only
+  // that key — merged onto a fresh read of the cloud row — instead of
+  // blindly overwriting all of PC_SYNCED_KEYS from local storage matters
+  // because saveJSON() is called for ONE key at a time, but every call
+  // used to push all three. A device whose local copy of, say, the food
+  // LOG was stale (pull silently timed out, or it just hadn't been
+  // reopened since food was logged elsewhere) would clobber the cloud's
+  // current log the moment ANYTHING else changed — e.g. the one-time
+  // starter-food seed writing to the food database. That's what erased
+  // a day's entries. Omit changedKey to push everything from local (used
+  // only when flushing a pending offline write, where trusting local is
+  // the point).
+  async function pcPushNow(changedKey) {
     if (!pcSupa) return;
-    const out = {};
-    PC_SYNCED_KEYS.forEach(k => {
+    let cloud = {};
+    try {
+      const result = await Promise.race([
+        pcSupa.from('app_state').select('data').eq('key', PC_APP_KEY).maybeSingle(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (result && !result.error && result.data && result.data.data) cloud = result.data.data;
+    } catch (e) {}
+    const out = Object.assign({}, cloud);
+    (changedKey ? [changedKey] : PC_SYNCED_KEYS).forEach(k => {
       const v = localStorage.getItem(k);
       if (v == null) return;
       try { out[k] = JSON.parse(v); } catch (e) { out[k] = v; }
@@ -395,7 +415,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // ---- storage helpers ----
   function loadJSON(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } }
   function saveJSON(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); pcPushNow(); return true; }
+    try { localStorage.setItem(k, JSON.stringify(v)); if (PC_SYNCED_KEYS.indexOf(k) !== -1) pcPushNow(k); return true; }
     catch (e) {
       console.error('save failed', k, e);
       if (!window.__lastSaveFailAlert || Date.now() - window.__lastSaveFailAlert > 60000) {
