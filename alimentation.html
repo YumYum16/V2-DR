@@ -142,6 +142,13 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .program-row span:last-child { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
 .program-note { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
 
+/* ---- macro gap suggestions ---- */
+.macro-tips { list-style: none; margin: 0; padding: 0; }
+.macro-tip { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); }
+.macro-tip:first-child { border-top: 0; }
+.macro-tip .ic { flex-shrink: 0; }
+.macro-tip strong { color: var(--text-primary); }
+
 /* ---- food calendar ---- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
 .cal-nav-btn {
@@ -742,6 +749,63 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     if (profile.sex === 'f') return age > 50 ? 21 : 25;
     return age > 50 ? 30 : 38;
   }
+
+  // ================================================================
+  // MACRO GAP SUGGESTIONS — "what should I eat to close today's gap
+  // without blowing my kcal budget", computed only from foods already in
+  // your own database (Mes aliments), picking whichever has the best
+  // ratio of the missing macro per kcal. Small, at most 2 tips (the two
+  // biggest relative gaps), and it backs off entirely once the calorie
+  // budget for the day is already spent.
+  // ================================================================
+  const MACRO_TIP_MIN_GAP_G = { protein: 5, fiber: 3, carbs: 10, fat: 5 };
+  function bestFoodForMacro(field, db) {
+    let best = null, bestRatio = -1;
+    db.forEach(f => {
+      const kcal = f.kcalPer100g || 0, macro = f[field] || 0;
+      if (kcal <= 0 || macro <= 0) return;
+      const ratio = macro / kcal;
+      if (ratio > bestRatio) { bestRatio = ratio; best = f; }
+    });
+    return best;
+  }
+  function renderMacroTipsCard(targets, totals, fiberTarget, db) {
+    const kcalRemaining = targets.target - totals.kcal;
+    const defs = [
+      { field: 'proteinPer100g', label: 'Protéines', icon: '🥩', unit: 'g de protéines', targetG: targets.proteinG, haveG: totals.protein, min: MACRO_TIP_MIN_GAP_G.protein },
+      { field: 'fiberPer100g', label: 'Fibres', icon: '🌾', unit: 'g de fibres', targetG: fiberTarget, haveG: totals.fiber, min: MACRO_TIP_MIN_GAP_G.fiber },
+      { field: 'carbsPer100g', label: 'Glucides', icon: '🍞', unit: 'g de glucides', targetG: targets.carbsG, haveG: totals.carbs, min: MACRO_TIP_MIN_GAP_G.carbs },
+      { field: 'fatPer100g', label: 'Lipides', icon: '🧈', unit: 'g de lipides', targetG: targets.fatG, haveG: totals.fat, min: MACRO_TIP_MIN_GAP_G.fat }
+    ];
+    const gaps = defs
+      .map(d => Object.assign({}, d, { gapG: d.targetG - d.haveG }))
+      .filter(d => d.targetG > 0 && d.gapG >= d.min)
+      .sort((a, b) => (b.gapG / b.targetG) - (a.gapG / a.targetG))
+      .slice(0, 2);
+    if (!gaps.length) return '';
+    const tips = [];
+    gaps.forEach(g => {
+      const food = bestFoodForMacro(g.field, db);
+      if (!food) return;
+      const per100 = food[g.field];
+      const gramsNeeded = g.gapG * 100 / per100;
+      const kcalNeeded = gramsNeeded * food.kcalPer100g / 100;
+      if (kcalRemaining <= 0) {
+        tips.push(g.icon + ' <strong>' + g.label + '</strong> : il te manque ' + Math.round(g.gapG) + ' ' + g.unit + ', mais tu as déjà atteint ou dépassé ton objectif calorique — pas de suggestion pour ne pas creuser davantage.');
+      } else if (kcalNeeded <= kcalRemaining) {
+        tips.push(g.icon + ' <strong>' + g.label + '</strong> : il te manque ' + Math.round(g.gapG) + ' ' + g.unit + '. <strong>' + escapeHtml(food.name) + '</strong> est ton option la plus efficace — ~' + Math.round(gramsNeeded) + ' g (' + Math.round(kcalNeeded) + ' kcal) comblerait l\'écart, dans ta marge de ' + Math.round(kcalRemaining) + ' kcal restants.');
+      } else {
+        const gramsCapped = kcalRemaining * 100 / food.kcalPer100g;
+        const macroCovered = gramsCapped * per100 / 100;
+        tips.push(g.icon + ' <strong>' + g.label + '</strong> : il te manque ' + Math.round(g.gapG) + ' ' + g.unit + '. <strong>' + escapeHtml(food.name) + '</strong> est le plus efficace, mais combler tout l\'écart dépasserait ta marge calorique (' + Math.round(kcalRemaining) + ' kcal restants) — à hauteur de ta marge, ~' + Math.round(gramsCapped) + ' g couvriraient ' + Math.round(macroCovered) + ' ' + g.unit + '.');
+      }
+    });
+    if (!tips.length) return '';
+    return '<div class="gm-card">' +
+      '<div class="section-title">Suggestions du jour</div>' +
+      '<ul class="macro-tips">' + tips.map(t => '<li class="macro-tip">' + t + '</li>').join('') + '</ul>' +
+      '</div>';
+  }
   // WHO: under 5g salt/day (~2000mg sodium), at least 3510mg potassium/day
   // — together these give a sodium:potassium molar ratio of ~1.0, which
   // WHO names explicitly as the target ratio (not just two separate caps).
@@ -1081,6 +1145,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<div class="salt-row"><div class="salt-row-head"><span>🌾 Fibres</span><strong>' + Math.round(totals.fiber) + ' / ' + fiberTarget + ' g</strong></div>' +
       '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.fiber/fiberTarget)*100).toFixed(0) + '%;background:' + (totals.fiber >= fiberTarget ? 'var(--lime)' : 'var(--warning)') + ';"></div></div></div>' +
       '</div>';
+
+    html += renderMacroTipsCard(targets, totals, fiberTarget, db);
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +

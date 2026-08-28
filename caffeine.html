@@ -240,8 +240,8 @@ details.info strong { color: var(--text-primary); }
     <div class="gm-card">
       <details class="info"><summary>D'où viennent ces chiffres (études citées)</summary>
         <p><strong>Caféine</strong> : demi-vie de 5h (moyenne de la littérature pharmacocinétique), pic d'effet ~45 min après la prise.</p>
-        <p><strong>Repas → énergie</strong> : chaque aliment enregistré dans <a href="alimentation.html" style="color:var(--text-primary)">Alimentation</a> (avec son heure) influence la courbe. Les glucides nets (glucides − 2×fibres, une approximation de la charge glycémique réelle — les fibres ralentissent l'absorption du glucose, <strong>Jenkins et al.</strong>, travaux fondateurs sur l'index glycémique) donnent un pic d'énergie ~35 min après le repas puis une baisse ~90 min après, un effet dose-dépendant documenté par <strong>Philippou &amp; Constantinou (2014, Nutrition Reviews)</strong> : plus la charge glycémique est élevée, plus la baisse qui suit le pic est marquée. Les lipides ajoutent une somnolence plus lente et plus longue (<strong>Wells et al. 1997, Physiological Behavior</strong> : les repas riches en graisses augmentent la somnolence post-prandiale davantage que les repas riches en glucides). La taille du repas (kcal) ajoute elle-même une petite baisse, indépendamment de sa composition (le "coup de barre" post-repas classique). Les fibres ne fatiguent pas dans cette littérature — elles atténuent le pic-puis-chute des glucides, l'effet inverse de ce qu'on pourrait croire.</p>
-        <p><strong>Couleur de la courbe</strong> : la ligne elle-même vire de vert vers <span style="color:#F2A65A">🟠 orange (lipides)</span> ou <span style="color:#F5D76E">🟡 jaune (glucides)</span> exactement là où cet effet devient sensible, en fondu — plus l'effet est fort, plus la couleur est marquée, puis elle refond vers le vert. Pas de couleur "protéines" : contrairement aux glucides et lipides, il n'existe pas de mécanisme établi par lequel les protéines provoqueraient une baisse d'énergie post-repas — la littérature (hypothèse tyrosine/vigilance de Wurtman) pencherait plutôt dans l'autre sens, mais reste trop contestée pour être modélisée ici. Rien n'est inventé pour compléter la liste de trois.</p>
+        <p><strong>Repas → énergie</strong> : chaque aliment enregistré dans <a href="alimentation.html" style="color:var(--text-primary)">Alimentation</a> (avec son heure) influence la courbe. Les glucides nets (glucides − 2×fibres, une approximation de la charge glycémique réelle — les fibres ralentissent l'absorption du glucose, <strong>Jenkins et al.</strong>, travaux fondateurs sur l'index glycémique) donnent un pic d'énergie ~35 min après le repas — <strong>c'est le vrai effet dominant des glucides ici</strong> — puis une baisse plus petite ~90 min après, un effet dose-dépendant documenté par <strong>Philippou &amp; Constantinou (2014, Nutrition Reviews)</strong> : plus la charge glycémique est élevée, plus la baisse qui suit le pic est marquée. Les glucides ne "fatiguent" donc pas par eux-mêmes — ils boostent d'abord, et ne redescendent que légèrement en dessous de la ligne de base ensuite, surtout si le repas est pauvre en fibres ou riche en sucres rapides. Les lipides ajoutent une somnolence plus lente et plus longue (<strong>Wells et al. 1997, Physiological Behavior</strong> : les repas riches en graisses augmentent la somnolence post-prandiale davantage que les repas riches en glucides). La taille du repas (kcal) ajoute elle-même une petite baisse, indépendamment de sa composition (le "coup de barre" post-repas classique). Les fibres ne fatiguent pas dans cette littérature — elles atténuent le pic-puis-chute des glucides, l'effet inverse de ce qu'on pourrait croire.</p>
+        <p><strong>Couleur de la courbe</strong> : la ligne elle-même vire de vert vers <span style="color:#7DD3FC">🔵 bleu (regain glucidique)</span>, <span style="color:#F5D76E">🟡 jaune (baisse glucidique)</span> ou <span style="color:#F2A65A">🟠 orange (lipides)</span> exactement là où l'effet correspondant devient sensible, en fondu — plus l'effet est fort, plus la couleur est marquée, puis elle refond vers le vert. Le bleu (le regain) apparaît systématiquement avant le jaune (la baisse qui suit) pour un même repas — la liste "Repas d'aujourd'hui" plus bas détaille les deux pour chaque aliment, pas seulement la baisse. Pas de couleur "protéines" : contrairement aux glucides et lipides, il n'existe pas de mécanisme établi par lequel les protéines provoqueraient une baisse d'énergie post-repas — la littérature (hypothèse tyrosine/vigilance de Wurtman) pencherait plutôt dans l'autre sens, mais reste trop contestée pour être modélisée ici. Rien n'est inventé pour compléter la liste de trois.</p>
         <p><strong>Limite</strong> : sans repas enregistré à une heure donnée, la courbe ne prévoit aucun effet alimentaire à ce moment — elle ne devine pas les repas non enregistrés.</p>
       </details>
       <div class="energy-head">
@@ -284,12 +284,24 @@ details.info strong { color: var(--text-primary); }
   <div class="section">
     <div class="section-title">Minutage intelligent</div>
     <div class="gm-card">
+      <div class="train-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <label for="trainTimeInput" style="font-size:11px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:var(--text-tertiary);">🏋️ Entraînement prévu aujourd'hui</label>
+        <input type="time" id="trainTimeInput" class="gm-input" style="max-width:130px;">
+      </div>
       <div class="tile-grid">
         <div class="mini peak"><div class="k">Plus productif</div><div class="v" id="mPeak">—</div><div class="s" id="mPeakSub"></div></div>
         <div class="mini crash"><div class="k">Coup de barre</div><div class="v" id="mCrash">—</div><div class="s" id="mCrashSub"></div></div>
         <div class="mini cutoff"><div class="k">Limite café</div><div class="v" id="mCutoff">—</div><div class="s" id="mCutoffSub"></div></div>
       </div>
       <ul class="tips" id="tips"></ul>
+    </div>
+  </div>
+
+  <!-- MEALS & THEIR EFFECT (not just the crash) -->
+  <div class="section" id="mealsSection" style="display:none;">
+    <div class="section-title">Repas d'aujourd'hui et leur effet</div>
+    <div class="gm-card">
+      <ul class="log-list" id="mealsList"></ul>
     </div>
   </div>
 
@@ -419,6 +431,18 @@ details.info strong { color: var(--text-primary); }
     const log = loadJSON(FOOD_LOG_KEY, {});
     return (log[todayDateKey()] || []).filter(e => timeStrToHour(e.time) != null);
   }
+
+  /* ============ Planned training today (optional, for pre-workout dosing) ============ */
+  const TRAIN_TIME_KEY = 'caf:trainTime';
+  function trainHour() {
+    const t = loadJSON(TRAIN_TIME_KEY, null);
+    if (!t || t.date !== todayDateKey()) return null;
+    return timeStrToHour(t.time);
+  }
+  function saveTrainTime(hm) {
+    if (!hm) { localStorage.removeItem(TRAIN_TIME_KEY); return; }
+    saveJSON(TRAIN_TIME_KEY, { date: todayDateKey(), time: hm });
+  }
   function dailyLimit() { if (recovery!=null && recovery<34) return 200; if (recovery!=null && recovery<67) return 300; return FDA_MAX; }
   function moderateTarget() { return bodyKg ? Math.round(3*bodyKg) : 200; }
 
@@ -478,16 +502,20 @@ details.info strong { color: var(--text-primary); }
     todaysFoodEntries().forEach(entry => { e += entryEffectAt(entry, t); });
     return e;
   }
-  // Total carb-crash / fat-drag at a given hour, summed across every food
-  // logged today — used to fade the line's own color at the moment each
-  // effect actually bites, instead of a separate label.
+  // Total carb-bump / carb-crash / fat-drag at a given hour, summed across
+  // every food logged today — used to fade the line's own color at the
+  // moment each effect actually bites, instead of a separate label. The
+  // bump is included (not just crash/fatDrag) so the chart also shows
+  // carbs *helping* — otherwise the line only ever colors on the way
+  // down, which reads as "carbs = fatigue" when the model actually gives
+  // them a bigger early lift than the later dip.
   function foodDipComponentsAt(t){
-    let crash=0, fatDrag=0;
+    let bump=0, crash=0, fatDrag=0;
     todaysFoodEntries().forEach(entry => {
       const c = entryEffectComponents(entry, t);
-      crash += c.crash; fatDrag += c.fatDrag;
+      bump += c.bump; crash += c.crash; fatDrag += c.fatDrag;
     });
-    return { crash, fatDrag };
+    return { bump, crash, fatDrag };
   }
   function hexToRgb(hex){ const n=parseInt(hex.replace('#',''),16); return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 }; }
   function lerpColor(hexA, hexB, t){
@@ -496,13 +524,16 @@ details.info strong { color: var(--text-primary); }
     return 'rgb('+Math.round(a.r+(b.r-a.r)*t)+','+Math.round(a.g+(b.g-a.g)*t)+','+Math.round(a.b+(b.b-a.b)*t)+')';
   }
   const LINE_BASE_COLOR = '#6BE3A4';
-  // Orange for fat, yellow for carbs — whichever term is bigger at that
-  // moment wins; a floor of 0.3 keeps the line green except where the
-  // effect is actually noticeable, not everywhere it's technically nonzero.
+  // Orange for fat, yellow for carb-crash, cyan for carb-bump — whichever
+  // term is biggest at that moment wins; a floor of 0.3 keeps the line
+  // green except where an effect is actually noticeable. The bump check
+  // comes last (lowest priority) since it's a "good" effect and the dips
+  // are the ones worth flagging when they overlap.
   function lineColorAt(t){
-    const { crash, fatDrag } = foodDipComponentsAt(t);
-    if (fatDrag >= crash && fatDrag > 0.3) return lerpColor(LINE_BASE_COLOR, '#F2A65A', fatDrag/5);
-    if (crash > 0.3) return lerpColor(LINE_BASE_COLOR, '#F5D76E', crash/6);
+    const { bump, crash, fatDrag } = foodDipComponentsAt(t);
+    if (fatDrag >= crash && fatDrag >= bump && fatDrag > 0.3) return lerpColor(LINE_BASE_COLOR, '#F2A65A', fatDrag/5);
+    if (crash >= bump && crash > 0.3) return lerpColor(LINE_BASE_COLOR, '#F5D76E', crash/6);
+    if (bump > 0.3) return lerpColor(LINE_BASE_COLOR, '#7DD3FC', bump/6);
     return LINE_BASE_COLOR;
   }
   function sleepPressure(awakeH){ return clamp(awakeH,0,24)*1.7; }
@@ -569,6 +600,24 @@ details.info strong { color: var(--text-primary); }
     // COFFEE CUTOFF: latest time a 95mg coffee stays <30mg by bedtime
     const cutoff = bedHour - HALF_LIFE_H*Math.log2(95/30); // hours
     return { now, peakT, peakV:Math.round(peakV), pStart, pEnd, crashT, crashSignificant, crashTo, cutoff };
+  }
+
+  // TRAINING-DAY DOSE: the sleep cutoff above answers "when do I stop for
+  // the night" — it says nothing about "I train at 18h30, can I still get
+  // a pre-workout boost". This answers that second question directly:
+  // the largest dose, taken ~45 min before training (its peak-effect
+  // window), that still decays to a sleep-safe ~50mg by bedtime.
+  function trainingCaffeinePlan(th) {
+    if (th == null) return null;
+    const idealIntake = th - 0.75;
+    const intake = Math.max(idealIntake, nowHour());
+    let bed = bedHour;
+    if (bed <= intake) bed += 24;
+    const hoursToBed = bed - intake;
+    const maxDoseForBed = Math.round(50 * Math.pow(2, hoursToBed / HALF_LIFE_H));
+    const perfDose = bodyKg ? Math.round(3 * bodyKg) : 200;
+    const recommendedDose = Math.min(perfDose, maxDoseForBed);
+    return { intake, maxDoseForBed, perfDose, recommendedDose };
   }
 
   /* ============ Rendering ============ */
@@ -685,10 +734,55 @@ details.info strong { color: var(--text-primary); }
     else tips.push(['🌙','Vous pouvez encore prendre un café jusqu\'à ~'+fmtClock(a.cutoff)+' sans compromettre votre coucher de '+fmtClock(bedHour)+'.']);
     if(atBed>=50) tips.push(['⚠️','~'+atBed+' mg seront encore actifs au coucher — de quoi retarder le sommeil profond. Levez le pied.']);
     if(a.crashSignificant) tips.push(['🚶','Contrez la baisse de '+fmtClock(a.crashT)+' avec 10 min de lumière du jour et de l\'eau plutôt qu\'un autre café — vous éviterez un coup de barre tardif.']);
+    const th = trainHour();
+    if (th != null && th >= a.now - 0.25) {
+      const plan = trainingCaffeinePlan(th);
+      if (plan.recommendedDose >= 80) {
+        tips.push(['🏋️','Séance à '+fmtClock(th)+' : prenez ~'+plan.recommendedDose+' mg vers '+fmtClock(plan.intake)+' (45 min avant, le temps d\'atteindre le pic) — ça reste sous ~50 mg actifs à votre coucher de '+fmtClock(bedHour)+', donc la perf sans sacrifier le sommeil.']);
+      } else if (plan.maxDoseForBed > 20) {
+        tips.push(['🏋️','Séance à '+fmtClock(th)+', mais si proche du coucher qu\'une pleine dose pré-workout laisserait un résidu — limitez-vous à ~'+plan.maxDoseForBed+' mg vers '+fmtClock(plan.intake)+' (un café léger plutôt qu\'un pré-workout dosé).']);
+      } else {
+        tips.push(['🏋️','Séance à '+fmtClock(th)+' trop proche de votre coucher ('+fmtClock(bedHour)+') pour de la caféine sans nuire au sommeil — misez sur un repas riche en glucides ~1-2h avant pour l\'énergie de la séance, la caféine coûterait plus cher en récup que ce qu\'elle apporterait en perf.']);
+      }
+    }
     tips.push(['💧','Buvez un verre d\'eau pour chaque boisson caféinée — la déshydratation imite et aggrave le coup de barre.']);
     if(recovery!=null && recovery<34) tips.push(['🔋','La récupération WHOOP est de '+recovery+'% — faible. La caféine masque la fatigue mais ne compense pas la dette de sommeil ; restez sous '+dailyLimit()+' mg aujourd\'hui.']);
     const ul=$('tips'); ul.innerHTML='';
     tips.forEach(([ic,txt])=>{ const li=document.createElement('li'); li.className='tip'; li.innerHTML='<span class="ic">'+ic+'</span><span>'+txt+'</span>'; ul.appendChild(li); });
+  }
+
+  // Per-food breakdown — the chart's line color only shows whichever
+  // effect (bump/crash/fatDrag) is biggest at a given minute, so a food
+  // with a real boost can still look like "just a dip" if you only skim
+  // the curve. This spells out both halves for every food logged today.
+  function mealEffectSummary(entry){
+    const mealT = timeStrToHour(entry.time);
+    if (mealT == null) return null;
+    const carbs = entry.carbs||0, fat = entry.fat||0, fiber = entry.fiber||0;
+    const netCarbs = Math.max(0, carbs - fiber*2);
+    const bumpPeak = 0.12*netCarbs, crashPeak = 0.10*netCarbs, fatDragPeak = 0.15*fat;
+    const parts = [];
+    if (bumpPeak >= 0.5) parts.push({ txt: '↑ regain vers '+fmtClock(mealT+0.6), cls: 'up' });
+    if (crashPeak >= 0.5) parts.push({ txt: '↓ légère baisse vers '+fmtClock(mealT+1.6), cls: 'down' });
+    if (fatDragPeak >= 0.5) parts.push({ txt: '↓ somnolence (lipides) vers '+fmtClock(mealT+1.6), cls: 'down' });
+    if (!parts.length) return { parts: [{ txt: 'Effet négligeable sur l\'énergie.', cls: 'neutral' }] };
+    return { parts };
+  }
+  function renderMeals(){
+    const section = $('mealsSection'), list = $('mealsList');
+    const entries = todaysFoodEntries();
+    if (!entries.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    list.innerHTML = '';
+    entries.slice().sort((a,b)=>timeStrToHour(a.time)-timeStrToHour(b.time)).forEach(entry => {
+      const s = mealEffectSummary(entry);
+      if (!s) return;
+      const colorFor = (cls) => cls==='up' ? '#7DD3FC' : (cls==='down' ? '#F5D76E' : 'var(--text-tertiary)');
+      const meta = s.parts.map(p => '<span style="color:'+colorFor(p.cls)+'">'+escapeHtml(p.txt)+'</span>').join('<span class="sep">•</span>');
+      const li = document.createElement('li'); li.className = 'log-row';
+      li.innerHTML = '<div class="log-main"><div class="log-name">'+escapeHtml(entry.foodName||'Aliment')+'</div><div class="log-meta">'+meta+'</div></div><span class="log-time">'+entry.time+'</span>';
+      list.appendChild(li);
+    });
   }
 
   function renderDaily(){
@@ -741,7 +835,7 @@ details.info strong { color: var(--text-primary); }
     });
   }
 
-  function renderAll(){ renderRing(); renderChart(); renderPlan(); renderDaily(); renderLog(); renderRepeatYesterday(); }
+  function renderAll(){ renderRing(); renderChart(); renderPlan(); renderMeals(); renderDaily(); renderLog(); renderRepeatYesterday(); }
 
   /* ============ Logging / search / custom ============ */
   function logDrink(item){ logs.push({id:'c'+Date.now()+Math.floor(Math.random()*1000), n:item.n, mg:Math.round(item.mg), e:item.e||'☕', ts:Date.now()}); saveJSON(LOGS_KEY,logs); renderAll(); }
@@ -782,6 +876,12 @@ details.info strong { color: var(--text-primary); }
   $('search').addEventListener('input',(e)=>renderResults(e.target.value));
   $('customAdd').addEventListener('click',addCustom);
   $('customMg').addEventListener('keydown',(e)=>{ if(e.key==='Enter') addCustom(); });
+  (function initTrainInput(){
+    const el = $('trainTimeInput');
+    const t = loadJSON(TRAIN_TIME_KEY, null);
+    if (t && t.date === todayDateKey()) el.value = t.time;
+    el.addEventListener('change', () => { saveTrainTime(el.value || null); renderPlan(); });
+  })();
 
   readProfile();
   renderResults('');
