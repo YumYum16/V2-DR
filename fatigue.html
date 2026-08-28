@@ -385,6 +385,53 @@ details.info strong { color: var(--text-primary); }
     return { ready: true, ratio, cls, label, acute, chronic, useRpe };
   }
 
+  // A single ratio hides the trend that actually matters — is the acute
+  // line climbing toward the chronic one, or has it already crossed and
+  // is coming back down. Plots both rolling averages over 60 days so the
+  // ACWR reads as a trajectory, the way it's actually used in the sports-
+  // science literature this page cites (Gabbett), not a one-off number.
+  function rollingAvg(loads, dateKeys, idx, window){
+    let sum = 0;
+    for (let i = Math.max(0, idx - window + 1); i <= idx; i++) sum += loads[dateKeys[i]] || 0;
+    return sum / window;
+  }
+  function renderFatigueChart(gym, fatigue){
+    if (!fatigue.ready) return '';
+    const sessions = sessionsFromGym(gym);
+    const loads = dailyLoads(sessions, fatigue.useRpe);
+    const DAYS = 60;
+    const dateKeys = [];
+    for (let i = DAYS - 1; i >= 0; i--) dateKeys.push(daysAgoStr(i));
+    const acuteSeries = dateKeys.map((_, i) => rollingAvg(loads, dateKeys, i, 7));
+    const chronicSeries = dateKeys.map((_, i) => rollingAvg(loads, dateKeys, i, 28));
+    const dayVals = dateKeys.map(k => loads[k] || 0);
+    const maxVal = Math.max(1, ...dayVals, ...acuteSeries, ...chronicSeries);
+    const W = 600, H = 150, padB = 6, padT = 6;
+    const X = i => (i / (DAYS - 1)) * W;
+    const Y = v => H - padB - (v / maxVal) * (H - padB - padT);
+    let bars = '';
+    dayVals.forEach((v, i) => {
+      if (!v) return;
+      const w = (W / DAYS) * 0.7, x = X(i) - w / 2;
+      bars += '<rect x="' + x.toFixed(1) + '" y="' + Y(v).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + (H - padB - Y(v)).toFixed(1) + '" fill="rgba(255,255,255,0.09)" rx="1"/>';
+    });
+    const linePath = (series, color) => {
+      let d = 'M ' + X(0).toFixed(1) + ' ' + Y(series[0]).toFixed(1);
+      series.forEach((v, i) => { if (i) d += ' L ' + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); });
+      return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+    };
+    return '<div class="gm-card">' +
+      '<div class="section-title">Évolution de la charge (60 jours)</div>' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:150px;display:block;" preserveAspectRatio="none">' +
+      bars + linePath(chronicSeries, '#7DD3FC') + linePath(acuteSeries, '#6BE3A4') +
+      '</svg>' +
+      '<div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text-tertiary);">' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#6BE3A4;margin-right:5px;"></span>Charge aiguë (7j)</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7DD3FC;margin-right:5px;"></span>Charge chronique (28j)</span>' +
+      '</div>' +
+      '<div class="fatigue-note">Quand la ligne verte (aiguë) dépasse nettement la bleue (chronique) et reste au-dessus, c\'est le signal de surcharge ACWR — une tendance qui se lit dans le temps, pas juste le chiffre du jour.</div>' +
+      '</div>';
+  }
   function renderFatigueCard(gym, fatigue){
     if (!fatigue.ready) {
       return '<div class="gm-card"><div class="section-title">Fatigue (charge d\'entraînement)</div>' +
@@ -541,6 +588,7 @@ details.info strong { color: var(--text-primary); }
       '<p>Volume d\'entraînement et hypertrophie : voir aussi le panneau du <strong>suivi musculaire</strong> (Schoenfeld, Grgic, Krieger).</p>' +
       '</details>' +
       renderFatigueCard(gym, fatigue) +
+      renderFatigueChart(gym, fatigue) +
       renderFatigueMotivationLink(fatigue, mood) +
       renderMotivationCard(gym, mood) +
       CROSS_NAV;

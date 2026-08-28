@@ -837,7 +837,62 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     });
     return best;
   }
-  function renderMacroTipsCard(targets, totals, fiberTarget, db) {
+  function timeGapMin(t1, t2) {
+    if (!t1 || !t2) return Infinity;
+    const [h1, m1] = t1.split(':').map(Number), [h2, m2] = t2.split(':').map(Number);
+    return (h2 * 60 + m2) - (h1 * 60 + m1);
+  }
+  // Schoenfeld, Aragon & Krieger (2018), "How much protein can the body
+  // use in a single meal for muscle-building? Implications for daily
+  // protein distribution": the muscle protein synthesis response to a
+  // meal plateaus above ~0.4g/kg — the same daily total split into 3-4
+  // meals stimulates MPS more over the day than the same total crammed
+  // into 1-2 meals. Meals aren't a field anywhere in this app's data, so
+  // they're inferred as log entries within 45min of each other.
+  function proteinMealTip(entries, targets) {
+    if (!entries.length) return null;
+    const totalProtein = entries.reduce((s, e) => s + (e.protein || 0), 0);
+    if (totalProtein < 40) return null; // too little logged yet to judge distribution
+    const sorted = entries.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const meals = [];
+    sorted.forEach(e => {
+      const last = meals[meals.length - 1];
+      if (last && timeGapMin(last.time, e.time) <= 45) { last.protein += (e.protein || 0); last.time = e.time; }
+      else meals.push({ time: e.time, protein: e.protein || 0 });
+    });
+    const perMealTarget = 0.4 * targets.weightKg;
+    const substantialMeals = meals.filter(m => m.protein >= perMealTarget * 0.6).length;
+    if (substantialMeals >= 3) return null; // already well distributed
+    return '🍽️ <strong>Répartition des protéines</strong> : ' + Math.round(totalProtein) + ' g répartis sur ' + substantialMeals + ' prise(s) substantielle(s) aujourd\'hui. Au-delà d\'environ ' + Math.round(perMealTarget) + ' g par repas (~0.4 g/kg), l\'effet sur la synthèse protéique musculaire plafonne (<strong>Schoenfeld, Aragon &amp; Krieger, 2018</strong>) — répartir sur 3-4 prises dans la journée sert mieux l\'hypertrophie que la même quantité concentrée sur 1-2 gros repas.';
+  }
+  // A training-volume spike raises energy/recovery demands the way the
+  // weekly-hours activity factor (a fixed setting) can't react to — a
+  // deficit combined with a sudden jump in sets works against recovery
+  // and muscle protein synthesis (Areta et al., 2014; Iraki et al.,
+  // 2019, on nutrition for resistance-trained athletes in a cut).
+  // Qualitative on purpose: unlike cardio's ACSM formula, there's no
+  // well-established kcal-per-set figure worth inventing here.
+  function weeklyVolumeNote() {
+    const gym = loadJSON(GYM_KEY, {});
+    const logs = gym.logs || {};
+    function countSetsInWindow(startAgo, endAgo) {
+      let n = 0;
+      Object.values(logs).forEach(arr => {
+        (arr || []).forEach(l => {
+          if (!l.date) return;
+          const days = (Date.now() - new Date(l.date + 'T00:00:00').getTime()) / DAY_MS;
+          if (days >= startAgo && days < endAgo) n++;
+        });
+      });
+      return n;
+    }
+    const thisWeek = countSetsInWindow(0, 7), lastWeek = countSetsInWindow(7, 14);
+    if (!thisWeek || !lastWeek) return null;
+    const increasePct = (thisWeek - lastWeek) / lastWeek;
+    if (increasePct < 0.25) return null;
+    return '📈 <strong>Volume en hausse</strong> : ' + thisWeek + ' séries cette semaine vs ' + lastWeek + ' la semaine dernière (+' + Math.round(increasePct * 100) + '%). Un pic de volume combiné à un déficit calorique nuit à la récupération et à la synthèse protéique musculaire (<strong>Areta et al., 2014</strong> ; <strong>Iraki et al., 2019</strong>, sur la nutrition des athlètes en sèche) — vise au moins ton objectif calorique cette semaine, pas en dessous.';
+  }
+  function renderMacroTipsCard(targets, totals, fiberTarget, db, entries) {
     const kcalRemaining = targets.target - totals.kcal;
     const defs = [
       { field: 'proteinPer100g', label: 'Protéines', icon: '🥩', unit: 'g de protéines', targetG: targets.proteinG, haveG: totals.protein, min: MACRO_TIP_MIN_GAP_G.protein },
@@ -850,8 +905,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       .filter(d => d.targetG > 0 && d.gapG >= d.min)
       .sort((a, b) => (b.gapG / b.targetG) - (a.gapG / a.targetG))
       .slice(0, 2);
-    if (!gaps.length) return '';
     const tips = [];
+    const volNote = weeklyVolumeNote();
+    if (volNote) tips.push(volNote);
+    const mealTip = proteinMealTip(entries, targets);
+    if (mealTip) tips.push(mealTip);
     gaps.forEach(g => {
       const food = bestFoodForMacro(g.field, db);
       if (!food) return;
@@ -1219,7 +1277,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<div class="salt-bar-track"><div class="salt-bar-fill" style="width:' + Math.min(100, (totals.fiber/fiberTarget)*100).toFixed(0) + '%;background:' + (totals.fiber >= fiberTarget ? 'var(--lime)' : 'var(--warning)') + ';"></div></div></div>' +
       '</div>';
 
-    html += renderMacroTipsCard(targets, totals, fiberTarget, db);
+    html += renderMacroTipsCard(targets, totals, fiberTarget, db, entries);
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +

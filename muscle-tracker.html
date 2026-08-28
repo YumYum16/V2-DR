@@ -477,6 +477,7 @@
   <h2 id="bilanTitle">Bilan &mdash; 1 mois</h2>
   <p class="summary-line" id="bilanSummary"></p>
   <div class="bilan-grid" id="bilanGrid"></div>
+  <p class="summary-line" id="bilanUnrecognized" style="display:none;color:var(--text-tertiary);"></p>
 </div>
 
 <p class="note">Segmentation automatique à partir de l'image d'origine &middot; certaines zones sont regroupées quand le dessin ne sépare pas les muscles.</p>
@@ -533,6 +534,8 @@ const DAY_MS = 86400000;
 
   const history = {};
   const contrib = {}; // key -> [{ date, name, weight }] pour le détail au clic
+  const setCounts = {}; // key -> { dateStr -> weighted set count } — volume (séries/semaine), distinct from history's recency/intensity score
+  const unrecognized = new Set(); // exercise names with logged sets that EXERCISE_MUSCLE_MAP doesn't match — their volume is silently missing from every stat below until it's taught a pattern
   const pieceIndex = { front: [], back: [] };
   let periodDays = 30;
 
@@ -540,6 +543,11 @@ const DAY_MS = 86400000;
   function parseDate(s){
     const [y,m,d] = s.split('-').map(Number);
     return new Date(y, m-1, d);
+  }
+  function formatShortDate(s){
+    const dt = parseDate(s);
+    const mons = ['jan','fév','mars','avr','mai','juin','juil','août','sep','oct','nov','déc'];
+    return dt.getDate() + ' ' + mons[dt.getMonth()];
   }
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -560,7 +568,8 @@ const DAY_MS = 86400000;
     { match: /d[ée]velopp[ée].*couch[ée]|\bbench\b/i, hits: [['front_pec',1],['back_triceps',.5],['front_delt',.35]] },
     { match: /d[ée]velopp[ée].*inclin[ée]|incline.*press/i, hits: [['front_pec',.9],['front_delt',.5],['back_triceps',.5]] },
     { match: /d[ée]velopp[ée].*d[ée]clin[ée]|decline.*press/i, hits: [['front_pec',1],['back_triceps',.4]] },
-    { match: /[ée]cart[ée]|\bfly\b|pec.?deck|papillon/i, hits: [['front_pec',1],['front_delt',.2]] },
+    { match: /[ée]cart[ée]|\bfly\b|pec.?deck|papillon|crossover/i, hits: [['front_pec',1],['front_delt',.2]] },
+    { match: /chest.?press/i, hits: [['front_pec',1],['back_triceps',.5],['front_delt',.35]] },
     { match: /pompe|push.?up/i, hits: [['front_pec',.8],['back_triceps',.5],['front_delt',.3],['front_abdos',.2]] },
     { match: /\bdips?\b/i, hits: [['front_pec',.6],['back_triceps',.8],['front_delt',.25]] },
     // --- Dos ---
@@ -586,7 +595,7 @@ const DAY_MS = 86400000;
     { match: /front.?squat/i, hits: [['front_quad',1],['back_fessier',.5]] },
     { match: /squat/i, hits: [['front_quad',1],['back_fessier',.8],['back_ischios',.3],['front_add',.3],['back_lombaires',.3]] },
     { match: /presse.*cuisses|leg.?press/i, hits: [['front_quad',1],['back_fessier',.6],['back_ischios',.2]] },
-    { match: /fente|lunge/i, hits: [['front_quad',.8],['back_fessier',.8],['back_ischios',.3]] },
+    { match: /fente|lunge|split.?squat|bulgarian/i, hits: [['front_quad',.8],['back_fessier',.8],['back_ischios',.3]] },
     { match: /extension.*jambes?|leg.?extension/i, hits: [['front_quad',1]] },
     { match: /curl.*ischio|curl.*jambes?|leg.?curl/i, hits: [['back_ischios',1]] },
     { match: /hip.?thrust|pont.*fessier|glute.?bridge/i, hits: [['back_fessier',1],['back_ischios',.4]] },
@@ -615,12 +624,17 @@ const DAY_MS = 86400000;
   function rebuildHistory(){
     Object.keys(history).forEach(k => delete history[k]);
     Object.keys(contrib).forEach(k => delete contrib[k]);
+    Object.keys(setCounts).forEach(k => delete setCounts[k]);
+    unrecognized.clear();
     const gym = readGymState();
     const exercises = Array.isArray(gym.exercises) ? gym.exercises : [];
     const logs = (gym.logs && typeof gym.logs === 'object') ? gym.logs : {};
     exercises.forEach(ex => {
       const hits = musclesForExercise(ex.name);
-      if (!hits) return;
+      if (!hits) {
+        if ((logs[ex.id] || []).length) unrecognized.add(ex.name);
+        return;
+      }
       const sets = logs[ex.id] || [];
       const doneDates = new Set(sets.map(s => (s.date || '').slice(0, 10)).filter(Boolean));
       doneDates.forEach(dateStr => {
@@ -629,6 +643,28 @@ const DAY_MS = 86400000;
           history[key][dateStr] = Math.max(history[key][dateStr] || 0, w);
           contrib[key] = contrib[key] || [];
           contrib[key].push({ date: dateStr, name: ex.name, weight: w });
+        });
+      });
+      // Volume (distinct from the recency score above): every set counts,
+      // summed across every exercise that hits a muscle the same day —
+      // 3 sets of bench + 3 of incline press is ~6 sets for pecs, not
+      // capped at one exercise like the freshness model above. Grouped by
+      // (date, time) rather than raw entry count so a unilateral
+      // exercise's separate left/right log entries — the same physical
+      // set, logged twice — collapse to one, matching how the volume-
+      // landmark literature (Schoenfeld et al.) counts a set.
+      const instancesByDate = {};
+      sets.forEach(s => {
+        const d = (s.date || '').slice(0, 10);
+        if (!d) return;
+        instancesByDate[d] = instancesByDate[d] || new Set();
+        instancesByDate[d].add(s.time || s.id || Math.random());
+      });
+      Object.keys(instancesByDate).forEach(dateStr => {
+        const n = instancesByDate[dateStr].size;
+        hits.forEach(([key, w]) => {
+          setCounts[key] = setCounts[key] || {};
+          setCounts[key][dateStr] = (setCounts[key][dateStr] || 0) + n * w;
         });
       });
     });
@@ -666,6 +702,29 @@ const DAY_MS = 86400000;
     if(stat.perWeek >= 1.8) return { tag: 'Fréquence optimale', cls: 'optimal' };
     if(stat.perWeek >= 0.8) return { tag: 'Fréquence correcte', cls: 'correct' };
     return { tag: 'Fréquence faible', cls: 'low' };
+  }
+  function volumeStats(key, days){
+    const dates = setCounts[key] || {};
+    const now = new Date();
+    let total = 0;
+    Object.keys(dates).forEach(s => { if((now - parseDate(s)) / DAY_MS <= days) total += dates[s]; });
+    const weeks = days / 7;
+    return { totalSets: total, perWeek: total / weeks };
+  }
+  // Schoenfeld, Ogborn & Krieger (2017) dose-response meta-analysis on
+  // weekly sets vs. hypertrophy, and the ~10-20 sets/muscle/week range
+  // widely cited from it (also used in Fatigue/Séance elsewhere in this
+  // app) — below ~6/week undershoots most trainees' minimum effective
+  // volume (Israetel et al.'s MEV concept), 10-20 is the well-supported
+  // growth range, and past ~20 the marginal gain per extra set tends to
+  // flatten while fatigue cost keeps climbing (Baz-Valle et al., 2022,
+  // meta-regression).
+  function volumeVerdict(setsPerWeek){
+    if(setsPerWeek === 0) return { tag: 'Aucun volume', cls: 'none' };
+    if(setsPerWeek < 6) return { tag: 'Volume insuffisant', cls: 'low' };
+    if(setsPerWeek < 10) return { tag: 'Volume correct', cls: 'correct' };
+    if(setsPerWeek <= 20) return { tag: 'Volume optimal', cls: 'optimal' };
+    return { tag: 'Volume élevé (rendements décroissants)', cls: 'correct' };
   }
 
   function loadPieceCanvas(p){
@@ -754,9 +813,16 @@ const DAY_MS = 86400000;
     const lastDays = Math.max(0, Math.floor((new Date() - parseDate(items[0].date)) / DAY_MS));
     const seen = {};
     const names = items.filter(it => (seen[it.name] ? false : (seen[it.name] = true))).slice(0, 6);
+    const vol = volumeStats(key, 30);
+    const vv = volumeVerdict(vol.perWeek);
+    const perSession = Object.entries(setCounts[key] || {})
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 6);
     panel.innerHTML =
       '<div class="mt-detail-title">' + escapeHtml(label)
       + ' <span class="mt-detail-sub">· dernière séance il y a ' + lastDays + (lastDays <= 1 ? ' jour' : ' jours') + '</span></div>'
+      + '<div class="mt-detail-sub">' + vol.perWeek.toFixed(1) + ' séries/semaine (30j) — <span class="btag" style="margin-left:2px;">' + vv.tag + '</span></div>'
+      + (perSession.length ? '<ul class="mt-detail-list">' + perSession.map(([d, n]) => '<li>' + formatShortDate(d) + ' — ' + n.toFixed(1) + ' série(s) équivalentes</li>').join('') + '</ul>' : '')
       + '<ul class="mt-detail-list">' + names.map(it => '<li>' + escapeHtml(it.name) + '</li>').join('') + '</ul>';
     panel.style.display = 'block';
   }
@@ -834,16 +900,27 @@ const DAY_MS = 86400000;
       trained + ' muscle(s) travaillé(s) sur ' + rows.length + ' &middot; ' +
       totalDaysActive + ' jour(s) d\'entraînement actif sur la période'.replace('&middot;','·');
 
+    const unrecEl = document.getElementById('bilanUnrecognized');
+    if (unrecognized.size) {
+      unrecEl.style.display = 'block';
+      unrecEl.textContent = '⚠️ Pas reconnu(s), donc absent(s) de tous les chiffres ci-dessus : ' + Array.from(unrecognized).join(', ') + '.';
+    } else {
+      unrecEl.style.display = 'none';
+    }
+
     const grid = document.getElementById('bilanGrid');
     grid.innerHTML = '';
     rows.forEach(r => {
       const v = verdict(r.stat);
+      const vol = volumeStats(r.key, periodDays);
+      const vv = volumeVerdict(vol.perWeek);
       const item = document.createElement('div');
-      item.className = 'bilan-item ' + v.cls;
+      item.className = 'bilan-item ' + vv.cls;
       item.innerHTML =
         '<div class="bname">' + r.label + ' <span style="color:var(--text-tertiary);font-weight:400;">(' + (r.view==='front'?'devant':'dos') + ')</span></div>' +
-        '<div class="bstat">' + r.stat.count + ' séance(s) &middot; ' + r.stat.perWeek.toFixed(1) + '/semaine</div>' +
-        '<span class="btag">' + v.tag + '</span>';
+        '<div class="bstat">' + r.stat.count + ' séance(s) &middot; ' + r.stat.perWeek.toFixed(1) + '/semaine &middot; ' + vol.perWeek.toFixed(1) + ' séries/semaine</div>' +
+        '<span class="btag">' + vv.tag + '</span>' +
+        '<span class="btag" style="margin-left:6px;opacity:.75;">' + v.tag + '</span>';
       grid.appendChild(item);
     });
   }
