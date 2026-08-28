@@ -1525,6 +1525,10 @@ img, video, canvas, svg { max-width: 100%; }
       Poids du corps (tractions, pompes, dips…)
     </label>
     <label class="po-bw-toggle">
+      <input type="checkbox" id="exUnilateral">
+      Unilatéral (un bras / une jambe à la fois — logué séparément par côté)
+    </label>
+    <label class="po-bw-toggle">
       <input type="checkbox" id="exAlternate">
       Alterne avec un autre exercice (1 fois sur 2)
     </label>
@@ -2164,6 +2168,7 @@ img, video, canvas, svg { max-width: 100%; }
       modalDays = (ex.days || []).slice();
       $('exFixedWeight').checked = !!ex.fixedWeight;
       $('exBodyweight').checked = !!ex.bodyweight;
+      $('exUnilateral').checked = !!ex.unilateral;
       $('exAlternate').checked = !!ex.alternateId;
       renderAlternateSelect(editingExId, ex.alternateId);
     } else {
@@ -2173,6 +2178,7 @@ img, video, canvas, svg { max-width: 100%; }
       modalDays = state.filterDay ? [state.filterDay] : [];
       $('exFixedWeight').checked = false;
       $('exBodyweight').checked = false;
+      $('exUnilateral').checked = false;
       $('exAlternate').checked = false;
       renderAlternateSelect(null, null);
     }
@@ -2264,6 +2270,7 @@ img, video, canvas, svg { max-width: 100%; }
       image: modalImage || null,
       fixedWeight: $('exFixedWeight').checked,
       bodyweight: $('exBodyweight').checked,
+      unilateral: $('exUnilateral').checked,
       days: modalDays.slice()
     };
     const alternatePartnerId = $('exAlternate').checked ? ($('exAlternateSelect').value || null) : null;

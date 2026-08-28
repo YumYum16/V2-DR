@@ -589,9 +589,28 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // matching intake to that day's real expenditure, rather than a fixed
   // weekly average every day. Not a hard rule backed by an outcome
   // trial — just aligning input with actual output.
+  // Cardio logged in Séance (cardioKcalOn, below) gets added on top of
+  // TDEE as an exact kcal figure — but the activityHrsPerWeek category
+  // multiplier above is a generic "how many hours a week do you train"
+  // estimate that was very likely already set INCLUDING that same
+  // cardio (e.g. a fixed 30min incline walk tacked onto every session).
+  // Left alone, that's the same activity counted twice: once crudely via
+  // the hours category, once precisely via the kcal addition. Subtracting
+  // the last 7 days' actual logged cardio hours from the profile number
+  // before the tier lookup keeps the category representing strength
+  // training only, so a routine cardio habit doesn't inflate TDEE twice.
+  function weeklyCardioHours() {
+    const gym = loadJSON(GYM_KEY, {});
+    const cutoffMs = Date.now() - 7 * 86400000;
+    const totalMin = (Array.isArray(gym.cardio) ? gym.cardio : [])
+      .filter(c => new Date(c.date + 'T00:00:00').getTime() >= cutoffMs)
+      .reduce((sum, c) => sum + (c.durationMin || 0), 0);
+    return totalMin / 60;
+  }
   function computeTDEE(profile, weightKg, restDay) {
     const tiers = [1.2, 1.375, 1.55, 1.725, 1.9];
-    let mult = activityMultiplier(profile.activityHrsPerWeek);
+    const nonCardioHrs = Math.max(0, (profile.activityHrsPerWeek || 0) - weeklyCardioHours());
+    let mult = activityMultiplier(nonCardioHrs);
     if (restDay) {
       const idx = Math.max(0, tiers.indexOf(mult) - 1);
       mult = tiers[idx];
@@ -1127,7 +1146,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     let html = '<h1 class="dash-title">Alimentation</h1>' +
       '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta vraie perte de poids.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
-      '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau). Une séance de cardio enregistrée dans <a href="seance.html" style="color:var(--text-primary)">Séance</a> (marche/course sur tapis avec vitesse+pente, formule ACSM ; ou vélo/elliptique/rameur/natation via MET, Ainsworth et al. 2011) s\'ajoute par-dessus, en kcal réellement calculées — le facteur d\'activité hebdomadaire reste une moyenne, ça, c\'est la dépense mesurée du jour.</p>' +
+      '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau). Une séance de cardio enregistrée dans <a href="seance.html" style="color:var(--text-primary)">Séance</a> (marche/course sur tapis avec vitesse+pente, formule ACSM ; ou vélo/elliptique/rameur/natation via MET, Ainsworth et al. 2011) s\'ajoute par-dessus, en kcal réellement calculées — le facteur d\'activité hebdomadaire reste une moyenne, ça, c\'est la dépense mesurée du jour. Pour éviter de compter ce même cardio deux fois (une fois dans les heures/semaine du profil, une fois dans le calcul précis), les heures de cardio réellement loguées sur les 7 derniers jours sont retirées des heures/semaine avant de choisir le palier d\'activité — le palier ne représente donc plus que la muscu.</p>' +
       '<p><strong>Déficit adaptatif</strong> : <strong>Garthe et al. (2011)</strong> ont montré que des athlètes perdant du poids à <strong>0.7%/semaine</strong> gagnaient de la masse maigre et de la force pendant leur sèche, contrairement à ceux perdant 1.4%/semaine. Ce programme vise 0.5-0.7%/semaine et ajuste ton déficit chaque semaine selon ta perte réelle (Fitness → Poids), pas une estimation figée.</p>' +
       '<p><strong>Protéines</strong> : <strong>Helms, Aragon &amp; Fitschen (2014)</strong>, revue systématique — 1.8 à 2.7 g/kg de poids de corps pendant une restriction calorique chez les athlètes entraînés en résistance ; 2.2 g/kg utilisé ici. Le reste des calories est réparti entre lipides (plancher ~25% pour la santé hormonale) et glucides (le reste, pour soutenir l\'intensité à l\'entraînement).</p>' +
       '<p><strong>Débloat (sodium/potassium)</strong> : l\'<strong>OMS</strong> recommande &lt; 2000 mg de sodium (5g de sel) et ≥ 3510 mg de potassium par jour — ces deux seuils donnent, une fois atteints, un ratio sodium:potassium molaire d\'environ 1.0, que l\'OMS cite explicitement comme objectif. Un ratio élevé (sodium dominant, potassium faible) est associé à la rétention d\'eau dans la littérature physiologique — pas juste "trop de sel" isolément. Le sodium ici vient de tes aliments (Alimentation), pas d\'une estimation séparée.</p>' +

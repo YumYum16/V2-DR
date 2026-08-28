@@ -129,6 +129,7 @@ body::after {
 .hist-set-list { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: var(--text-secondary); }
 .hist-set-list li { margin-bottom: 3px; }
 .hist-fail-tag { color: var(--danger); font-size: 10.5px; font-weight: 700; }
+.hist-rest-tag { color: var(--text-tertiary); font-size: 10.5px; font-weight: 700; }
 .hist-critique p { margin: 0 0 4px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
 
 /* ---- Day picker (shared by desktop form + mobile step 1) ---- */
@@ -445,6 +446,10 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       return false;
     }
   }
+  function fmtRestSec(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m ? (m + 'min' + (s ? String(s).padStart(2, '0') : '')) : (s + 's');
+  }
   function todayStr(){
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -552,7 +557,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         if (!l.dayId || !l.date) return; // older/manual entries without a séance context are skipped
         const key = l.date + '|' + l.dayId;
         const s = map[key] = map[key] || { date: l.date, dayId: l.dayId, lastTime: '', sets: [] };
-        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed });
+        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side });
         if (l.time && l.time > s.lastTime) s.lastTime = l.time;
       });
     });
@@ -757,7 +762,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           '</div>' +
           '<div class="hist-row-meta">' + a.totalSets + ' série(s) · ' + Math.round(a.tonnage) + ' ' + unit + ' de tonnage · ' + Math.round(a.failRate * 100) + '% échec</div>' +
           '<div class="hist-detail hidden" id="histDetail-' + i + '">' +
-            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + '</li>').join('') + '</ul>' +
+            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + '</li>').join('') + '</ul>' +
             '<div class="hist-critique">' + a.critique.map(c => '<p>' + escapeHtml(c) + '</p>').join('') + '</div>' +
           '</div>' +
         '</div>';
@@ -1118,14 +1123,30 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<button type="button" class="timer-btn" id="timerReset">Réinitialiser</button>' +
         '</div></div>' +
         '<div class="gm-card">' +
-        '<div class="live-set-form">' +
-        '<div class="live-input-row">' +
-        '<div class="live-input-col"><label>Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeight" value="' + prefWeight + '"></div>' +
-        '<div class="live-input-col"><label>Reps</label><input type="number" inputmode="numeric" id="liveReps" value="' + prefReps + '"></div>' +
-        '</div>' +
-        '<button type="button" class="live-fail-toggle" id="liveFailToggle">Marquer échec</button>' +
-        '<button type="button" class="live-validate-btn" id="liveValidateSet">✓ Valider la série</button>' +
-        '</div></div>' +
+        (ex.unilateral ?
+          '<div class="live-set-form">' +
+          '<div class="live-input-row">' +
+          '<div class="live-input-col"><label>Gauche — Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeightG" value="' + prefWeight + '"></div>' +
+          '<div class="live-input-col"><label>Gauche — Reps</label><input type="number" inputmode="numeric" id="liveRepsG" value="' + prefReps + '"></div>' +
+          '</div>' +
+          '<button type="button" class="live-fail-toggle" id="liveFailToggleG">Échec (gauche)</button>' +
+          '<div class="live-input-row" style="margin-top:10px;">' +
+          '<div class="live-input-col"><label>Droite — Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeightD" value="' + prefWeight + '"></div>' +
+          '<div class="live-input-col"><label>Droite — Reps</label><input type="number" inputmode="numeric" id="liveRepsD" value="' + prefReps + '"></div>' +
+          '</div>' +
+          '<button type="button" class="live-fail-toggle" id="liveFailToggleD">Échec (droite)</button>' +
+          '<button type="button" class="live-validate-btn" id="liveValidateSet">✓ Valider la série</button>' +
+          '</div>'
+        :
+          '<div class="live-set-form">' +
+          '<div class="live-input-row">' +
+          '<div class="live-input-col"><label>Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" id="liveWeight" value="' + prefWeight + '"></div>' +
+          '<div class="live-input-col"><label>Reps</label><input type="number" inputmode="numeric" id="liveReps" value="' + prefReps + '"></div>' +
+          '</div>' +
+          '<button type="button" class="live-fail-toggle" id="liveFailToggle">Marquer échec</button>' +
+          '<button type="button" class="live-validate-btn" id="liveValidateSet">✓ Valider la série</button>' +
+          '</div>'
+        ) + '</div>' +
         '<div class="live-queue-title">File d\'attente — ' + escapeHtml(day ? day.name : '') + '</div>' +
         '<div id="liveQueue"></div>' +
         '</div>';
@@ -1139,7 +1160,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       document.getElementById('liveEndBtn').addEventListener('click', endLive);
       spBtn.addEventListener('click', timerStartPause);
       document.getElementById('timerReset').addEventListener('click', timerReset);
-      document.getElementById('liveFailToggle').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+      if (ex.unilateral) {
+        document.getElementById('liveFailToggleG').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+        document.getElementById('liveFailToggleD').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+      } else {
+        document.getElementById('liveFailToggle').addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+      }
       document.getElementById('liveValidateSet').addEventListener('click', validateSet);
     }
 
@@ -1165,16 +1191,34 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 
     function validateSet(){
       const ex = queue[currentIdx];
-      const weight = parseFloat(document.getElementById('liveWeight').value);
-      const reps = parseInt(document.getElementById('liveReps').value, 10);
-      if (!reps) return;
-      const failed = document.getElementById('liveFailToggle').classList.contains('active');
+      // Rest time is read straight off the timer instead of asking for a
+      // separate "I'm doing my set now" tap: validateSet() already resets
+      // and restarts it right after each set (below), so whatever it reads
+      // right before that reset IS the rest since the previous set — free
+      // signal from an interaction he's already doing.
+      const restSec = Math.round((timerMs + (timerRunning ? Date.now() - timerStartedAt : 0)) / 1000);
       state.logs = state.logs || {};
       state.logs[ex.id] = state.logs[ex.id] || [];
-      state.logs[ex.id].push({
-        id: uid(), date: todayStr(), time: nowTimeStr(), dayId: chosenDay,
-        weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed
-      });
+      const base = { date: todayStr(), time: nowTimeStr(), dayId: chosenDay, restSec: restSec };
+
+      if (ex.unilateral) {
+        const wG = parseFloat(document.getElementById('liveWeightG').value);
+        const rG = parseInt(document.getElementById('liveRepsG').value, 10);
+        const wD = parseFloat(document.getElementById('liveWeightD').value);
+        const rD = parseInt(document.getElementById('liveRepsD').value, 10);
+        if (!rG && !rD) return;
+        const failG = document.getElementById('liveFailToggleG').classList.contains('active');
+        const failD = document.getElementById('liveFailToggleD').classList.contains('active');
+        if (rG) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wG) ? 0 : wG, reps: rG, failed: failG, side: 'G' }));
+        if (rD) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wD) ? 0 : wD, reps: rD, failed: failD, side: 'D' }));
+      } else {
+        const weight = parseFloat(document.getElementById('liveWeight').value);
+        const reps = parseInt(document.getElementById('liveReps').value, 10);
+        if (!reps) return;
+        const failed = document.getElementById('liveFailToggle').classList.contains('active');
+        state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed }));
+      }
+
       saveGym(state);
       setCounts[ex.id] = (setCounts[ex.id] || 1) + 1;
       timerReset();
