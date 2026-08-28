@@ -496,6 +496,19 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_FIBER_PATCHED_KEY, true);
   }
 
+  // Third one-time import batch.
+  const STARTER_FOODS_3_SEEDED_KEY = 'po_food_seeded_batch3_v1';
+  const STARTER_FOODS_3 = [
+    { name: 'Pâte à tout faire (farine bio T65 + skyr/yaourt nature)', kcalPer100g: 202, proteinPer100g: 11, carbsPer100g: 36, fatPer100g: 1.15, sugarPer100g: 3.15, saltPer100g: 0.06, potassiumPer100g: 145, fiberPer100g: 2.85, servingGrams: 120, servingLabel: 'pâte' }
+  ];
+  if (!loadJSON(STARTER_FOODS_3_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const existingNames = new Set(db.map(f => f.name));
+    const toAdd = STARTER_FOODS_3.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
+    if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
+    saveJSON(STARTER_FOODS_3_SEEDED_KEY, true);
+  }
+
   // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
   // taille) so nothing has to be entered twice; weight always follows
