@@ -1436,6 +1436,15 @@ img, video, canvas, svg { max-width: 100%; }
     </button>
   </div>
 
+  <!-- GARMIN STEPS — read-only, fetched server-side from a pre-authenticated
+       Garmin Connect token (see /api/garmin-data.py); no credentials ever
+       touch the browser. Shows nothing but a quiet placeholder until that
+       token is configured (GARMIN_TOKENS_B64 env var). -->
+  <div class="card" id="garminStepsCard" style="display:none;">
+    <div class="po-sub-title">🥾 Pas (Garmin)</div>
+    <div id="garminStepsBody"></div>
+  </div>
+
   <div class="card" id="mainCard">
     <!-- Filters -->
     <div class="po-filters">
@@ -3723,6 +3732,58 @@ img, video, canvas, svg { max-width: 100%; }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', spawnParticles);
   else spawnParticles();
+})();
+</script>
+<script>
+// ================================================================
+// GARMIN STEPS — independent of the exercise-editor script above on
+// purpose: this card degrades to "just stay hidden" if the server-side
+// token isn't configured yet (/api/garmin-data.py, GARMIN_TOKENS_B64 env
+// var), so it can't break anything else on this page if Garmin's API
+// changes shape or the token expires.
+// ================================================================
+(function () {
+  'use strict';
+  const CACHE_KEY = 'garmin_steps_cache_v1';
+  const CACHE_MS = 30 * 60 * 1000; // 30 min — Garmin's unofficial API is rate-limit prone
+  function loadCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch (e) { return null; } }
+  function saveCache(data) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch (e) {} }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const mons = ['jan', 'fév', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
+    return dt.getDate() + ' ' + mons[dt.getMonth()];
+  }
+  function render(data) {
+    const card = document.getElementById('garminStepsCard'), body = document.getElementById('garminStepsBody');
+    if (!card || !body || !data || !data.today) { if (card) card.style.display = 'none'; return; }
+    card.style.display = '';
+    const t = data.today;
+    const pct = t.goal ? Math.min(100, Math.round((t.steps / t.goal) * 100)) : null;
+    let html = '<div style="display:flex;align-items:baseline;gap:8px;">' +
+      '<span style="font-size:28px;font-weight:700;color:var(--text-1);">' + (t.steps || 0).toLocaleString('fr-FR') + '</span>' +
+      (t.goal ? '<span style="color:var(--text-3);font-size:13px;">/ ' + t.goal.toLocaleString('fr-FR') + ' pas' + (pct != null ? ' · ' + pct + '%' : '') + '</span>' : '<span style="color:var(--text-3);font-size:13px;">pas aujourd\'hui</span>') +
+      '</div>';
+    const hist = (data.history || []).filter(h => h.date !== t.date).slice(-6).reverse();
+    if (hist.length) {
+      html += '<div style="display:flex;gap:6px;margin-top:12px;overflow-x:auto;">' +
+        hist.map(h => '<div style="flex:0 0 auto;text-align:center;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.04);"><div style="font-size:11px;color:var(--text-3);">' + fmtDate(h.date) + '</div><div style="font-size:13px;font-weight:600;">' + (h.steps || 0).toLocaleString('fr-FR') + '</div></div>').join('') +
+        '</div>';
+    }
+    body.innerHTML = html;
+  }
+  async function fetchSteps() {
+    try { const r = await fetch('/api/garmin-data'); if (!r.ok) return null; return await r.json(); }
+    catch (e) { return null; }
+  }
+  (async function init() {
+    const cached = loadCache();
+    if (cached && cached.data) render(cached.data);
+    if (cached && (Date.now() - cached.ts) < CACHE_MS) return;
+    const fresh = await fetchSteps();
+    if (fresh && !fresh.error) { saveCache(fresh); render(fresh); }
+  })();
 })();
 </script>
 </body>
