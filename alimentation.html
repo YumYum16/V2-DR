@@ -516,6 +516,20 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_3_SEEDED_KEY, true);
   }
 
+  // Fourth one-time import batch.
+  const STARTER_FOODS_4_SEEDED_KEY = 'po_food_seeded_batch4_v1';
+  const STARTER_FOODS_4 = [
+    // Potassium not on this label — USDA value for walnuts (~441mg/100g), same treatment as the other "not on label" starter foods.
+    { name: 'Cerneaux de noix (Lidl)', kcalPer100g: 712, proteinPer100g: 15.5, carbsPer100g: 3.7, fatPer100g: 69.1, sugarPer100g: 3.0, saltPer100g: 0.02, potassiumPer100g: 441, fiberPer100g: 6.8, servingGrams: 30, servingLabel: 'portion' }
+  ];
+  if (!loadJSON(STARTER_FOODS_4_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const existingNames = new Set(db.map(f => f.name));
+    const toAdd = STARTER_FOODS_4.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
+    if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
+    saveJSON(STARTER_FOODS_4_SEEDED_KEY, true);
+  }
+
   // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
   // taille) so nothing has to be entered twice; weight always follows
