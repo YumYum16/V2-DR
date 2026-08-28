@@ -88,6 +88,7 @@ body::after {
   color: var(--text-tertiary); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .empty-note { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 10px 4px; line-height: 1.6; }
+.save-banner { text-align: center; font-size: 13px; color: var(--success); padding: 14px; }
 .gm-ghost {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10);
@@ -1166,18 +1167,23 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     bg.classList.add('show');
   }
 
+  let flashMsg = '';
   function renderMain() {
     const targets = computeTargets();
     const totals = todayTotals();
     const db = loadJSON(FOOD_DB_KEY, []);
     const entries = todaysEntries();
+    const hasAnyPastLog = Object.keys(loadJSON(FOOD_LOG_KEY, {})).some(k => k !== todayStr());
 
     const pP = targets.proteinG ? totals.protein / targets.proteinG : 0;
     const pC = targets.carbsG ? totals.carbs / targets.carbsG : 0;
     const pF = targets.fatG ? totals.fat / targets.fatG : 0;
     const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
 
+    const banner = flashMsg ? '<div class="gm-card save-banner">' + escapeHtml(flashMsg) + '</div>' : '';
+    flashMsg = '';
     let html = '<h1 class="dash-title">Alimentation</h1>' +
+      banner +
       '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta vraie perte de poids.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
       '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau). Une séance de cardio enregistrée dans <a href="seance.html" style="color:var(--text-primary)">Séance</a> (marche/course sur tapis avec vitesse+pente, formule ACSM ; ou vélo/elliptique/rameur/natation via MET, Ainsworth et al. 2011) s\'ajoute par-dessus, en kcal réellement calculées — le facteur d\'activité hebdomadaire reste une moyenne, ça, c\'est la dépense mesurée du jour. Pour éviter de compter ce même cardio deux fois (une fois dans les heures/semaine du profil, une fois dans le calcul précis), les heures de cardio réellement loguées sur les 7 derniers jours sont retirées des heures/semaine avant de choisir le palier d\'activité — le palier ne représente donc plus que la muscu.</p>' +
@@ -1221,7 +1227,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
         '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span>' +
         '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
-      ).join('') : '<p class="empty-note">Rien enregistré aujourd\'hui.</p>') +
+      ).join('') : '<p class="empty-note">' + (hasAnyPastLog ? 'Nouveau jour — rien enregistré depuis minuit. Rien n\'est perdu : ton historique des jours précédents est intact, juste en dessous dans le calendrier.' : 'Rien enregistré aujourd\'hui.') + '</p>') +
       '</div>';
 
     html += '<div class="gm-card">' +
@@ -1414,6 +1420,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           salt: (f.saltPer100g || 0) * ratio, potassium: (f.potassiumPer100g || 0) * ratio,
           sugar: (f.sugarPer100g || 0) * ratio, fiber: (f.fiberPer100g || 0) * ratio
         });
+        flashMsg = '✓ Enregistré et synchronisé.';
         closeModal();
         renderMain();
       });
@@ -1459,6 +1466,16 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
 
   renderMain();
+  // Auto-refresh at midnight rollover — otherwise a tab left open across
+  // the date change keeps showing yesterday's now-stale "Journal du jour"
+  // until manually reloaded, which reads as data having vanished instead
+  // of just being a new day. Checked every minute, only re-renders when
+  // the date actually changed.
+  let lastRenderedDate = todayStr();
+  setInterval(() => {
+    const now = todayStr();
+    if (now !== lastRenderedDate) { lastRenderedDate = now; renderMain(); }
+  }, 60000);
 })();
 </script>
 <script id="atmo-backdrop-js">
