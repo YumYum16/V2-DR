@@ -518,6 +518,19 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   // occurs across a wide rep spectrum (roughly 5-30) as long as sets are
   // close to failure (Schoenfeld et al.'s load-comparison meta-analyses;
   // Refalo et al. 2021's re-examination of the "repetition continuum").
+  //
+  // The underlying principle — always give the body a slightly bigger
+  // stimulus than last time, never the same one — is progressive
+  // overload, dating back to DeLorme & Watkins' (1948) founding work on
+  // progressive resistance exercise and formalized as the core driver of
+  // continued strength/hypertrophy adaptation in the ACSM's position
+  // stand on progression models in resistance training (Kraemer &
+  // Ratamess, 2004). The double-progression scheme (reps up before
+  // weight up) is the standard way strength & conditioning coaching
+  // applies it in practice (NSCA's Essentials of Strength Training and
+  // Conditioning, Baechle & Earle, eds.) — which is why the target below
+  // is always phrased as "beat the last session by at least one rep",
+  // not just a static number.
   // ================================================================
   const HYPERTROPHY_REP_LOW = 6, HYPERTROPHY_REP_HIGH = 10;
   function suggestNextTarget(state, ex){
@@ -539,7 +552,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       } else {
         weight = Math.round((weight + step) * 10) / 10;
         reps = HYPERTROPHY_REP_LOW;
-        note = 'Toutes les séries ont atteint ' + HYPERTROPHY_REP_HIGH + ' reps — charge augmentée (+' + step + (state.units || 'kg') + ').';
+        note = 'Toutes les séries ont battu ' + HYPERTROPHY_REP_HIGH + ' reps — charge augmentée (+' + step + (state.units || 'kg') + ') pour continuer à progresser.';
       }
     } else {
       // Floor the target on the best "weakest working set" seen across the
@@ -560,7 +573,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         note = 'Échec sur au moins une série — reste sur cette charge, revise ' + reps + ' reps sur toutes les séries.';
       } else {
         reps = Math.min(HYPERTROPHY_REP_HIGH, recentBestMin + 1);
-        note = 'Vise ' + reps + ' reps sur TOUTES les séries (ta meilleure série récente était à ' + recentBestMin + ') avant d\'augmenter la charge.';
+        note = 'Bats ta dernière séance : ' + reps + ' reps sur TOUTES les séries — au moins 1 de plus que ta meilleure série récente (' + recentBestMin + '), avant d\'augmenter la charge.';
       }
     }
     return { weight, reps, note };
