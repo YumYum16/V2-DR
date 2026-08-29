@@ -766,7 +766,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, deficitPct };
+    return { weightKg, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, deficitPct, profile };
   }
 
   // ================================================================
@@ -1193,6 +1193,93 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     return html;
   }
 
+  // ================================================================
+  // AVIS DÉTAILLÉ DU JOUR — un verdict par critère (kcal, protéines,
+  // glucides, lipides, sel, sucres, fibres) plutôt qu'une simple étiquette
+  // bien/moyen/pas bien : chaque ligne dit où on en est ET quoi faire
+  // ensuite si l'écart est notable, sans en rajouter quand c'est déjà bon.
+  // ================================================================
+  function dayVerdictHtml(totals, targets, fiberTarget, sugarTargetG) {
+    const pct = (have, tgt) => tgt > 0 ? have / tgt : 0;
+    const rows = [];
+
+    (() => {
+      const p = pct(totals.kcal, targets.target);
+      const diff = Math.round(Math.abs(totals.kcal - targets.target));
+      let text;
+      if (p >= 0.93 && p <= 1.07) {
+        text = 'Aligné sur l\'objectif (' + Math.round(totals.kcal) + ' / ' + targets.target + ' kcal), rien à changer.';
+      } else if (p < 0.93) {
+        text = (p < 0.80 ? 'Nettement' : 'Un peu') + ' en dessous, ' + diff + ' kcal manquants. Si ça se répète plusieurs jours de suite, le corps peut puiser dans le muscle en plus du gras — comble au moins une partie de l\'écart dans les prochains jours.';
+      } else {
+        text = (p > 1.20 ? 'Nettement' : 'Légèrement') + ' au-dessus, +' + diff + ' kcal. Ponctuel ce n\'est rien, mais si ça revient souvent ça dilue le déficit — resserre un peu les prochains jours.';
+      }
+      rows.push({ icon: '🔥', label: 'Calories', text });
+    })();
+
+    (() => {
+      const p = pct(totals.protein, targets.proteinG);
+      const diff = Math.round(Math.abs(targets.proteinG - totals.protein));
+      let text;
+      if (p >= 0.93) {
+        text = 'Cible atteinte (' + Math.round(totals.protein) + ' / ' + targets.proteinG + ' g) — c\'est le macro le plus important pour garder le muscle en déficit.' + (p > 1.3 ? ' Large marge au-dessus, pas un souci mais pas la peine d\'en rajouter.' : '');
+      } else {
+        text = (p < 0.75 ? 'Nettement' : 'Un peu') + ' en dessous, il manque ' + diff + ' g. À prioriser : ajoute une portion de viande maigre, poisson, œufs ou protéine en poudre dans les prochains jours.';
+      }
+      rows.push({ icon: '🥩', label: 'Protéines', text });
+    })();
+
+    (() => {
+      const p = pct(totals.carbs, targets.carbsG);
+      const diff = Math.round(Math.abs(targets.carbsG - totals.carbs));
+      let text;
+      if (p >= 0.85 && p <= 1.15) {
+        text = 'Dans la cible (' + Math.round(totals.carbs) + ' / ' + targets.carbsG + ' g), de quoi tenir l\'intensité à l\'entraînement.';
+      } else if (p < 0.85) {
+        text = diff + ' g en dessous. Pas dramatique isolément, mais si l\'énergie manque à l\'entraînement, ajoute un peu plus de féculents (riz, pâtes, pain, patate) autour des séances les prochains jours.';
+      } else {
+        text = diff + ' g au-dessus. À voir si c\'était justifié par une grosse séance ce jour-là — sinon ça vient souvent de grignotage sucré, à surveiller.';
+      }
+      rows.push({ icon: '🍞', label: 'Glucides', text });
+    })();
+
+    (() => {
+      const p = pct(totals.fat, targets.fatG);
+      const diff = Math.round(Math.abs(targets.fatG - totals.fat));
+      let text;
+      if (p >= 0.85 && p <= 1.15) {
+        text = 'Dans la cible (' + Math.round(totals.fat) + ' / ' + targets.fatG + ' g), suffisant pour la santé hormonale.';
+      } else if (p < 0.85) {
+        text = diff + ' g en dessous. Un plancher trop bas trop souvent peut jouer sur les hormones — ajoute huile d\'olive, oléagineux ou avocat dans les prochains jours.';
+      } else {
+        text = diff + ' g au-dessus. Les lipides sont denses en calories (9 kcal/g) — si les calories totales dépassent aussi l\'objectif, c\'est souvent la première case à réduire un peu.';
+      }
+      rows.push({ icon: '🧈', label: 'Lipides', text });
+    })();
+
+    rows.push({
+      icon: '🧂', label: 'Sel',
+      text: totals.salt > SALT_TARGET_G
+        ? 'Au-dessus de la limite OMS (' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g) — repère plats préparés, sauces et fromages ces prochains jours, c\'est souvent la source principale.'
+        : 'Sous la limite recommandée (' + totals.salt.toFixed(1) + ' / ' + SALT_TARGET_G + ' g), rien à changer.'
+    });
+    rows.push({
+      icon: '🍬', label: 'Sucres',
+      text: totals.sugar > sugarTargetG
+        ? 'Au-dessus du seuil OMS (' + Math.round(totals.sugar) + ' / ' + Math.round(sugarTargetG) + ' g) — regarde d\'où ça vient (boissons sucrées, snacks) avant d\'ajuster.'
+        : 'Sous le seuil recommandé (' + Math.round(totals.sugar) + ' / ' + Math.round(sugarTargetG) + ' g), bien géré.'
+    });
+    rows.push({
+      icon: '🌾', label: 'Fibres',
+      text: totals.fiber < fiberTarget
+        ? Math.round(fiberTarget - totals.fiber) + ' g en dessous de l\'objectif — ajoute légumes, légumineuses ou céréales complètes dans les prochains jours, ça aide aussi la satiété en déficit.'
+        : 'Objectif atteint (' + Math.round(totals.fiber) + ' / ' + fiberTarget + ' g), bon pour la satiété.'
+    });
+
+    return '<div class="section-title" style="margin-top:16px;">Avis détaillé</div>' +
+      '<ul class="macro-tips">' + rows.map(r => '<li class="macro-tip">' + r.icon + ' <strong>' + r.label + '</strong> : ' + r.text + '</li>').join('') + '</ul>';
+  }
+
   function openDayDetailModal(dk) {
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
@@ -1207,6 +1294,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const dayTypeLabel = override || 'Repos (par défaut)';
     const mood = loadJSON(MOOD_KEY, {})[dk];
     const dateLabel = formatDateLabel(dk);
+    const fiberTarget = fiberTargetG(targets.profile);
+    const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
 
     inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' + escapeHtml(dateLabel) + '<button type="button" class="gm-ghost" id="addFoodForDayBtn">+ Ajouter</button></h3>' +
       '<div class="day-detail-head">' +
@@ -1224,6 +1313,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
         '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span></div>'
       ).join('') : '<p class="empty-note">Rien enregistré.</p>') +
+      (entries.length ? dayVerdictHtml(totals, targets, fiberTarget, sugarTargetG) : '') +
       '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeDayDetail">Fermer</button></div>';
     document.getElementById('closeDayDetail').addEventListener('click', closeModal);
     document.getElementById('addFoodForDayBtn').addEventListener('click', () => openAddFoodModal(dk));
