@@ -555,6 +555,24 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_4_SEEDED_KEY, true);
   }
 
+  // Second fiber patch: the first one only backfilled undefined fields
+  // (never existed). Explicit null ("not on label" at import time) was
+  // left alone — but some starter values were updated since with the
+  // real number once found (e.g. Spaghetti complet bio, 11g/100g).
+  // Backfill those too, matched by name, only while still null.
+  const STARTER_FOODS_FIBER_PATCHED_2_KEY = 'po_food_fiber_patched_v2';
+  if (!loadJSON(STARTER_FOODS_FIBER_PATCHED_2_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const byName = {};
+    STARTER_FOODS.concat(STARTER_FOODS_2, STARTER_FOODS_3, STARTER_FOODS_4).forEach(f => { byName[f.name] = f.fiberPer100g; });
+    let changed = false;
+    db.forEach(f => {
+      if (f.fiberPer100g == null && byName[f.name] != null) { f.fiberPer100g = byName[f.name]; changed = true; }
+    });
+    if (changed) saveJSON(FOOD_DB_KEY, db);
+    saveJSON(STARTER_FOODS_FIBER_PATCHED_2_KEY, true);
+  }
+
   // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
   // taille) so nothing has to be entered twice; weight always follows
