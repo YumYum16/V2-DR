@@ -573,6 +573,32 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_FIBER_PATCHED_2_KEY, true);
   }
 
+  // Log entries snapshot their macros at the moment they're logged, so
+  // fixing the food's fiberPer100g above doesn't retroactively fix
+  // portions already logged before the real value was known (e.g. pasta
+  // logged while Spaghetti complet bio still had null fiber). Recompute
+  // fiber on already-logged entries that match a starter food by name,
+  // once — grams are fixed at logging time, so this is just correcting
+  // a derived number, not overwriting anything the user typed in.
+  const LOG_FIBER_PATCHED_KEY = 'po_food_log_fiber_patched_v1';
+  if (!loadJSON(LOG_FIBER_PATCHED_KEY, false)) {
+    const byName = {};
+    STARTER_FOODS.concat(STARTER_FOODS_2, STARTER_FOODS_3, STARTER_FOODS_4).forEach(f => { if (f.fiberPer100g != null) byName[f.name] = f.fiberPer100g; });
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    let logChanged = false;
+    Object.keys(log).forEach(dk => {
+      (log[dk] || []).forEach(e => {
+        const per100 = byName[e.foodName];
+        if (per100 != null && e.grams) {
+          const correct = per100 * e.grams / 100;
+          if (Math.abs((e.fiber || 0) - correct) > 0.01) { e.fiber = correct; logChanged = true; }
+        }
+      });
+    });
+    if (logChanged) saveJSON(FOOD_LOG_KEY, log);
+    saveJSON(LOG_FIBER_PATCHED_KEY, true);
+  }
+
   // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
   // taille) so nothing has to be entered twice; weight always follows
