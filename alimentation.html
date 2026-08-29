@@ -170,7 +170,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   transition: background 0.15s, border-color 0.15s;
 }
 .cal-cell.logged:hover { background: rgba(255,255,255,0.07); }
-.cal-cell.empty { cursor: default; opacity: 0.5; }
+.cal-cell.empty { opacity: 0.5; }
+.cal-cell.empty:hover { opacity: 0.75; background: rgba(255,255,255,0.07); }
+.cal-cell:disabled { cursor: default; opacity: 0.3; }
+.cal-cell:disabled:hover { background: rgba(255,255,255,0.03); }
 .cal-cell.today { box-shadow: inset 0 0 0 1px rgba(132,204,22,0.45); }
 .cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
 .cal-score { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -429,6 +432,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function dateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function todayStr(){ return dateStr(new Date()); }
   function daysAgoStr(n){ const d=new Date(); d.setDate(d.getDate()-n); return dateStr(d); }
+  function formatDateLabel(dk){ const [yy,mm,dd]=dk.split('-').map(Number); return new Date(yy,mm-1,dd).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); }
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function uid(){ return 'f_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
   function isoWeekKey(d){
@@ -784,15 +788,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       sugar: acc.sugar + (e.sugar||0), fiber: acc.fiber + (e.fiber||0)
     }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0, fiber: 0 });
   }
-  function addLogEntry(entry) {
+  function addLogEntry(entry, dateKey) {
     const log = loadJSON(FOOD_LOG_KEY, {});
-    const k = todayStr();
+    const k = dateKey || todayStr();
     log[k] = (log[k] || []).concat([Object.assign({ id: uid(), time: new Date().toTimeString().slice(0,5) }, entry)]);
     return saveJSON(FOOD_LOG_KEY, log);
   }
-  function removeLogEntry(id) {
+  function removeLogEntry(id, dateKey) {
     const log = loadJSON(FOOD_LOG_KEY, {});
-    const k = todayStr();
+    const k = dateKey || todayStr();
     log[k] = (log[k] || []).filter(e => e.id !== id);
     return saveJSON(FOOD_LOG_KEY, log);
   }
@@ -1168,11 +1172,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const dk = dateStr(date);
       const hasLog = !!(log[dk] && log[dk].length);
       const isToday = dk === todayKey;
+      const isFuture = dk > todayKey;
       const score = hasLog ? dayScore(dk) : null;
       const color = hasLog ? scoreColor(score) : null;
       const cls = 'cal-cell' + (isToday ? ' today' : '') + (hasLog ? ' logged' : ' empty');
       html += '<button type="button" class="' + cls + '"' +
-        (hasLog ? ' data-date="' + dk + '" style="border-left-color:' + color + ';"' : ' disabled') + '>' +
+        (isFuture ? ' disabled' : ' data-date="' + dk + '"' + (hasLog ? ' style="border-left-color:' + color + ';"' : '')) + '>' +
         '<span class="cal-day">' + d + '</span>' +
         (hasLog ? '<span class="cal-score" style="color:' + color + '">' + score + '</span>' : '<span class="cal-score cal-score-empty">·</span>') +
         '</button>';
@@ -1201,10 +1206,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const restDay = override ? /repos|rest/i.test(override) : true;
     const dayTypeLabel = override || 'Repos (par défaut)';
     const mood = loadJSON(MOOD_KEY, {})[dk];
-    const [yy, mm, dd] = dk.split('-').map(Number);
-    const dateLabel = new Date(yy, mm - 1, dd).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const dateLabel = formatDateLabel(dk);
 
-    inner.innerHTML = '<h3>' + escapeHtml(dateLabel) + '</h3>' +
+    inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' + escapeHtml(dateLabel) + '<button type="button" class="gm-ghost" id="addFoodForDayBtn">+ Ajouter</button></h3>' +
       '<div class="day-detail-head">' +
       '<div class="day-detail-score" style="color:' + color + ';border-color:' + color + ';background:' + color.replace('rgb', 'rgba').replace(')', ',0.14)') + ';">' + score + '</div>' +
       '<div class="day-detail-badges">' +
@@ -1222,6 +1226,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       ).join('') : '<p class="empty-note">Rien enregistré.</p>') +
       '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeDayDetail">Fermer</button></div>';
     document.getElementById('closeDayDetail').addEventListener('click', closeModal);
+    document.getElementById('addFoodForDayBtn').addEventListener('click', () => openAddFoodModal(dk));
     bg.classList.add('show');
   }
 
@@ -1339,9 +1344,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
   function closeModal() { const bg = document.getElementById('foodModalBg'); if (bg) bg.classList.remove('show'); }
 
-  function openAddFoodModal() {
+  function openAddFoodModal(targetDate) {
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
+    const dateKey = targetDate || todayStr();
+    const isPastDate = dateKey !== todayStr();
     let mode = 'pick'; // 'pick' | 'new'
     let selectedFood = null;
     let catFilter = 'Tous';
@@ -1349,7 +1356,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     function renderModal() {
       const db = loadJSON(FOOD_DB_KEY, []);
       inner.innerHTML =
-        '<h3>Ajouter un aliment</h3>' +
+        '<h3>Ajouter un aliment' + (isPastDate ? ' — ' + escapeHtml(formatDateLabel(dateKey)) : '') + '</h3>' +
         '<div class="seg-toggle"><button type="button" data-m="pick" class="' + (mode==='pick'?'active':'') + '">Mes aliments</button><button type="button" data-m="new" class="' + (mode==='new'?'active':'') + '">Créer</button></div>' +
         '<div id="modalBody"></div>';
       inner.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => { mode = b.dataset.m; selectedFood = null; renderModal(); }));
@@ -1477,10 +1484,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           carbs: f.carbsPer100g * ratio, fat: f.fatPer100g * ratio,
           salt: (f.saltPer100g || 0) * ratio, potassium: (f.potassiumPer100g || 0) * ratio,
           sugar: (f.sugarPer100g || 0) * ratio, fiber: (f.fiberPer100g || 0) * ratio
-        });
+        }, dateKey);
         flashMsg = '✓ Enregistré et synchronisé.';
         closeModal();
         renderMain();
+        if (isPastDate) openDayDetailModal(dateKey);
       });
     }
 
