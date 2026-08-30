@@ -1327,40 +1327,53 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function openDayDetailModal(dk) {
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
-    const entries = entriesForDate(dk);
-    const totals = totalsFor(entries);
-    const targets = computeTargetsForDate(dk);
-    const score = dayScore(dk);
-    const color = scoreColor(score);
-    const overrides = loadJSON('po_day_overrides_v1', {});
-    const override = overrides[dk];
-    const restDay = override ? /repos|rest/i.test(override) : true;
-    const dayTypeLabel = override || 'Repos (par défaut)';
-    const mood = loadJSON(MOOD_KEY, {})[dk];
-    const dateLabel = formatDateLabel(dk);
-    const fiberTarget = fiberTargetG(targets.profile);
-    const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
 
-    inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' + escapeHtml(dateLabel) + '<button type="button" class="gm-ghost" id="addFoodForDayBtn">+ Ajouter</button></h3>' +
-      '<div class="day-detail-head">' +
-      '<div class="day-detail-score" style="color:' + color + ';border-color:' + color + ';background:' + color.replace('rgb', 'rgba').replace(')', ',0.14)') + ';">' + score + '</div>' +
-      '<div class="day-detail-badges">' +
-      '<span class="program-badge' + (restDay ? ' warn' : '') + '">' + (restDay ? '😴 ' : '💪 ') + escapeHtml(dayTypeLabel) + '</span>' +
-      (mood ? '<span class="program-badge">Humeur ' + (MOOD_EMOJI[mood.mood] || '') + '</span>' : '') +
-      '</div>' +
-      '</div>' +
-      '<div class="kcal-total" style="margin-bottom:14px;"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal' +
-      '<div class="kcal-remaining" style="color:var(--text-tertiary);">P' + Math.round(totals.protein) + '/' + targets.proteinG + 'g · G' + Math.round(totals.carbs) + '/' + targets.carbsG + 'g · L' + Math.round(totals.fat) + '/' + targets.fatG + 'g</div>' +
-      '</div>' +
-      '<div class="section-title">Journal de cette journée</div>' +
-      (entries.length ? entries.map(e =>
-        '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
-        '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span></div>'
-      ).join('') : '<p class="empty-note">Rien enregistré.</p>') +
-      (entries.length ? dayVerdictHtml(totals, targets, fiberTarget, sugarTargetG) : '') +
-      '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeDayDetail">Fermer</button></div>';
-    document.getElementById('closeDayDetail').addEventListener('click', closeModal);
-    document.getElementById('addFoodForDayBtn').addEventListener('click', () => openAddFoodModal(dk));
+    function render() {
+      const entries = entriesForDate(dk);
+      const totals = totalsFor(entries);
+      const targets = computeTargetsForDate(dk);
+      const score = dayScore(dk);
+      const color = scoreColor(score);
+      const overrides = loadJSON('po_day_overrides_v1', {});
+      const override = overrides[dk];
+      const restDay = override ? /repos|rest/i.test(override) : true;
+      const dayTypeLabel = override || 'Repos (par défaut)';
+      const mood = loadJSON(MOOD_KEY, {})[dk];
+      const dateLabel = formatDateLabel(dk);
+      const fiberTarget = fiberTargetG(targets.profile);
+      const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
+
+      inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' + escapeHtml(dateLabel) + '<button type="button" class="gm-ghost" id="addFoodForDayBtn">+ Ajouter</button></h3>' +
+        '<div class="day-detail-head">' +
+        '<div class="day-detail-score" style="color:' + color + ';border-color:' + color + ';background:' + color.replace('rgb', 'rgba').replace(')', ',0.14)') + ';">' + score + '</div>' +
+        '<div class="day-detail-badges">' +
+        '<span class="program-badge' + (restDay ? ' warn' : '') + '">' + (restDay ? '😴 ' : '💪 ') + escapeHtml(dayTypeLabel) + '</span>' +
+        (mood ? '<span class="program-badge">Humeur ' + (MOOD_EMOJI[mood.mood] || '') + '</span>' : '') +
+        '</div>' +
+        '</div>' +
+        '<div class="kcal-total" style="margin-bottom:14px;"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal' +
+        '<div class="kcal-remaining" style="color:var(--text-tertiary);">P' + Math.round(totals.protein) + '/' + targets.proteinG + 'g · G' + Math.round(totals.carbs) + '/' + targets.carbsG + 'g · L' + Math.round(totals.fat) + '/' + targets.fatG + 'g</div>' +
+        '</div>' +
+        '<div class="section-title">Journal de cette journée</div>' +
+        (entries.length ? entries.map(e =>
+          '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
+          '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span>' +
+          '<button type="button" class="log-del" data-daydel="' + e.id + '" aria-label="Supprimer">×</button></div>'
+        ).join('') : '<p class="empty-note">Rien enregistré.</p>') +
+        (entries.length ? dayVerdictHtml(totals, targets, fiberTarget, sugarTargetG) : '') +
+        '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeDayDetail">Fermer</button></div>';
+      document.getElementById('closeDayDetail').addEventListener('click', closeModal);
+      document.getElementById('addFoodForDayBtn').addEventListener('click', () => openAddFoodModal(dk));
+      inner.querySelectorAll('[data-daydel]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          removeLogEntry(btn.dataset.daydel, dk);
+          render();
+          renderMain();
+        });
+      });
+    }
+
+    render();
     bg.classList.add('show');
   }
 
