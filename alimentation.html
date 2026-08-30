@@ -1478,14 +1478,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
   function closeModal() { const bg = document.getElementById('foodModalBg'); if (bg) bg.classList.remove('show'); }
 
-  function openAddFoodModal(targetDate) {
+  function openAddFoodModal(targetDate, startMode) {
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
     const dateKey = targetDate || todayStr();
     const isPastDate = dateKey !== todayStr();
-    let mode = 'pick'; // 'pick' | 'new'
+    let mode = startMode || 'pick'; // 'pick' | 'new'
     let selectedFood = null;
     let catFilter = 'Tous';
+    let qtyMode = 'unit'; // 'unit' | 'grams' — only meaningful when the selected food has a servingGrams unit
 
     function renderModal() {
       const db = loadJSON(FOOD_DB_KEY, []);
@@ -1520,6 +1521,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           el.addEventListener('click', (e) => {
             if (e.target.closest('[data-fdel]')) return;
             selectedFood = db.find(f => f.id === el.dataset.id);
+            qtyMode = 'unit';
             renderModal();
           });
         });
@@ -1579,19 +1581,28 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           };
           const list = loadJSON(FOOD_DB_KEY, []).concat([food]);
           saveJSON(FOOD_DB_KEY, list);
-          selectedFood = food; mode = 'pick';
+          selectedFood = food; mode = 'pick'; qtyMode = 'unit';
           renderModal();
         });
       }
     }
 
     function renderQuantityForm(food) {
-      const useServing = !!food.servingGrams;
+      const hasServing = !!food.servingGrams;
+      const useServing = hasServing && qtyMode === 'unit';
       const nowHM = new Date().toTimeString().slice(0, 5);
       return '<div class="gm-card" style="margin-top:10px;">' +
+        (hasServing ?
+          '<div class="seg-toggle" style="margin-bottom:10px;"><button type="button" data-qm="unit" class="' + (qtyMode==='unit'?'active':'') + '">' + escapeHtml(food.servingLabel || 'Unité') + '</button><button type="button" data-qm="grams" class="' + (qtyMode==='grams'?'active':'') + '">Grammes</button></div>'
+          : '') +
         '<div class="field-row">' +
         (useServing ?
-          '<div class="field-col"><label>Nombre de ' + escapeHtml(food.servingLabel || 'unités') + ' (1 = ' + food.servingGrams + 'g)</label><input type="number" id="qtyUnits" step="0.25" value="1"></div>' :
+          '<div class="field-col"><label>Nombre de ' + escapeHtml(food.servingLabel || 'unités') + ' (1 = ' + food.servingGrams + 'g)</label>' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<button type="button" class="btn-secondary" id="qtyUnitsDown" style="padding:10px 14px;">−</button>' +
+          '<input type="number" id="qtyUnits" step="0.25" min="0" value="1" style="flex:1;text-align:center;">' +
+          '<button type="button" class="btn-secondary" id="qtyUnitsUp" style="padding:10px 14px;">+</button>' +
+          '</div></div>' :
           '<div class="field-col"><label>Grammes</label><input type="number" id="qtyGrams" step="1" value="100"></div>') +
         '<div class="field-col"><label>Heure</label><input type="time" id="qtyTime" value="' + nowHM + '"></div>' +
         '</div>' +
@@ -1599,13 +1610,25 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '</div>';
     }
     function wireQuantityForm(body) {
+      body.querySelectorAll('[data-qm]').forEach(b => {
+        b.addEventListener('click', () => { qtyMode = b.dataset.qm; renderModal(); });
+      });
+      const unitsEl = body.querySelector('#qtyUnits');
+      const stepUnits = (delta) => {
+        if (!unitsEl) return;
+        const next = Math.max(0, (parseFloat(unitsEl.value) || 0) + delta);
+        unitsEl.value = Math.round(next * 100) / 100;
+      };
+      const downBtn = body.querySelector('#qtyUnitsDown'), upBtn = body.querySelector('#qtyUnitsUp');
+      if (downBtn) downBtn.addEventListener('click', () => stepUnits(-0.25));
+      if (upBtn) upBtn.addEventListener('click', () => stepUnits(0.25));
       const cancelBtn = body.querySelector('#cancelQty');
       const saveBtn = body.querySelector('#saveQty');
       if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
       if (saveBtn) saveBtn.addEventListener('click', () => {
         const f = selectedFood;
         let grams;
-        const unitsEl = body.querySelector('#qtyUnits'), gramsEl = body.querySelector('#qtyGrams');
+        const gramsEl = body.querySelector('#qtyGrams');
         if (unitsEl) grams = (parseFloat(unitsEl.value) || 0) * f.servingGrams;
         else grams = parseFloat(gramsEl.value) || 0;
         if (!grams) { alert('Quantité invalide.'); return; }
@@ -1637,7 +1660,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     function render() {
       const db = loadJSON(FOOD_DB_KEY, []);
       const shown = catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter);
-      inner.innerHTML = '<h3>Mes aliments</h3>' +
+      inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">Mes aliments<button type="button" class="gm-ghost" id="createFoodBtn">+ Créer</button></h3>' +
         (db.length ?
           '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
             '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
@@ -1650,6 +1673,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeManage">Fermer</button></div>';
       document.getElementById('closeManage').addEventListener('click', closeModal);
+      document.getElementById('createFoodBtn').addEventListener('click', () => openAddFoodModal(todayStr(), 'new'));
       inner.querySelectorAll('[data-cat]').forEach(b => {
         b.addEventListener('click', () => { catFilter = b.dataset.cat; render(); });
       });

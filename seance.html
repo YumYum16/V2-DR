@@ -251,6 +251,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   font-family: var(--font-mono); font-size: 48px; font-weight: 700; letter-spacing: -0.02em;
   color: var(--text-primary); margin-bottom: 14px; font-variant-numeric: tabular-nums;
 }
+.timer-suggest { font-size: 11.5px; color: var(--text-tertiary); margin: -6px 0 14px; }
 .timer-controls { display: flex; gap: 10px; justify-content: center; }
 .timer-btn {
   flex: 1; max-width: 160px; padding: 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10);
@@ -1095,6 +1096,24 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       });
     }
 
+    // Suggested rest time by the muscle mass an exercise recruits — big
+    // compounds and lower-body lifts need more recovery between sets than
+    // isolation work (broadly in line with Schoenfeld et al.'s rest-interval
+    // findings: ~2-3min for compounds, ~60-90s for isolation). Matched by
+    // keyword against the free-typed exercise name, same approach as
+    // muscle-tracker.html's EXERCISE_MUSCLE_MAP — no match falls back to a
+    // safe middle-ground default.
+    const REST_SUGGESTIONS = [
+      { match: /soulev[ée].*terre|deadlift|squat|presse.*cuisses|leg.?press|d[ée]velopp[ée].*couch[ée]|\bbench\b|tirage|rowing|\brow\b|traction|pull.?up|chin.?up/i, label: '2-3 min' },
+      { match: /d[ée]velopp[ée].*militaire|overhead|shoulder.?press|fente|lunge|split.?squat|bulgarian|\bdips?\b|hip.?thrust/i, label: '~2 min' },
+      { match: /curl|extension.*triceps|triceps|pushdown|skull.?crusher|kickback|[ée]l[ée]vation|lateral.?raise|front.?raise|oiseau|rear.?delt|face.?pull|mollet|calf|abdo|crunch|gainage|plank|planche|obliqu|poignet|wrist/i, label: '60-90 s' }
+    ];
+    function suggestRest(name){
+      const n = String(name || '');
+      for (const r of REST_SUGGESTIONS) if (r.match.test(n)) return r.label;
+      return '~2 min';
+    }
+
     // ---- timer state ----
     let timerMs = 0, timerRunning = false, timerStartedAt = 0, timerInterval = null;
     function timerTick(){
@@ -1216,6 +1235,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '</div>' +
         '<div class="gm-card timer-card">' +
         '<div class="timer-display" id="timerDisplay">00:00</div>' +
+        '<div class="timer-suggest">⏱ Repos conseillé pour cet exercice : ' + suggestRest(ex.name) + '</div>' +
         '<div class="timer-controls">' +
         '<button type="button" class="timer-btn primary" id="timerStartPause">Démarrer</button>' +
         '<button type="button" class="timer-btn" id="timerReset">Réinitialiser</button>' +
@@ -1253,8 +1273,10 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       app.querySelectorAll('.live-rir-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const suffix = btn.dataset.rirTarget, val = btn.dataset.rirVal;
-          document.getElementById('liveRir' + suffix).value = val;
-          app.querySelectorAll('.live-rir-btn[data-rir-target="' + suffix + '"]').forEach(b => b.classList.toggle('active', b === btn));
+          const input = document.getElementById('liveRir' + suffix);
+          const wasActive = btn.classList.contains('active');
+          input.value = wasActive ? '' : val;
+          app.querySelectorAll('.live-rir-btn[data-rir-target="' + suffix + '"]').forEach(b => b.classList.toggle('active', !wasActive && b === btn));
         });
       });
       document.getElementById('liveValidateSet').addEventListener('click', validateSet);
