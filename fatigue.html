@@ -312,6 +312,9 @@ details.info strong { color: var(--text-primary); }
         if (!l.date || !l.dayId) return;
         const key = l.date + '|' + l.dayId;
         const s = map[key] = map[key] || { date: l.date, tonnage: 0, rirs: [] };
+        // Warm-up sets are deliberately lighter than a working set — folding
+        // them into tonnage/RIR would water down the real training load.
+        if (l.warmup) return;
         s.tonnage += (l.weight || 0) * (l.reps || 0);
         if (l.rir != null) s.rirs.push(l.rir);
       });

@@ -292,6 +292,38 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   font-size: 13px; font-weight: 700; cursor: pointer;
 }
 .live-rir-btn.active { background: rgba(107,227,164,0.16); color: var(--success); border-color: rgba(107,227,164,0.4); }
+.live-warmup-row { margin-top: 6px; }
+.live-warmup-toggle {
+  width: 100%; padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03); color: var(--text-tertiary); font-family: inherit;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.live-warmup-toggle.active { background: rgba(242,192,99,0.14); color: var(--warning); border-color: rgba(242,192,99,0.4); }
+.ex-settings-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.uni-ask {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px;
+  border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  font-size: 11.5px; color: var(--text-tertiary); flex-wrap: wrap;
+}
+.uni-ask-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.uni-ask-btn {
+  padding: 6px 13px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06); color: var(--text-primary); font-family: inherit;
+  font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.machine-setting-row { display: flex; align-items: center; gap: 8px; }
+.machine-setting-row label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.machine-setting-input {
+  width: 100px; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(20,20,22,0.7); color: var(--text-primary); font-family: inherit; font-size: 12.5px;
+}
+.last-set-card .last-set-hint { text-transform: none; font-weight: 500; letter-spacing: normal; color: var(--text-tertiary); font-size: 10.5px; }
+.last-set-block { margin-top: 10px; }
+.last-set-block:first-of-type { margin-top: 0; }
+.last-set-side { font-size: 10.5px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.ls-fail-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--text-tertiary); }
 .live-validate-btn {
   padding: 16px; border: 0; border-radius: 14px;
   background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
@@ -482,6 +514,35 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     const m = Math.floor(sec / 60), s = sec % 60;
     return m ? (m + 'min' + (s ? String(s).padStart(2, '0') : '')) : (s + 's');
   }
+  // Patches an exercise's own metadata (unilateral flag, machine setting) —
+  // merges into fresh localStorage state like saveGym does, and also
+  // updates `ex` in place since it's the same object living in
+  // state.exercises (queue[] is built with .filter(), which doesn't clone).
+  function saveExercisePatch(ex, patch) {
+    Object.assign(ex, patch);
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.exercises = fresh.exercises || [];
+      const idx = fresh.exercises.findIndex(e => e.id === ex.id);
+      if (idx !== -1) Object.assign(fresh.exercises[idx], patch);
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      pcPushNow();
+    } catch (e) { console.error('saveExercisePatch failed', e); }
+  }
+  // Edits an already-logged set in place (weight/reps/RIR/échec correction)
+  // instead of appending a new entry.
+  function updateLastSetPatch(exId, id, patch) {
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.logs = fresh.logs || {};
+      const entry = (fresh.logs[exId] || []).find(l => l.id === id);
+      if (entry) Object.assign(entry, patch);
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      const memEntry = ((state.logs && state.logs[exId]) || []).find(l => l.id === id);
+      if (memEntry) Object.assign(memEntry, patch);
+      pcPushNow();
+    } catch (e) { console.error('updateLastSetPatch failed', e); }
+  }
   function todayStr(){
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -602,7 +663,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         if (!l.dayId || !l.date) return; // older/manual entries without a séance context are skipped
         const key = l.date + '|' + l.dayId;
         const s = map[key] = map[key] || { date: l.date, dayId: l.dayId, lastTime: '', sets: [] };
-        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side, rir: (l.rir != null ? l.rir : null) });
+        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side, rir: (l.rir != null ? l.rir : null), warmup: !!l.warmup });
         if (l.time && l.time > s.lastTime) s.lastTime = l.time;
       });
     });
@@ -614,10 +675,15 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     const planned = plannedExercisesForDay(state, session.dayId);
     const doneIds = new Set(session.sets.map(s => s.exId));
     const missing = planned.filter(e => !doneIds.has(e.id));
-    const totalSets = session.sets.length;
-    const failedSets = session.sets.filter(s => s.failed).length;
+    // Warm-up sets are deliberately lighter than a working set, so they're
+    // excluded from every intensity/volume metric below — counting them
+    // would dilute tonnage, fail-rate, and avg RIR into a fuzzier number.
+    // They still count toward "exercise was done" (doneIds, above).
+    const workingSets = session.sets.filter(s => !s.warmup);
+    const totalSets = workingSets.length;
+    const failedSets = workingSets.filter(s => s.failed).length;
     const failRate = totalSets ? failedSets / totalSets : 0;
-    const tonnage = session.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+    const tonnage = workingSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
 
     const completionScore = planned.length ? Math.min(1, doneIds.size / planned.length) : (doneIds.size ? 1 : 0);
     // RIR (reps in reserve) is the real proximity-to-failure signal when
@@ -630,7 +696,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     // a single session. Falls back to the cruder échec rate when a
     // session has no RIR logged at all (older entries, or the desktop
     // form used without filling it in).
-    const ratedSets = session.sets.filter(s => s.rir != null);
+    const ratedSets = workingSets.filter(s => s.rir != null);
     const avgRir = ratedSets.length ? ratedSets.reduce((sum, s) => sum + s.rir, 0) / ratedSets.length : null;
     let intensityScore;
     if (avgRir != null) {
@@ -825,7 +891,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           '</div>' +
           '<div class="hist-row-meta">' + a.totalSets + ' série(s) · ' + Math.round(a.tonnage) + ' ' + unit + ' de tonnage · ' + (a.avgRir != null ? 'RIR moyen ' + a.avgRir.toFixed(1) : Math.round(a.failRate * 100) + '% échec') + (s.durationMin ? ' · ' + s.durationMin + ' min' : '') + '</div>' +
           '<div class="hist-detail hidden" id="histDetail-' + i + '">' +
-            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.rir != null ? ' <span class="hist-rest-tag">RIR ' + x.rir + '</span>' : '') + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + '</li>').join('') + '</ul>' +
+            '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.rir != null ? ' <span class="hist-rest-tag">RIR ' + x.rir + '</span>' : '') + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + (x.warmup ? ' <span class="hist-rest-tag">échauffement</span>' : '') + '</li>').join('') + '</ul>' +
             '<div class="hist-critique">' + a.critique.map(c => '<p>' + escapeHtml(c) + '</p>').join('') + '</div>' +
           '</div>' +
         '</div>';
@@ -1049,6 +1115,10 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     // validated a minute ago would count as "last session" for the next
     // set and nudge the weight up mid-workout, which isn't the intent.
     const targetCache = {};
+    // exId -> { single: id } | { G: id, D: id } for the most recently
+    // validated set(s), so the "Dernière série" card knows what to show
+    // and edit. Reset when starting a fresh live session.
+    let lastValidated = {};
     let wakeLock = null;
 
     renderDayPick();
@@ -1099,24 +1169,55 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       });
     }
 
-    // Suggested rest time by the muscle mass an exercise recruits — big
-    // compounds and lower-body lifts need more recovery between sets than
-    // isolation work (broadly in line with Schoenfeld et al.'s rest-interval
-    // findings: ~2-3min for compounds, ~60-90s for isolation). Matched by
-    // keyword against the free-typed exercise name, same approach as
-    // muscle-tracker.html's EXERCISE_MUSCLE_MAP — no match falls back to a
-    // safe middle-ground default.
-    // sec is the low end of the range — the alert fires as soon as that
-    // minimum is reached, since more rest is always fine, less isn't.
-    const REST_SUGGESTIONS = [
-      { match: /soulev[ée].*terre|deadlift|squat|presse.*cuisses|leg.?press|d[ée]velopp[ée].*couch[ée]|\bbench\b|tirage|rowing|\brow\b|traction|pull.?up|chin.?up/i, label: '2-3 min', sec: 120 },
-      { match: /d[ée]velopp[ée].*militaire|overhead|shoulder.?press|fente|lunge|split.?squat|bulgarian|\bdips?\b|hip.?thrust/i, label: '~2 min', sec: 100 },
-      { match: /curl|extension.*triceps|triceps|pushdown|skull.?crusher|kickback|[ée]l[ée]vation|lateral.?raise|front.?raise|oiseau|rear.?delt|face.?pull|mollet|calf|abdo|crunch|gainage|plank|planche|obliqu|poignet|wrist/i, label: '60-90 s', sec: 60 }
+    // Suggested rest time — a base drawn from the muscle mass an exercise
+    // recruits (big compounds/lower-body need more recovery than isolation
+    // work), then scaled by how close the SET YOU JUST FINISHED got to
+    // failure and by how many sets of it you've already done this session.
+    // A blind fixed range regardless of effort was the complaint: going to
+    // failure on legs genuinely calls for ~4-5min, not the same 2min as a
+    // clean mid-range set — proximity to failure drives fatigue, and more
+    // fatigue needs more recovery (broadly the logic behind RIR-based
+    // autoregulation, e.g. Helms/Zourdos, and rest-interval work like
+    // Grgic et al.'s meta-analysis). Matched by keyword against the
+    // free-typed exercise name, same approach as muscle-tracker.html's
+    // EXERCISE_MUSCLE_MAP — no match falls back to a safe middle default.
+    const REST_BASE = [
+      { match: /soulev[ée].*terre|deadlift|squat|presse.*cuisses|leg.?press|d[ée]velopp[ée].*couch[ée]|\bbench\b|tirage|rowing|\brow\b|traction|pull.?up|chin.?up/i, sec: 140 },
+      { match: /d[ée]velopp[ée].*militaire|overhead|shoulder.?press|fente|lunge|split.?squat|bulgarian|\bdips?\b|hip.?thrust/i, sec: 100 },
+      { match: /curl|extension.*triceps|triceps|pushdown|skull.?crusher|kickback|[ée]l[ée]vation|lateral.?raise|front.?raise|oiseau|rear.?delt|face.?pull|mollet|calf|abdo|crunch|gainage|plank|planche|obliqu|poignet|wrist/i, sec: 60 }
     ];
-    function suggestRest(name){
+    function restBaseSec(name){
       const n = String(name || '');
-      for (const r of REST_SUGGESTIONS) if (r.match.test(n)) return r;
-      return { label: '~2 min', sec: 100 };
+      for (const r of REST_BASE) if (r.match.test(n)) return r.sec;
+      return 100;
+    }
+    // sev = { rir, failed } from the set that was just validated, or null
+    // before the first set of an exercise. setsDoneSoFar = sets already
+    // completed for this exercise this session (fatigue accumulates).
+    function computeRestTarget(ex, setsDoneSoFar, sev){
+      const base = restBaseSec(ex.name);
+      let failMult = 1, effortDesc = '';
+      const rir = sev ? sev.rir : null, failed = sev ? sev.failed : false;
+      if (failed) { failMult = 1.8; effortDesc = 'échec'; }
+      else if (rir === 0) { failMult = 1.55; effortDesc = 'RIR 0'; }
+      else if (rir === 1) { failMult = 1.3; effortDesc = 'RIR 1'; }
+      else if (rir === 2) { failMult = 1.1; effortDesc = 'RIR 2'; }
+      let fatigueMult = 1;
+      if (setsDoneSoFar >= 5) fatigueMult = 1.25;
+      else if (setsDoneSoFar >= 3) fatigueMult = 1.1;
+      const sec = Math.round(Math.min(300, Math.max(30, base * failMult * fatigueMult)) / 5) * 5;
+      const label = '≈' + fmtRestSec(sec) + (effortDesc ? ' (' + effortDesc + ', série ' + (setsDoneSoFar + 1) + ')' : (setsDoneSoFar ? ' (série ' + (setsDoneSoFar + 1) + ')' : ' (avant la 1re série)'));
+      return { sec, label };
+    }
+    // ex.id -> { rir, failed } from the most recently validated set, used to
+    // scale the NEXT rest period. Cleared per page load (not persisted) —
+    // only matters while a live session is in progress.
+    let lastSetSeverity = {};
+    function worseSeverity(a, b){
+      if (!a) return b; if (!b) return a;
+      if (a.failed || b.failed) return { rir: 0, failed: true };
+      const ar = a.rir == null ? 99 : a.rir, br = b.rir == null ? 99 : b.rir;
+      return ar <= br ? a : b;
     }
 
     // ---- timer state ----
@@ -1221,6 +1322,8 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     function startLive(){
       document.body.classList.add('seance-live');
       liveSessionStartTs = Date.now();
+      lastValidated = {};
+      lastSetSeverity = {};
       timerReset();
       renderLive();
       acquireWakeLock();
@@ -1257,19 +1360,70 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<button type="button" class="live-rir-btn" data-rir-target="' + suffix + '" data-rir-val="0">0</button>' +
         '<button type="button" class="live-rir-btn" data-rir-target="' + suffix + '" data-rir-val="1">1</button>' +
         '<button type="button" class="live-fail-toggle small" id="liveFailToggle' + suffix + '">Échec</button>' +
+        '</div>' +
+        '<div class="live-warmup-row"><button type="button" class="live-warmup-toggle" id="liveWarmupToggle' + suffix + '">🔥 Série d\'échauffement</button></div>';
+    }
+    // Ask-once "is this machine unilateral?" prompt (remembered on the
+    // exercise itself, editable later from Fitness) plus a small "R:"
+    // machine-setting field (seat position etc.), remembered the same way.
+    function exSettingsHtml(ex){
+      let html = '<div class="ex-settings-row">';
+      if (!ex.unilateralAsked) {
+        html += '<div class="uni-ask"><span>Exercice unilatéral (gauche/droite séparés) ?</span>' +
+          '<div class="uni-ask-btns"><button type="button" class="uni-ask-btn" id="uniAskYes">Oui</button><button type="button" class="uni-ask-btn" id="uniAskNo">Non</button></div></div>';
+      }
+      html += '<div class="machine-setting-row"><label for="machineSetting">R:</label>' +
+        '<input type="text" id="machineSetting" class="machine-setting-input" placeholder="réglage" value="' + escapeHtml(ex.machineSetting || '') + '"></div>';
+      html += '</div>';
+      return html;
+    }
+    // "Dernière série" — editable recap of the set(s) just validated for
+    // this exercise, so a mis-typed weight/reps/RIR doesn't need redoing
+    // the whole set. Only shows once a set has actually been validated
+    // this session (lastValidated is in-memory only, not persisted).
+    function lastSetCardHtml(ex){
+      const lv = lastValidated[ex.id];
+      if (!lv) return '';
+      const logs = (state.logs && state.logs[ex.id]) || [];
+      const blocks = [];
+      if (lv.single) { const e = logs.find(l => l.id === lv.single); if (e) blocks.push({ e, label: '' }); }
+      if (lv.G) { const e = logs.find(l => l.id === lv.G); if (e) blocks.push({ e, label: 'Gauche' }); }
+      if (lv.D) { const e = logs.find(l => l.id === lv.D); if (e) blocks.push({ e, label: 'Droite' }); }
+      if (!blocks.length) return '';
+      return '<div class="gm-card last-set-card">' +
+        '<div class="section-title">Dernière série <span class="last-set-hint">— modifiable</span></div>' +
+        blocks.map(({ e, label }) =>
+          '<div class="last-set-block" data-lsid="' + e.id + '">' +
+          (label ? '<div class="last-set-side">' + label + '</div>' : '') +
+          '<div class="live-input-row">' +
+          '<div class="live-input-col"><label>Poids</label><input type="number" step="0.1" class="ls-weight" value="' + e.weight + '"></div>' +
+          '<div class="live-input-col"><label>Reps</label><input type="number" class="ls-reps" value="' + e.reps + '"></div>' +
+          '<div class="live-input-col"><label>RIR</label><input type="number" min="0" class="ls-rir" value="' + (e.rir != null ? e.rir : '') + '" placeholder="—"></div>' +
+          '</div>' +
+          '<label class="ls-fail-row"><input type="checkbox" class="ls-fail"' + (e.failed ? ' checked' : '') + '> Échec</label>' +
+          '</div>'
+        ).join('') +
         '</div>';
     }
     function renderLive(){
       const ex = queue[currentIdx];
       const day = days.find(d => d.id === chosenDay);
       const last = lastLogFor(state, ex.id);
-      const rest = suggestRest(ex.name);
-      restTargetSec = rest.sec;
       if (!(ex.id in setCounts)) setCounts[ex.id] = 1;
+      const setsDoneSoFar = setCounts[ex.id] - 1;
+      const rest = computeRestTarget(ex, setsDoneSoFar, lastSetSeverity[ex.id]);
+      restTargetSec = rest.sec;
       if (!(ex.id in targetCache)) targetCache[ex.id] = suggestNextTarget(state, ex);
       const target = targetCache[ex.id];
-      const prefWeight = target ? target.weight : (last ? last.weight : '');
-      const prefReps = target ? target.reps : (last ? last.reps : '');
+      // Weight pre-fills from the heaviest set already logged for this
+      // exercise TODAY, in THIS session, if any — not last session's
+      // suggestion, which used to stick around and undercut a heavier
+      // weight already used a few minutes ago. Reps is always left blank:
+      // it's re-entered per set on purpose, never carried over.
+      const todaySets = ((state.logs && state.logs[ex.id]) || []).filter(l => l.date === todayStr() && l.dayId === chosenDay);
+      const sessionMaxWeight = todaySets.length ? Math.max.apply(null, todaySets.map(l => l.weight || 0)) : null;
+      const prefWeight = sessionMaxWeight != null ? sessionMaxWeight : (target ? target.weight : (last ? last.weight : ''));
+      const prefReps = '';
 
       app.innerHTML =
         '<div class="live-view">' +
@@ -1284,12 +1438,13 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '</div>' +
         '<div class="gm-card timer-card">' +
         '<div class="timer-display" id="timerDisplay">00:00</div>' +
-        '<div class="timer-suggest">⏱ Repos conseillé pour cet exercice : ' + rest.label + '</div>' +
+        '<div class="timer-suggest">⏱ Repos conseillé : ' + rest.label + '</div>' +
         '<div class="timer-controls">' +
         '<button type="button" class="timer-btn primary" id="timerStartPause">Démarrer</button>' +
         '<button type="button" class="timer-btn" id="timerReset">Réinitialiser</button>' +
         '</div></div>' +
         '<div class="gm-card">' +
+        exSettingsHtml(ex) +
         (ex.unilateral ?
           '<div class="live-set-form">' +
           sideBlockHtml('G', 'Gauche — ', prefWeight, prefReps) +
@@ -1302,6 +1457,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           '<button type="button" class="live-validate-btn" id="liveValidateSet" style="margin-top:10px;">✓ Valider la série</button>' +
           '</div>'
         ) + '</div>' +
+        lastSetCardHtml(ex) +
         '<div class="live-queue-title">File d\'attente — ' + escapeHtml(day ? day.name : '') + '</div>' +
         '<div id="liveQueue"></div>' +
         '</div>';
@@ -1318,6 +1474,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       const sides = ex.unilateral ? ['G', 'D'] : [''];
       sides.forEach(suffix => {
         document.getElementById('liveFailToggle' + suffix).addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+        document.getElementById('liveWarmupToggle' + suffix).addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
       });
       app.querySelectorAll('.live-rir-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1329,6 +1486,32 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         });
       });
       document.getElementById('liveValidateSet').addEventListener('click', validateSet);
+
+      const uniYes = document.getElementById('uniAskYes'), uniNo = document.getElementById('uniAskNo');
+      if (uniYes) uniYes.addEventListener('click', () => { saveExercisePatch(ex, { unilateral: true, unilateralAsked: true }); renderLive(); });
+      if (uniNo) uniNo.addEventListener('click', () => { saveExercisePatch(ex, { unilateral: false, unilateralAsked: true }); renderLive(); });
+      const msInput = document.getElementById('machineSetting');
+      if (msInput) {
+        const commitSetting = () => {
+          const v = msInput.value.trim();
+          if (v !== (ex.machineSetting || '')) saveExercisePatch(ex, { machineSetting: v || null });
+        };
+        msInput.addEventListener('blur', commitSetting);
+        msInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') msInput.blur(); });
+      }
+      app.querySelectorAll('.last-set-block').forEach(block => {
+        const id = block.dataset.lsid;
+        const commitLastSet = () => {
+          const w = parseFloat(block.querySelector('.ls-weight').value);
+          const r = parseInt(block.querySelector('.ls-reps').value, 10);
+          const rirRaw = block.querySelector('.ls-rir').value;
+          const rir = rirRaw === '' ? null : Math.max(0, parseInt(rirRaw, 10) || 0);
+          const failedNow = block.querySelector('.ls-fail').checked;
+          updateLastSetPatch(ex.id, id, { weight: isNaN(w) ? 0 : w, reps: isNaN(r) ? 0 : r, rir, failed: failedNow });
+        };
+        block.querySelectorAll('.ls-weight, .ls-reps, .ls-rir').forEach(inp => inp.addEventListener('blur', commitLastSet));
+        block.querySelector('.ls-fail').addEventListener('change', commitLastSet);
+      });
     }
 
     function renderQueue(){
@@ -1367,6 +1550,11 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         const raw = document.getElementById('liveRir' + suffix).value;
         return raw === '' ? null : Math.max(0, parseInt(raw, 10) || 0);
       }
+      function readWarmup(suffix) {
+        const el = document.getElementById('liveWarmupToggle' + suffix);
+        return !!(el && el.classList.contains('active'));
+      }
+      let sev = null;
       if (ex.unilateral) {
         const wG = parseFloat(document.getElementById('liveWeightG').value);
         const rG = parseInt(document.getElementById('liveRepsG').value, 10);
@@ -1375,15 +1563,29 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         if (!rG && !rD) return;
         const failG = document.getElementById('liveFailToggleG').classList.contains('active');
         const failD = document.getElementById('liveFailToggleD').classList.contains('active');
-        if (rG) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wG) ? 0 : wG, reps: rG, failed: failG, rir: readRir('G'), side: 'G' }));
-        if (rD) state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(wD) ? 0 : wD, reps: rD, failed: failD, rir: readRir('D'), side: 'D' }));
+        const lv = {};
+        if (rG) {
+          const eG = Object.assign({ id: uid() }, base, { weight: isNaN(wG) ? 0 : wG, reps: rG, failed: failG, rir: readRir('G'), side: 'G', warmup: readWarmup('G') });
+          state.logs[ex.id].push(eG); lv.G = eG.id;
+          sev = worseSeverity(sev, { rir: eG.rir, failed: eG.failed });
+        }
+        if (rD) {
+          const eD = Object.assign({ id: uid() }, base, { weight: isNaN(wD) ? 0 : wD, reps: rD, failed: failD, rir: readRir('D'), side: 'D', warmup: readWarmup('D') });
+          state.logs[ex.id].push(eD); lv.D = eD.id;
+          sev = worseSeverity(sev, { rir: eD.rir, failed: eD.failed });
+        }
+        lastValidated[ex.id] = lv;
       } else {
         const weight = parseFloat(document.getElementById('liveWeight').value);
         const reps = parseInt(document.getElementById('liveReps').value, 10);
         if (!reps) return;
         const failed = document.getElementById('liveFailToggle').classList.contains('active');
-        state.logs[ex.id].push(Object.assign({ id: uid() }, base, { weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed, rir: readRir('') }));
+        const e = Object.assign({ id: uid() }, base, { weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed, rir: readRir(''), warmup: readWarmup('') });
+        state.logs[ex.id].push(e);
+        lastValidated[ex.id] = { single: e.id };
+        sev = { rir: e.rir, failed: e.failed };
       }
+      lastSetSeverity[ex.id] = sev;
 
       saveGym(state);
       setCounts[ex.id] = (setCounts[ex.id] || 1) + 1;

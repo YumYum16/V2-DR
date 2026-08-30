@@ -1528,6 +1528,10 @@ img, video, canvas, svg { max-width: 100%; }
       <input type="checkbox" id="exUnilateral">
       Unilatéral (un bras / une jambe à la fois — logué séparément par côté)
     </label>
+    <div class="po-field">
+      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Réglage machine (optionnel)</label>
+      <input type="text" id="exMachineSetting" placeholder="ex. siège 3, dossier 2">
+    </div>
     <label class="po-bw-toggle">
       <input type="checkbox" id="exAlternate">
       Alterne avec un autre exercice (1 fois sur 2)
@@ -2182,6 +2186,7 @@ img, video, canvas, svg { max-width: 100%; }
       $('exFixedWeight').checked = !!ex.fixedWeight;
       $('exBodyweight').checked = !!ex.bodyweight;
       $('exUnilateral').checked = !!ex.unilateral;
+      $('exMachineSetting').value = ex.machineSetting || '';
       $('exAlternate').checked = !!ex.alternateId;
       renderAlternateSelect(editingExId, ex.alternateId);
     } else {
@@ -2192,6 +2197,7 @@ img, video, canvas, svg { max-width: 100%; }
       $('exFixedWeight').checked = false;
       $('exBodyweight').checked = false;
       $('exUnilateral').checked = false;
+      $('exMachineSetting').value = '';
       $('exAlternate').checked = false;
       renderAlternateSelect(null, null);
     }
@@ -2284,6 +2290,10 @@ img, video, canvas, svg { max-width: 100%; }
       fixedWeight: $('exFixedWeight').checked,
       bodyweight: $('exBodyweight').checked,
       unilateral: $('exUnilateral').checked,
+      // Set explicitly here so Séance's inline "unilatéral ?" ask-once
+      // prompt doesn't ask again for an exercise already configured here.
+      unilateralAsked: true,
+      machineSetting: $('exMachineSetting').value.trim() || null,
       days: modalDays.slice()
     };
     const alternatePartnerId = $('exAlternate').checked ? ($('exAlternateSelect').value || null) : null;
