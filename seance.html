@@ -8,6 +8,17 @@
 <meta name="theme-color" content="#050506">
 <title>Séance · Tableau de bord</title>
 
+<!-- Lets "Partager → Sur l'écran d'accueil" (iPhone) add this page as its
+     own app icon that opens straight into Séance, full-screen, no barre
+     Safari — that's the only way iOS lets a web page become a home-screen
+     "app". -->
+<link rel="manifest" href="manifest-seance.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Séance">
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -250,7 +261,9 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 .timer-display {
   font-family: var(--font-mono); font-size: 48px; font-weight: 700; letter-spacing: -0.02em;
   color: var(--text-primary); margin-bottom: 14px; font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
 }
+.timer-display.rest-ready { color: var(--success); }
 .timer-suggest { font-size: 11.5px; color: var(--text-tertiary); margin: -6px 0 14px; }
 .timer-controls { display: flex; gap: 10px; justify-content: center; }
 .timer-btn {
@@ -1103,25 +1116,65 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     // keyword against the free-typed exercise name, same approach as
     // muscle-tracker.html's EXERCISE_MUSCLE_MAP — no match falls back to a
     // safe middle-ground default.
+    // sec is the low end of the range — the alert fires as soon as that
+    // minimum is reached, since more rest is always fine, less isn't.
     const REST_SUGGESTIONS = [
-      { match: /soulev[ée].*terre|deadlift|squat|presse.*cuisses|leg.?press|d[ée]velopp[ée].*couch[ée]|\bbench\b|tirage|rowing|\brow\b|traction|pull.?up|chin.?up/i, label: '2-3 min' },
-      { match: /d[ée]velopp[ée].*militaire|overhead|shoulder.?press|fente|lunge|split.?squat|bulgarian|\bdips?\b|hip.?thrust/i, label: '~2 min' },
-      { match: /curl|extension.*triceps|triceps|pushdown|skull.?crusher|kickback|[ée]l[ée]vation|lateral.?raise|front.?raise|oiseau|rear.?delt|face.?pull|mollet|calf|abdo|crunch|gainage|plank|planche|obliqu|poignet|wrist/i, label: '60-90 s' }
+      { match: /soulev[ée].*terre|deadlift|squat|presse.*cuisses|leg.?press|d[ée]velopp[ée].*couch[ée]|\bbench\b|tirage|rowing|\brow\b|traction|pull.?up|chin.?up/i, label: '2-3 min', sec: 120 },
+      { match: /d[ée]velopp[ée].*militaire|overhead|shoulder.?press|fente|lunge|split.?squat|bulgarian|\bdips?\b|hip.?thrust/i, label: '~2 min', sec: 100 },
+      { match: /curl|extension.*triceps|triceps|pushdown|skull.?crusher|kickback|[ée]l[ée]vation|lateral.?raise|front.?raise|oiseau|rear.?delt|face.?pull|mollet|calf|abdo|crunch|gainage|plank|planche|obliqu|poignet|wrist/i, label: '60-90 s', sec: 60 }
     ];
     function suggestRest(name){
       const n = String(name || '');
-      for (const r of REST_SUGGESTIONS) if (r.match.test(n)) return r.label;
-      return '~2 min';
+      for (const r of REST_SUGGESTIONS) if (r.match.test(n)) return r;
+      return { label: '~2 min', sec: 100 };
     }
 
     // ---- timer state ----
     let timerMs = 0, timerRunning = false, timerStartedAt = 0, timerInterval = null;
+    let restTargetSec = 100, restAlertFired = false;
+
+    // Web Audio needs to be created/resumed inside a user-gesture handler on
+    // iOS Safari or it stays silent — timerStartPause (a tap) is that gesture,
+    // so the context is created there and reused for every beep after.
+    let audioCtx = null;
+    function ensureAudioCtx(){
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch(e) { audioCtx = null; }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+    function playRestAlert(){
+      const ctx = audioCtx;
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      [660, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const t0 = now + i * 0.16;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.24);
+      });
+      if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch(e){} }
+    }
     function timerTick(){
       const el = document.getElementById('timerDisplay');
       if (!el) return;
       const total = timerMs + (timerRunning ? (Date.now() - timerStartedAt) : 0);
       const s = Math.floor(total / 1000);
       el.textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+      if (timerRunning && !restAlertFired && s >= restTargetSec) {
+        restAlertFired = true;
+        el.classList.add('rest-ready');
+        playRestAlert();
+      }
     }
     function timerStartPause(){
       if (timerRunning) {
@@ -1129,6 +1182,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         timerRunning = false;
         clearInterval(timerInterval);
       } else {
+        ensureAudioCtx();
         timerStartedAt = Date.now();
         timerRunning = true;
         timerInterval = setInterval(timerTick, 250);
@@ -1139,9 +1193,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     }
     function timerReset(){
       timerMs = 0; timerRunning = false;
+      restAlertFired = false;
       clearInterval(timerInterval);
       const btn = document.getElementById('timerStartPause');
       if (btn) btn.textContent = 'Démarrer';
+      const el = document.getElementById('timerDisplay');
+      if (el) el.classList.remove('rest-ready');
       timerTick();
     }
 
@@ -1216,6 +1273,8 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       const ex = queue[currentIdx];
       const day = days.find(d => d.id === chosenDay);
       const last = lastLogFor(state, ex.id);
+      const rest = suggestRest(ex.name);
+      restTargetSec = rest.sec;
       if (!(ex.id in setCounts)) setCounts[ex.id] = 1;
       if (!(ex.id in targetCache)) targetCache[ex.id] = suggestNextTarget(state, ex);
       const target = targetCache[ex.id];
@@ -1235,7 +1294,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '</div>' +
         '<div class="gm-card timer-card">' +
         '<div class="timer-display" id="timerDisplay">00:00</div>' +
-        '<div class="timer-suggest">⏱ Repos conseillé pour cet exercice : ' + suggestRest(ex.name) + '</div>' +
+        '<div class="timer-suggest">⏱ Repos conseillé pour cet exercice : ' + rest.label + '</div>' +
         '<div class="timer-controls">' +
         '<button type="button" class="timer-btn primary" id="timerStartPause">Démarrer</button>' +
         '<button type="button" class="timer-btn" id="timerReset">Réinitialiser</button>' +
