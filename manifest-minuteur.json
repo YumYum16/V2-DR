@@ -1,8 +1,8 @@
 {
-  "name": "Séance",
-  "short_name": "Séance",
-  "start_url": "/seance.html",
-  "scope": "/seance.html",
+  "name": "Minuteur",
+  "short_name": "Minuteur",
+  "start_url": "/minuteur.html",
+  "scope": "/minuteur.html",
   "display": "standalone",
   "background_color": "#050506",
   "theme_color": "#050506",

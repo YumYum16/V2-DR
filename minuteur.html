@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Minuteur · Tableau de bord</title>
+
+<!-- This page exists specifically so "Partager → Sur l'écran d'accueil"
+     (iPhone) gives a dedicated, instant-open rest-timer app — opening
+     straight into a working timer, not into Séance's full guided-workout
+     flow (pick a day, queue exercises, etc.) just to reach a stopwatch. -->
+<link rel="manifest" href="manifest-minuteur.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Minuteur">
+
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255, 107, 107, 0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180, 180, 200, 0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift {
+  0%   { transform: translate3d(0,0,0); }
+  100% { transform: translate3d(-22px, 14px, 0); }
+}
+.page { max-width: 720px; margin: 0 auto; position: relative; z-index: 5; }
+.dash-title {
+  margin: 0 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.dash-sub { margin: 0 0 20px; font-size: 13px; color: var(--text-tertiary); }
+.gm-card {
+  position: relative; background: rgba(255, 255, 255, 0.04); border-radius: 16px;
+  padding: 20px; margin-bottom: 14px;
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 12px;
+}
+.timer-card { text-align: center; }
+.timer-display {
+  font-family: var(--font-mono); font-size: 56px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-primary); margin-bottom: 6px; font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
+}
+.timer-display.rest-ready { color: var(--success); }
+.timer-suggest { font-size: 12px; color: var(--text-tertiary); margin: 0 0 16px; }
+.timer-controls { display: flex; gap: 10px; justify-content: center; }
+.timer-btn {
+  flex: 1; max-width: 160px; padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05); color: var(--text-primary); font-family: inherit;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.timer-btn.primary {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; border: 0;
+}
+.wakelock-pill {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 14px;
+  font-size: 10.5px; color: var(--text-tertiary); background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 4px 10px;
+}
+.wakelock-pill.on { color: var(--success); border-color: rgba(107,227,164,0.3); }
+.preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.preset-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 6px;
+  border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04);
+  color: var(--text-secondary); cursor: pointer; font-family: inherit;
+}
+.preset-btn.active { border-color: rgba(107,227,164,0.5); background: rgba(107,227,164,0.12); }
+.preset-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.preset-sub { font-size: 9.5px; color: var(--text-tertiary); text-align: center; line-height: 1.3; }
+.preset-sec { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.custom-row { display: flex; gap: 8px; margin-top: 12px; }
+.custom-row input {
+  flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 14px;
+}
+.btn-secondary {
+  padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05); color: var(--text-primary); font-family: inherit;
+  font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.cross-nav a {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+  color: var(--text-secondary); text-decoration: none; font-size: 12.5px; font-weight: 600;
+  transition: background .15s, color .15s;
+}
+.cross-nav a:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .dash-title { font-size: 22px; }
+  .timer-display { font-size: 44px; }
+}
+</style>
+</head>
+<body>
+
+<div class="page" id="app"></div>
+
+<script>
+(function () {
+  'use strict';
+  var app = document.getElementById('app');
+
+  var PRESETS = [
+    { key: 'compound', label: 'Composé', sub: 'squat, développé couché, tirage…', sec: 120 },
+    { key: 'moderate', label: 'Modéré', sub: 'épaules, fentes, dips…', sec: 100 },
+    { key: 'isolation', label: 'Isolation', sub: 'curl, extension, mollets…', sec: 60 }
+  ];
+
+  var TARGET_KEY = 'minuteur_target_sec_v1';
+  var targetSec = 120;
+  try {
+    var saved = parseInt(localStorage.getItem(TARGET_KEY), 10);
+    if (saved > 0) targetSec = saved;
+  } catch (e) {}
+
+  var timerMs = 0, timerRunning = false, timerStartedAt = 0, timerInterval = null, alertFired = false;
+  var wakeLock = null;
+  var audioCtx = null;
+
+  // AudioContext has to be created/resumed inside a user-gesture handler
+  // (the Démarrer tap) or iOS Safari keeps it silent.
+  function ensureAudioCtx() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function playRestAlert() {
+    var ctx = audioCtx;
+    if (!ctx) return;
+    var now = ctx.currentTime;
+    [660, 880].forEach(function (freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      var t0 = now + i * 0.16;
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.24);
+    });
+    if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch (e) {} }
+  }
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+  }
+
+  function timerTick() {
+    var el = document.getElementById('timerDisplay');
+    if (!el) return;
+    var total = timerMs + (timerRunning ? (Date.now() - timerStartedAt) : 0);
+    var s = Math.floor(total / 1000);
+    el.textContent = fmt(s);
+    if (timerRunning && !alertFired && s >= targetSec) {
+      alertFired = true;
+      el.classList.add('rest-ready');
+      playRestAlert();
+    }
+  }
+  function timerStartPause() {
+    if (timerRunning) {
+      timerMs += Date.now() - timerStartedAt;
+      timerRunning = false;
+      clearInterval(timerInterval);
+      releaseWakeLock();
+    } else {
+      ensureAudioCtx();
+      timerStartedAt = Date.now();
+      timerRunning = true;
+      timerInterval = setInterval(timerTick, 250);
+      acquireWakeLock();
+    }
+    var btn = document.getElementById('timerStartPause');
+    if (btn) btn.textContent = timerRunning ? 'Pause' : 'Démarrer';
+    timerTick();
+  }
+  function timerReset() {
+    timerMs = 0; timerRunning = false;
+    alertFired = false;
+    clearInterval(timerInterval);
+    releaseWakeLock();
+    var btn = document.getElementById('timerStartPause');
+    if (btn) btn.textContent = 'Démarrer';
+    var el = document.getElementById('timerDisplay');
+    if (el) el.classList.remove('rest-ready');
+    timerTick();
+  }
+
+  // ---- wake lock (keeps the phone screen on while the timer runs) ----
+  function acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (wl) {
+      wakeLock = wl;
+      wakeLock.addEventListener('release', function () { wakeLock = null; updateWakeLockPill(); });
+      updateWakeLockPill();
+    }).catch(function () { updateWakeLockPill(); });
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    updateWakeLockPill();
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && timerRunning && !wakeLock) acquireWakeLock();
+  });
+  function updateWakeLockPill() {
+    var pill = document.getElementById('wakeLockPill');
+    if (!pill) return;
+    if (wakeLock) { pill.textContent = '🔒 Écran maintenu allumé'; pill.classList.add('on'); }
+    else { pill.textContent = '🔓 Veille non bloquée'; pill.classList.remove('on'); }
+  }
+
+  function setTarget(sec) {
+    targetSec = sec;
+    try { localStorage.setItem(TARGET_KEY, String(sec)); } catch (e) {}
+    timerReset();
+    render();
+  }
+
+  function targetLabel() {
+    var preset = PRESETS.filter(function (p) { return p.sec === targetSec; })[0];
+    return (preset ? preset.label + ' — ' : '') + fmt(targetSec);
+  }
+
+  function render() {
+    app.innerHTML =
+      '<h1 class="dash-title">Minuteur</h1>' +
+      '<p class="dash-sub">Repos entre les séries — lance-le, un son (+ vibration) te prévient dès que le temps conseillé est atteint.</p>' +
+      '<div class="gm-card timer-card">' +
+      '<div class="timer-display' + (alertFired ? ' rest-ready' : '') + '" id="timerDisplay">' + fmt(0) + '</div>' +
+      '<div class="timer-suggest">Objectif : ' + targetLabel() + '</div>' +
+      '<div class="timer-controls">' +
+      '<button type="button" class="timer-btn primary" id="timerStartPause">Démarrer</button>' +
+      '<button type="button" class="timer-btn" id="timerResetBtn">Réinitialiser</button>' +
+      '</div>' +
+      '<div class="wakelock-pill" id="wakeLockPill">—</div>' +
+      '</div>' +
+      '<div class="gm-card">' +
+      '<div class="section-title">Type d\'exercice</div>' +
+      '<div class="preset-grid">' +
+      PRESETS.map(function (p) {
+        return '<button type="button" class="preset-btn' + (targetSec === p.sec ? ' active' : '') + '" data-sec="' + p.sec + '">' +
+          '<span class="preset-label">' + p.label + '</span>' +
+          '<span class="preset-sub">' + p.sub + '</span>' +
+          '<span class="preset-sec">' + fmt(p.sec) + '</span>' +
+          '</button>';
+      }).join('') +
+      '</div>' +
+      '<div class="custom-row">' +
+      '<input type="number" id="customSec" inputmode="numeric" placeholder="Secondes personnalisées" min="5" step="5">' +
+      '<button type="button" class="btn-secondary" id="applyCustom">Définir</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="cross-nav"><a href="seance.html">🏋️ Séance</a><a href="gym.html">💪 Fitness</a></div>';
+
+    document.getElementById('timerStartPause').addEventListener('click', timerStartPause);
+    document.getElementById('timerResetBtn').addEventListener('click', timerReset);
+    app.querySelectorAll('.preset-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { setTarget(parseInt(btn.dataset.sec, 10)); });
+    });
+    document.getElementById('applyCustom').addEventListener('click', function () {
+      var v = parseInt(document.getElementById('customSec').value, 10);
+      if (v > 0) setTarget(v);
+    });
+    updateWakeLockPill();
+    timerTick();
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

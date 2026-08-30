@@ -8,17 +8,6 @@
 <meta name="theme-color" content="#050506">
 <title>Séance · Tableau de bord</title>
 
-<!-- Lets "Partager → Sur l'écran d'accueil" (iPhone) add this page as its
-     own app icon that opens straight into Séance, full-screen, no barre
-     Safari — that's the only way iOS lets a web page become a home-screen
-     "app". -->
-<link rel="manifest" href="manifest-seance.json">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Séance">
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -855,6 +844,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
 
   const CROSS_NAV =
     '<div class="cross-nav">' +
+    '<a href="minuteur.html">⏱ Minuteur</a>' +
     '<a href="gym.html">💪 Fitness</a>' +
     '<a href="muscle-tracker.html">🩻 Muscle</a>' +
     '<a href="fatigue.html">🔋 Fatigue</a>' +
