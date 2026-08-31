@@ -781,7 +781,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const liveWeight = readLiveWeightKg();
     const weightKg = liveWeight || profile.weightKg || 75;
     const restDay = isRestDayToday();
-    const tdee = computeTDEE(profile, weightKg, restDay);
+    const calibration = actualMaintenanceCalibration(profile);
+    const tdee = computeTDEE(profile, weightKg, restDay) * (calibration ? calibration.ratio : 1);
     const cardioKcal = cardioKcalOn(todayStr());
     const tdeeWithCardio = tdee + cardioKcal;
     const program = tickProgram(profile);
@@ -792,7 +793,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), cardioKcal: Math.round(cardioKcal), target: Math.round(target), proteinG, fatG, carbsG, program, profile };
+    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), cardioKcal: Math.round(cardioKcal), target: Math.round(target), proteinG, fatG, carbsG, program, profile, calibration };
   }
 
   // ================================================================
@@ -832,7 +833,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const profile = readProfile();
     const weightKg = weightKgOnOrBefore(dateKey) || profile.weightKg || 75;
     const restDay = isRestDayOn(dateKey);
-    const tdee = computeTDEE(profile, weightKg, restDay) + cardioKcalOn(dateKey);
+    const calibration = actualMaintenanceCalibration(profile);
+    const tdee = computeTDEE(profile, weightKg, restDay) * (calibration ? calibration.ratio : 1) + cardioKcalOn(dateKey);
     const program = loadProgram();
     const deficitPct = deficitPctOn(program, dateKey);
     const target = tdee * (1 - deficitPct / 100);
@@ -843,6 +845,55 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
     return { weightKg, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, deficitPct, profile };
+  }
+
+  // ================================================================
+  // CALIBRATED MAINTENANCE — the formula TDEE above is Mifflin-St Jeor's
+  // population-average estimate; a real individual's maintenance can sit
+  // 10-20% off it (metabolic adaptation, NEAT, formula error). Once
+  // there's enough real data, back-solve the ACTUAL maintenance from what
+  // was really eaten vs. what the scale really did over the same 14
+  // days (energy balance: ~7700 kcal per kg of tissue change), then
+  // express it as a calibration ratio applied on top of today's formula
+  // estimate — that way the day-to-day rest/training tiering the formula
+  // already gets right is kept, and only the systematic bias gets
+  // corrected. Needs >=10 of the last 14 days actually logged AND both
+  // 7-day weigh-in windows populated; otherwise there's nothing
+  // trustworthy to calibrate from yet, so the formula is used as-is.
+  // The correction is capped at +/-25% of the formula estimate — real
+  // metabolic variance rarely exceeds that, so a bigger implied gap is
+  // more likely a logging gap or a one-off (illness, travel, a big
+  // restaurant weekend) than a genuine maintenance shift.
+  // ================================================================
+  const CALIBRATION_WINDOW_DAYS = 14;
+  const CALIBRATION_MIN_LOGGED_DAYS = 10;
+  function formulaAvgTDEEOverWindow(profile, days) {
+    let total = 0;
+    for (let i = 0; i < days; i++) {
+      const dk = daysAgoStr(i);
+      const w = weightKgOnOrBefore(dk) || profile.weightKg || 75;
+      total += computeTDEE(profile, w, isRestDayOn(dk)) + cardioKcalOn(dk);
+    }
+    return total / days;
+  }
+  function actualMaintenanceCalibration(profile) {
+    const W = CALIBRATION_WINDOW_DAYS;
+    let loggedDays = 0, totalKcal = 0;
+    for (let i = 0; i < W; i++) {
+      const entries = entriesForDate(daysAgoStr(i));
+      if (entries.length) { loggedDays++; totalKcal += totalsFor(entries).kcal; }
+    }
+    if (loggedDays < CALIBRATION_MIN_LOGGED_DAYS) return null;
+    const recentW = weeklyAvgWeightKg(0, 7);
+    const olderW = weeklyAvgWeightKg(W, W + 7); // centers ~14 days apart, matching the intake window
+    if (recentW == null || olderW == null) return null;
+    const avgIntake = totalKcal / loggedDays;
+    const deltaKg = recentW - olderW;
+    const measured = avgIntake - (deltaKg * 7700 / W);
+    const formulaAvg = formulaAvgTDEEOverWindow(profile, W);
+    if (!formulaAvg) return null;
+    const ratio = Math.max(0.75, Math.min(1.25, measured / formulaAvg));
+    return { ratio, measured: Math.round(measured), formulaAvg: Math.round(formulaAvg), avgIntake: Math.round(avgIntake), deltaKg, loggedDays };
   }
 
   // ================================================================
@@ -1477,9 +1528,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<span class="program-badge">Déficit actuel : -' + targets.program.deficitPct + '%</span>' +
       (targets.restDay ? ' <span class="program-badge warn">Jour de repos — activité réduite</span>' : '') +
       '<div class="program-row"><span>Poids utilisé</span><span>' + targets.weightKg.toFixed(1) + ' kg' + (targets.weightIsLive ? ' (Fitness, live)' : ' (profil Eau)') + '</span></div>' +
-      '<div class="program-row"><span>TDEE estimé' + (targets.restDay ? ' (repos)' : '') + '</span><span>' + targets.tdee + ' kcal</span></div>' +
+      '<div class="program-row"><span>TDEE ' + (targets.calibration ? 'calibré (données réelles)' : 'estimé (formule)') + (targets.restDay ? ' — repos' : '') + '</span><span>' + targets.tdee + ' kcal</span></div>' +
       (targets.cardioKcal > 0 ? '<div class="program-row"><span>🏃 Cardio (Séance)</span><span>+' + targets.cardioKcal + ' kcal</span></div>' : '') +
       '<div class="program-row"><span>Objectif</span><span>' + targets.target + ' kcal</span></div>' +
+      (targets.calibration ?
+        '<div class="program-note">Maintenance recalculée sur tes ' + targets.calibration.loggedDays + ' derniers jours réels (' + targets.calibration.avgIntake + ' kcal/j mangées en moyenne, poids ' + (targets.calibration.deltaKg >= 0 ? '+' : '') + targets.calibration.deltaKg.toFixed(1) + ' kg sur 14j) plutôt que la seule formule (' + targets.calibration.formulaAvg + ' kcal) — écart de ' + Math.round((targets.calibration.ratio - 1) * 100) + '%.</div>' :
+        '<div class="program-note">Pas encore assez de jours journalisés (min. ' + CALIBRATION_MIN_LOGGED_DAYS + ' sur les 14 derniers) pour calculer ta vraie maintenance — le TDEE reste sur la formule seule en attendant.</div>') +
       (targets.program.history && targets.program.history.length ?
         '<div class="program-note">' + escapeHtml(targets.program.history[targets.program.history.length-1].note) + '</div>' :
         '<div class="program-note">Pas encore assez de semaines de pesées pour ajuster automatiquement — le déficit de départ (-20%) est utilisé tel quel.</div>') +
