@@ -435,14 +435,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function formatDateLabel(dk){ const [yy,mm,dd]=dk.split('-').map(Number); return new Date(yy,mm-1,dd).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); }
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function uid(){ return 'f_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
-  function isoWeekKey(d){
-    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    const day = (t.getUTCDay() + 6) % 7;
-    t.setUTCDate(t.getUTCDate() - day + 3);
-    const firstThu = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
-    const week = 1 + Math.round(((t - firstThu) / DAY_MS - 3 + ((firstThu.getUTCDay()+6)%7)) / 7);
-    return t.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
-  }
 
   await Promise.all([pcPullOnce(), pcPullOverridesOnce()]);
 
@@ -672,16 +664,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // matching intake to that day's real expenditure, rather than a fixed
   // weekly average every day. Not a hard rule backed by an outcome
   // trial — just aligning input with actual output.
-  // Cardio logged in Séance (cardioKcalOn, below) gets added on top of
-  // TDEE as an exact kcal figure — but the activityHrsPerWeek category
-  // multiplier above is a generic "how many hours a week do you train"
-  // estimate that was very likely already set INCLUDING that same
-  // cardio (e.g. a fixed 30min incline walk tacked onto every session).
-  // Left alone, that's the same activity counted twice: once crudely via
-  // the hours category, once precisely via the kcal addition. Subtracting
-  // the last 7 days' actual logged cardio hours from the profile number
-  // before the tier lookup keeps the category representing strength
-  // training only, so a routine cardio habit doesn't inflate TDEE twice.
   function weeklyCardioHours() {
     const gym = loadJSON(GYM_KEY, {});
     const cutoffMs = Date.now() - 7 * 86400000;
@@ -690,10 +672,44 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       .reduce((sum, c) => sum + (c.durationMin || 0), 0);
     return totalMin / 60;
   }
+  // Actual weekly strength-training hours, reconstructed from Séance's own
+  // logged sessions instead of the profile's manually-typed "heures
+  // d'entraînement/semaine" (Eau's setup field) — that number is a rough
+  // guess entered once and never revisited, so it silently over- or
+  // understates real training load (and therefore TDEE) forever after.
+  // A "session" here is the same date+dayId grouping Séance itself uses
+  // (buildSessionsHistory in seance.html): every group logged in the
+  // trailing 7 days counts its captured start→end duration (sessionMeta,
+  // exact — from the live flow's timer or the retroactive form's start
+  // time) when available. A session logged without a start time (duration
+  // not captured) still counts, at a flat 60min typical-session estimate,
+  // rather than as zero — dropping it entirely would understate real
+  // training volume more than a rough estimate does.
+  const TYPICAL_SESSION_MIN = 60;
+  function weeklyStrengthHours() {
+    const gym = loadJSON(GYM_KEY, {});
+    const meta = gym.sessionMeta || {};
+    const logs = gym.logs || {};
+    const cutoffMs = Date.now() - 7 * 86400000;
+    const seen = new Set();
+    let totalMin = 0;
+    Object.keys(logs).forEach(exId => {
+      (logs[exId] || []).forEach(l => {
+        if (!l.date || !l.dayId) return;
+        if (new Date(l.date + 'T00:00:00').getTime() < cutoffMs) return;
+        const key = l.date + '|' + l.dayId;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const m = meta[key];
+        totalMin += (m && m.durationMin) ? m.durationMin : TYPICAL_SESSION_MIN;
+      });
+    });
+    return totalMin / 60;
+  }
   function computeTDEE(profile, weightKg, restDay) {
     const tiers = [1.2, 1.375, 1.55, 1.725, 1.9];
-    const nonCardioHrs = Math.max(0, (profile.activityHrsPerWeek || 0) - weeklyCardioHours());
-    let mult = activityMultiplier(nonCardioHrs);
+    const totalHrs = weeklyStrengthHours() + weeklyCardioHours();
+    let mult = activityMultiplier(totalHrs);
     if (restDay) {
       const idx = Math.max(0, tiers.indexOf(mult) - 1);
       mult = tiers[idx];
@@ -708,25 +724,43 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function loadProgram() {
     const p = loadJSON(PROGRAM_KEY, null);
     if (p && typeof p.deficitPct === 'number') return p;
-    return { deficitPct: 20, lastWeekChecked: null, history: [] };
+    return { deficitPct: 20, lastChecked: null, lastAdjustedDate: null, history: [] };
   }
+  // Re-checks the trend EVERY DAY, not once per calendar week — previously
+  // a clear uptrend seen today/yesterday just sat un-adjusted until the
+  // next ISO week rolled over, sometimes days away. The trend read itself
+  // is still the same smoothed 7-day-vs-prior-7-day comparison (Garthe et
+  // al., 2011's protocol — daily weight is too noisy on its own, dominated
+  // by water/glycogen, not fat), only the cadence changed. An actual
+  // deficit change is still throttled to at most once every 3 days so a
+  // single noisy weigh-in can't whipsaw it back and forth day to day.
   function tickProgram(profile) {
     const program = loadProgram();
-    const thisWeek = isoWeekKey(new Date());
-    if (program.lastWeekChecked === thisWeek) return program; // already adjusted this week
+    const today = todayStr();
+    if (program.lastChecked === today) return program; // already checked today
     const recent = weeklyAvgWeightKg(0, 7);
     const prior = weeklyAvgWeightKg(7, 14);
     if (recent != null && prior != null && prior > 0) {
       const pctChange = ((recent - prior) / prior) * 100; // negative = losing
+      const daysSinceAdjust = program.lastAdjustedDate
+        ? Math.round((Date.now() - new Date(program.lastAdjustedDate + 'T00:00:00').getTime()) / DAY_MS)
+        : Infinity;
       let note, delta = 0;
       if (pctChange > 0) { delta = 4; note = 'Poids en hausse — déficit augmenté.'; }
       else if (pctChange > -0.4) { delta = 3; note = 'Perte trop lente (' + pctChange.toFixed(1) + '%/sem) — déficit augmenté.'; }
       else if (pctChange < -1.0) { delta = -4; note = 'Perte trop rapide (' + pctChange.toFixed(1) + '%/sem, risque pour le muscle) — déficit réduit.'; }
       else { delta = 0; note = 'Perte dans la zone optimale (' + pctChange.toFixed(1) + '%/sem, Garthe et al. 2011) — inchangé.'; }
-      program.deficitPct = Math.max(10, Math.min(30, program.deficitPct + delta));
-      program.history = (program.history || []).concat([{ week: thisWeek, pctChange: Math.round(pctChange * 100) / 100, deficitPct: program.deficitPct, note }]).slice(-8);
+      if (delta !== 0 && daysSinceAdjust < 3) {
+        note += ' Ajustement mis en attente (dernier changement il y a ' + daysSinceAdjust + ' jour(s), min. 3 pour éviter de réagir au bruit).';
+        delta = 0;
+      }
+      if (delta !== 0) {
+        program.deficitPct = Math.max(10, Math.min(30, program.deficitPct + delta));
+        program.lastAdjustedDate = today;
+      }
+      program.history = (program.history || []).concat([{ date: today, pctChange: Math.round(pctChange * 100) / 100, deficitPct: program.deficitPct, note }]).slice(-8);
     }
-    program.lastWeekChecked = thisWeek;
+    program.lastChecked = today;
     saveJSON(PROGRAM_KEY, program);
     return program;
   }
@@ -768,7 +802,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // this reconstructs it: weight from the closest weigh-in on/before that
   // date, rest/training from that date's Calendrier placement (same
   // "untouched = repos" default), and the deficit % from the adaptive
-  // program's weekly history (nearest earlier week if that exact week
+  // program's daily history (nearest earlier day if that exact day
   // isn't in history, else today's current deficit). An approximation,
   // not a stored fact — profile (age/sexe/taille) is assumed unchanged.
   // ================================================================
@@ -786,23 +820,21 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const override = overrides[dateKey];
     return override ? /repos|rest/i.test(override) : true;
   }
-  function deficitPctOn(program, dateObj) {
-    const wk = isoWeekKey(dateObj);
-    const hist = (program.history || []).slice().sort((a, b) => a.week < b.week ? -1 : 1);
-    const exact = hist.find(h => h.week === wk);
+  function deficitPctOn(program, dateKey) {
+    const hist = (program.history || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const exact = hist.find(h => h.date === dateKey);
     if (exact) return exact.deficitPct;
-    const earlier = hist.filter(h => h.week < wk);
+    const earlier = hist.filter(h => h.date < dateKey);
     if (earlier.length) return earlier[earlier.length - 1].deficitPct;
     return program.deficitPct;
   }
   function computeTargetsForDate(dateKey) {
     const profile = readProfile();
-    const dateObj = new Date(dateKey + 'T00:00:00');
     const weightKg = weightKgOnOrBefore(dateKey) || profile.weightKg || 75;
     const restDay = isRestDayOn(dateKey);
     const tdee = computeTDEE(profile, weightKg, restDay) + cardioKcalOn(dateKey);
     const program = loadProgram();
-    const deficitPct = deficitPctOn(program, dateObj);
+    const deficitPct = deficitPctOn(program, dateKey);
     const target = tdee * (1 - deficitPct / 100);
     const proteinG = Math.round(weightKg * 2.2);
     const proteinKcal = proteinG * 4;
