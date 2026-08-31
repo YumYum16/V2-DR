@@ -1497,7 +1497,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     html += CROSS_NAV;
     app.innerHTML = html;
 
-    document.getElementById('addFoodBtn').addEventListener('click', openAddFoodModal);
+    document.getElementById('addFoodBtn').addEventListener('click', () => openAddFoodModal());
     document.getElementById('manageFoodsBtn').addEventListener('click', openManageFoodsModal);
     app.querySelectorAll('[data-del]').forEach(btn => {
       btn.addEventListener('click', () => { removeLogEntry(btn.dataset.del); renderMain(); });
