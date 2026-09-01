@@ -205,7 +205,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .field-col label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
 .field-col input, .field-col select {
   padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 16px;
 }
 .food-pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 10px; }
 .food-cat-label {
@@ -245,7 +245,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .modal-bg.show { display: flex; }
 .modal {
   background: #14140f; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 0 0;
-  padding: 22px 18px max(22px, env(safe-area-inset-bottom)); width: 100%; max-width: 640px; max-height: 86vh; overflow-y: auto;
+  padding: 22px 18px max(22px, env(safe-area-inset-bottom)); width: 100%; max-width: 640px;
+  max-height: 86vh; max-height: 86dvh; overflow-y: auto; overscroll-behavior: contain;
 }
 /* PC has room to spare — wider sheet, taller list, so browsing/creating
    foods doesn't feel as cramped as the phone bottom-sheet layout. */
@@ -1457,7 +1458,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     }
 
     render();
-    bg.classList.add('show');
+    showModal(bg);
   }
 
   let flashMsg = '';
@@ -1564,6 +1565,29 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
 
   // ---- add-food modal (pick existing or create new, then log a quantity) ----
+  // On iOS Safari, an unlocked body behind a fixed-position modal lets a
+  // scroll gesture inside the sheet bleed through to the page underneath,
+  // which yanks the browser's address/toolbar in and out mid-tap — the
+  // "clique sur le bas du navigateur" glitch. Pinning the body in place
+  // for as long as the modal is open stops that bleed-through.
+  let bodyScrollLockY = 0;
+  function lockBodyScroll() {
+    bodyScrollLockY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + bodyScrollLockY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+  function unlockBodyScroll() {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, bodyScrollLockY);
+  }
+  function showModal(bg) { lockBodyScroll(); bg.classList.add('show'); }
   function ensureModal() {
     let bg = document.getElementById('foodModalBg');
     if (bg) return bg;
@@ -1575,7 +1599,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
     return bg;
   }
-  function closeModal() { const bg = document.getElementById('foodModalBg'); if (bg) bg.classList.remove('show'); }
+  function closeModal() { const bg = document.getElementById('foodModalBg'); if (bg) bg.classList.remove('show'); unlockBodyScroll(); }
 
   function openAddFoodModal(targetDate, startMode) {
     const bg = ensureModal();
@@ -1749,7 +1773,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     }
 
     renderModal();
-    bg.classList.add('show');
+    showModal(bg);
   }
 
   function openManageFoodsModal() {
@@ -1785,7 +1809,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       });
     }
     render();
-    bg.classList.add('show');
+    showModal(bg);
   }
 
   renderMain();
