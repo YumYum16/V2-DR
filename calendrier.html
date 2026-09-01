@@ -103,6 +103,19 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 }
 .cal-nav-btn:hover { background: rgba(255,255,255,0.08); }
 .cal-month { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.cal-shift-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.cal-shift-label { font-size: 11.5px; color: var(--text-tertiary); margin-right: 2px; }
+.cal-shift-btn {
+  padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit;
+  font-size: 12px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.cal-shift-btn:hover { background: rgba(255,255,255,0.08); }
+.cal-shift-bar.armed { background: rgba(129,140,248,0.10); border: 1px solid rgba(129,140,248,0.3); border-radius: 12px; padding: 8px 10px; }
+.cal-shift-hint { flex: 1; min-width: 160px; font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.cal-shift-btn.cancel { border-color: rgba(255,255,255,0.14); }
+.cal-grid.armed .cal-cell { cursor: crosshair; }
+.cal-grid.armed .cal-cell:hover { border-color: rgba(129,140,248,0.5); background: rgba(129,140,248,0.10); }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
 .cal-weekday { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.06em; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
@@ -404,6 +417,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     '</div>';
 
   let monthOffset = 0;
+  let shiftAmount = 0; // armed via the shift bar — next cell click shifts from that day onward
 
   function render() {
     const app = document.getElementById('app');
@@ -431,8 +445,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<span class="cal-month">' + MONTH_NAMES[m] + ' ' + y + '</span>' +
       '<button type="button" class="cal-nav-btn" id="calNext" aria-label="Mois suivant">›</button>' +
       '</div>' +
+      (shiftAmount ?
+        '<div class="cal-shift-bar armed"><span class="cal-shift-hint">Touche le jour à partir duquel décaler tout de ' + shiftAmount + ' jour' + (shiftAmount > 1 ? 's' : '') + '…</span>' +
+        '<button type="button" class="cal-shift-btn cancel" id="calShiftCancel">Annuler</button></div>' :
+        '<div class="cal-shift-bar"><span class="cal-shift-label">Décaler tout à partir d\'un jour</span>' +
+        '<button type="button" class="cal-shift-btn" data-amt="1">+1 jour</button>' +
+        '<button type="button" class="cal-shift-btn" data-amt="2">+2 jours</button></div>') +
       '<div class="cal-weekdays">' + WEEKDAY_LABELS.map(d => '<div class="cal-weekday">' + d + '</div>').join('') + '</div>' +
-      '<div class="cal-grid">';
+      '<div class="cal-grid' + (shiftAmount ? ' armed' : '') + '">';
     for (let i = 0; i < firstWeekday; i++) html += '<div></div>';
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(y, m, d);
@@ -497,8 +517,21 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
     document.getElementById('calPrev').addEventListener('click', () => { monthOffset--; render(); });
     document.getElementById('calNext').addEventListener('click', () => { monthOffset++; render(); });
+    app.querySelectorAll('.cal-shift-btn[data-amt]').forEach(btn => {
+      btn.addEventListener('click', () => { shiftAmount = Number(btn.dataset.amt); render(); });
+    });
+    const shiftCancelBtn = document.getElementById('calShiftCancel');
+    if (shiftCancelBtn) shiftCancelBtn.addEventListener('click', () => { shiftAmount = 0; render(); });
     app.querySelectorAll('.cal-cell[data-date]').forEach(btn => {
-      btn.addEventListener('click', () => openDayModal(btn.dataset.date, gym, overrides));
+      btn.addEventListener('click', () => {
+        if (shiftAmount) {
+          shiftSessionsFrom(btn.dataset.date, shiftAmount);
+          shiftAmount = 0;
+          render();
+        } else {
+          openDayModal(btn.dataset.date, gym, overrides);
+        }
+      });
     });
     const dayModalBg = document.getElementById('dayModalBg');
     dayModalBg.addEventListener('click', (e) => { if (e.target === dayModalBg) closeDayModal(); });
@@ -524,6 +557,25 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function setOverride(dk, label) {
     const overrides = loadJSON(OVERRIDES_KEY, {});
     if (label) overrides[dk] = label; else delete overrides[dk];
+    saveJSON(OVERRIDES_KEY, overrides);
+  }
+  // Pushes dk's placed séance (and every placed séance after it) forward by
+  // `amount` days, freeing up dk (and the days right after it, for amount>1)
+  // as rest by default. Date keys are zero-padded YYYY-MM-DD, so lexical
+  // comparison/sort matches chronological order. Processing from the
+  // furthest date back to dk guarantees each write lands on a slot that's
+  // either untouched or already vacated by this same pass, never clobbering
+  // an entry still waiting to be moved.
+  function shiftSessionsFrom(dk, amount) {
+    const overrides = loadJSON(OVERRIDES_KEY, {});
+    const keys = Object.keys(overrides).filter(k => k >= dk).sort().reverse();
+    keys.forEach(k => {
+      const [yy, mm, dd] = k.split('-').map(Number);
+      const d = new Date(yy, mm - 1, dd);
+      d.setDate(d.getDate() + amount);
+      overrides[dateKey(d)] = overrides[k];
+      delete overrides[k];
+    });
     saveJSON(OVERRIDES_KEY, overrides);
   }
   function closeDayModal() {
