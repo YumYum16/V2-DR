@@ -239,14 +239,17 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .cat-filter-btn:hover { color: var(--text-primary); }
 .cat-filter-btn.active { background: rgba(132,204,22,0.16); color: var(--lime); border-color: rgba(132,204,22,0.35); }
 .modal-bg {
-  display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6);
+  display: none; position: fixed; left: 0; right: 0;
+  top: var(--vvt, 0px); height: var(--vvh, 100dvh);
+  z-index: 200; background: rgba(0,0,0,0.6);
   align-items: flex-end; justify-content: center; padding: 0;
 }
 .modal-bg.show { display: flex; }
 .modal {
   background: #14140f; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 0 0;
   padding: 22px 18px max(22px, env(safe-area-inset-bottom)); width: 100%; max-width: 640px;
-  max-height: 86vh; max-height: 86dvh; overflow-y: auto; overscroll-behavior: contain;
+  max-height: 86vh; max-height: min(86dvh, calc(var(--vvh, 100dvh) - 24px));
+  overflow-y: auto; overscroll-behavior: contain;
 }
 /* PC has room to spare — wider sheet, taller list, so browsing/creating
    foods doesn't feel as cramped as the phone bottom-sheet layout. */
@@ -307,6 +310,28 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const PROGRAM_KEY = 'po_nutrition_program_v1';
   const MOOD_KEY = 'po_motivation_v1';
   const DAY_MS = 86400000;
+
+  // iOS Safari's on-screen keyboard shrinks the *visual* viewport but not
+  // the layout one, so a bottom-sheet modal sized/anchored off 100vh (or
+  // even 100dvh) stays pinned to the pre-keyboard screen bottom — right
+  // behind the keyboard, taking its "Ajouter" button with it and out of
+  // reach with no way to scroll further (the sheet itself is already
+  // fully scrolled). Tracking the real visual viewport and feeding it in
+  // as --vvh/--vvt keeps the sheet's bottom edge above the keyboard.
+  function syncVisualViewport() {
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    const t = vv ? vv.offsetTop : 0;
+    document.documentElement.style.setProperty('--vvh', h + 'px');
+    document.documentElement.style.setProperty('--vvt', t + 'px');
+  }
+  syncVisualViewport();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncVisualViewport);
+    window.visualViewport.addEventListener('scroll', syncVisualViewport);
+  } else {
+    window.addEventListener('resize', syncVisualViewport);
+  }
 
   // ================================================================
   // CLOUD SYNC — own Supabase row ("nutrition"), same pull-once /
