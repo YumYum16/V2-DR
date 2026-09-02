@@ -315,6 +315,16 @@ html, body {
   font-family: var(--font-mono); font-size: 12px;
   color: var(--text-2); font-variant-numeric: tabular-nums;
 }
+.hist-adjust { display: flex; align-items: center; gap: 6px; }
+.hist-adj-btn {
+  width: 22px; height: 22px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.06); border: none; border-radius: 6px;
+  color: var(--text-1); font-size: 13px; font-weight: 700; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.hist-adj-btn:hover { background: rgba(255,255,255,0.12); }
+.hist-adj-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ----- Mini chart for last 14 days ----- */
 .spark-wrap { padding: 6px 0; }
@@ -983,7 +993,7 @@ html, body {
       const n = state.logs[k] || 0;
       days.push({ date: d, key: k, count: n });
     }
-    list.innerHTML = days.map(({date, count}) => {
+    list.innerHTML = days.map(({date, key, count}) => {
       const dows = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
       const lbl = dows[date.getDay()] + ' ' + (date.getMonth()+1) + '/' + date.getDate();
       const pct = Math.min(100, (count / target) * 100);
@@ -991,9 +1001,28 @@ html, body {
       return '<div class="hist-row">'
         + '<span class="hist-date">' + lbl + '</span>'
         + '<div class="hist-bar-wrap"><div class="hist-bar-fill ' + cls + '" style="width:' + pct + '%"></div></div>'
+        + '<div class="hist-adjust">'
+        + '<button type="button" class="hist-adj-btn" data-adj-key="' + key + '" data-adj-delta="-1"' + (count <= 0 ? ' disabled' : '') + ' aria-label="Retirer un ' + unitLabelSingular() + '">−</button>'
         + '<span class="hist-count">' + count + '/' + target + '</span>'
+        + '<button type="button" class="hist-adj-btn" data-adj-key="' + key + '" data-adj-delta="1" aria-label="Ajouter un ' + unitLabelSingular() + '">+</button>'
+        + '</div>'
         + '</div>';
     }).join('') || '<div style="text-align:center;font-size:12px;color:var(--text-3);padding:12px 0">Aucun enregistrement pour l\'instant.</div>';
+    list.querySelectorAll('.hist-adj-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        adjustDayCount(btn.dataset.adjKey, parseInt(btn.dataset.adjDelta, 10));
+      });
+    });
+  }
+  // Lets a past day's total be corrected (forgot to log, or logged a
+  // wrong amount) without needing to travel back to that day — today's
+  // count keeps its own dedicated +/- via the hero card above.
+  function adjustDayCount(key, delta) {
+    const n = Math.max(0, (state.logs[key] || 0) + delta);
+    if (n <= 0) delete state.logs[key];
+    else state.logs[key] = n;
+    saveState();
+    renderWater();
   }
 
   function renderSparkline(target) {

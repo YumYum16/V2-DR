@@ -131,6 +131,25 @@ body::after {
 .hist-fail-tag { color: var(--danger); font-size: 10.5px; font-weight: 700; }
 .hist-rest-tag { color: var(--text-tertiary); font-size: 10.5px; font-weight: 700; }
 .hist-critique p { margin: 0 0 4px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+.hist-add-ex { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); }
+.hist-add-ex-toggle {
+  width: 100%; padding: 9px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.14);
+  background: transparent; color: var(--text-tertiary); font-family: inherit;
+  font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.hist-add-ex-toggle:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.24); }
+.hist-add-ex-form { margin-top: 10px; }
+.hist-add-ex-select {
+  width: 100%; padding: 9px 10px; margin-bottom: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 13px;
+}
+.hist-add-ex-save {
+  width: 100%; margin-top: 10px; padding: 12px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+}
+.resume-card { border: 1px solid rgba(255,107,107,0.35); background: rgba(255,107,107,0.06); }
+.resume-card p { text-align: left; }
 
 /* ---- Day picker (shared by desktop form + mobile step 1) ---- */
 .day-grid { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -510,6 +529,17 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       pcPushNow();
     } catch (e) { console.error('saveSessionDuration failed', e); }
   }
+  // Reads back whatever duration is already stored for a session — used
+  // when resuming an interrupted live session so ending it a second time
+  // adds the new segment's minutes instead of overwriting the first
+  // segment's duration with just the resumed portion.
+  function loadSessionDurationMin(date, dayId) {
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      const meta = fresh.sessionMeta && fresh.sessionMeta[date + '|' + dayId];
+      return (meta && meta.durationMin) || 0;
+    } catch (e) { return 0; }
+  }
   function fmtRestSec(sec) {
     const m = Math.floor(sec / 60), s = sec % 60;
     return m ? (m + 'min' + (s ? String(s).padStart(2, '0') : '')) : (s + 's');
@@ -874,6 +904,20 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     });
   }
 
+  // Options for the "add an exercise to this session" picker — the day's
+  // own planned exercises first (most likely pick), then every other
+  // exercise, since a finished session sometimes needs one that wasn't
+  // originally planned for that day.
+  function exerciseOptionsHtml(state, dayId){
+    const all = state.exercises || [];
+    const planned = all.filter(e => Array.isArray(e.days) && e.days.includes(dayId));
+    const plannedIds = new Set(planned.map(e => e.id));
+    const rest = all.filter(e => !plannedIds.has(e.id));
+    let html = '';
+    if (planned.length) html += '<optgroup label="Cette séance">' + planned.map(e => '<option value="' + e.id + '">' + escapeHtml(e.name) + '</option>').join('') + '</optgroup>';
+    if (rest.length) html += '<optgroup label="Autres exercices">' + rest.map(e => '<option value="' + e.id + '">' + escapeHtml(e.name) + '</option>').join('') + '</optgroup>';
+    return html;
+  }
   function renderHistoryCard(state, unit){
     const sessions = buildSessionsHistory(state).slice(0, 8);
     if (!sessions.length) return '';
@@ -893,17 +937,60 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           '<div class="hist-detail hidden" id="histDetail-' + i + '">' +
             '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.rir != null ? ' <span class="hist-rest-tag">RIR ' + x.rir + '</span>' : '') + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + (x.warmup ? ' <span class="hist-rest-tag">échauffement</span>' : '') + '</li>').join('') + '</ul>' +
             '<div class="hist-critique">' + a.critique.map(c => '<p>' + escapeHtml(c) + '</p>').join('') + '</div>' +
+            '<div class="hist-add-ex">' +
+              '<button type="button" class="hist-add-ex-toggle" data-hist-add-toggle="' + i + '">+ Ajouter un exercice à cette séance</button>' +
+              '<div class="hist-add-ex-form hidden" id="histAddForm-' + i + '">' +
+                '<select class="hist-add-ex-select">' + exerciseOptionsHtml(state, s.dayId) + '</select>' +
+                '<div class="live-input-row">' +
+                  '<div class="live-input-col"><label>Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" class="hist-add-weight"></div>' +
+                  '<div class="live-input-col"><label>Reps</label><input type="number" inputmode="numeric" class="hist-add-reps"></div>' +
+                  '<div class="live-input-col"><label>RIR</label><input type="number" min="0" inputmode="numeric" class="hist-add-rir" placeholder="—"></div>' +
+                '</div>' +
+                '<label class="ls-fail-row"><input type="checkbox" class="hist-add-fail"> Échec</label>' +
+                '<button type="button" class="hist-add-ex-save" data-date="' + s.date + '" data-day="' + s.dayId + '">✓ Ajouter la série</button>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
         '</div>';
     });
     html += '</div></div>';
     return html;
   }
-  function wireHistoryToggles(){
+  // onChange, if given, re-renders whatever screen called this after a set
+  // is added to a past session — the history card itself has no owned
+  // container to patch in place, so the caller's own render function is
+  // the simplest way to reflect the new set immediately.
+  function wireHistoryToggles(onChange){
     document.querySelectorAll('.hist-row').forEach(row => {
-      row.addEventListener('click', () => {
+      row.addEventListener('click', (e) => {
+        // Clicks inside the detail block (including the add-exercise form)
+        // must not collapse the row they're typing into.
+        if (e.target.closest('.hist-detail')) return;
         const detail = row.querySelector('.hist-detail');
         if (detail) detail.classList.toggle('hidden');
+      });
+    });
+    document.querySelectorAll('.hist-add-ex-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const form = btn.nextElementSibling;
+        if (form) form.classList.toggle('hidden');
+      });
+    });
+    document.querySelectorAll('.hist-add-ex-save').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wrap = btn.closest('.hist-add-ex-form');
+        const exId = wrap.querySelector('.hist-add-ex-select').value;
+        const reps = parseInt(wrap.querySelector('.hist-add-reps').value, 10);
+        if (!exId || !reps) return;
+        const weight = parseFloat(wrap.querySelector('.hist-add-weight').value);
+        const rirRaw = wrap.querySelector('.hist-add-rir').value;
+        const rir = rirRaw === '' ? null : Math.max(0, parseInt(rirRaw, 10) || 0);
+        const failed = wrap.querySelector('.hist-add-fail').checked;
+        const date = btn.dataset.date, dayId = btn.dataset.day;
+        state.logs = state.logs || {};
+        state.logs[exId] = state.logs[exId] || [];
+        state.logs[exId].push({ id: uid(), date: date, time: nowTimeStr(), dayId: dayId, weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed, rir: rir });
+        if (saveGym(state) && onChange) onChange();
       });
     });
   }
@@ -965,7 +1052,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<div class="day-grid">' + days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '">' + escapeHtml(d.name) + '</button>').join('') + '</div>' +
         '</div>' +
         CROSS_NAV;
-      wireHistoryToggles();
+      wireHistoryToggles(renderDayPick);
       wireCardioCard(renderDayPick);
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; render(); });
@@ -1121,11 +1208,37 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     let lastValidated = {};
     let wakeLock = null;
 
+    // ---- open-session tracking, for resuming after the app/tab is closed
+    // mid-workout instead of losing the spot and having to re-pick day +
+    // exercise. Only tracks TODAY's session (a stale one from a previous
+    // day is just ignored, not offered back). Cleared on "Terminer".
+    const OPEN_SESSION_KEY = 'po_seance_open_v1';
+    function saveOpenSession(dayId, exId){
+      try { localStorage.setItem(OPEN_SESSION_KEY, JSON.stringify({ date: todayStr(), dayId: dayId, exId: exId })); } catch(e){}
+    }
+    function clearOpenSession(){
+      try { localStorage.removeItem(OPEN_SESSION_KEY); } catch(e){}
+    }
+    function loadOpenSession(){
+      try {
+        const raw = JSON.parse(localStorage.getItem(OPEN_SESSION_KEY));
+        if (raw && raw.date === todayStr() && raw.dayId && days.some(d => d.id === raw.dayId)) return raw;
+      } catch(e){}
+      return null;
+    }
+
     renderDayPick();
 
     function renderDayPick(){
+      const open = loadOpenSession();
+      const openDayName = open ? (days.find(d => d.id === open.dayId) || {}).name : '';
       app.innerHTML =
         '<h1 class="dash-title">Séance</h1>' +
+        (open ?
+          '<div class="gm-card resume-card"><div class="section-title">Séance en cours</div>' +
+          '<p>' + escapeHtml(openDayName) + ' — interrompue avant la fin. Reprends exactement où tu t\'es arrêté.</p>' +
+          '<button type="button" class="live-validate-btn" id="resumeSessionBtn" style="margin-top:10px;">▶ Reprendre la séance</button></div>'
+          : '') +
         renderHistoryCard(state, unit) +
         renderCardioCard() +
         '<p class="dash-sub">Quelle séance veux-tu lancer ?</p>' +
@@ -1133,11 +1246,55 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '" style="padding:18px;">' + escapeHtml(d.name) + '</button>').join('') +
         '</div>' +
         CROSS_NAV;
-      wireHistoryToggles();
+      wireHistoryToggles(renderDayPick);
       wireCardioCard(renderDayPick);
+      const resumeBtn = document.getElementById('resumeSessionBtn');
+      if (resumeBtn) resumeBtn.addEventListener('click', () => resumeSession(open));
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; startExercisePick(); });
       });
+    }
+
+    // Rebuilds the number of sets already done today for exId+chosenDay
+    // from the persisted logs (setCounts itself is in-memory only and is
+    // lost on reload) — unilateral exercises count by side since G/D are
+    // logged as two separate entries per set.
+    function computeSetCountToday(ex){
+      const logs = ((state.logs && state.logs[ex.id]) || []).filter(l => l.date === todayStr() && l.dayId === chosenDay && !l.warmup);
+      if (ex.unilateral) {
+        const g = logs.filter(l => l.side === 'G').length;
+        const d = logs.filter(l => l.side === 'D').length;
+        return Math.max(g, d) + 1;
+      }
+      return logs.length + 1;
+    }
+    // Rebuilds the "Dernière série" edit card for one exercise from
+    // today's logs, so resuming looks the same as never having left.
+    function rebuildLastValidated(ex){
+      const logs = ((state.logs && state.logs[ex.id]) || []).filter(l => l.date === todayStr() && l.dayId === chosenDay);
+      if (!logs.length) return;
+      if (ex.unilateral) {
+        const g = logs.filter(l => l.side === 'G').slice(-1)[0];
+        const d = logs.filter(l => l.side === 'D').slice(-1)[0];
+        const lv = {};
+        if (g) lv.G = g.id;
+        if (d) lv.D = d.id;
+        if (g || d) lastValidated[ex.id] = lv;
+      } else {
+        const last = logs.slice(-1)[0];
+        if (last) lastValidated[ex.id] = { single: last.id };
+      }
+    }
+    function resumeSession(open){
+      if (!open) return;
+      chosenDay = open.dayId;
+      queue = exercisesForDay(state, chosenDay);
+      if (!queue.length) { clearOpenSession(); startExercisePick(); return; }
+      queue.forEach(ex => { setCounts[ex.id] = computeSetCountToday(ex); });
+      const idx = queue.findIndex(e => e.id === open.exId);
+      currentIdx = idx !== -1 ? idx : 0;
+      rebuildLastValidated(queue[currentIdx]);
+      resumeLive();
     }
 
     function startExercisePick(){
@@ -1328,12 +1485,23 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       renderLive();
       acquireWakeLock();
     }
+    // Same as startLive(), but for coming back to a session that was
+    // already partway done (setCounts/currentIdx/lastValidated rebuilt by
+    // resumeSession() just before this runs) — doesn't wipe that state.
+    function resumeLive(){
+      document.body.classList.add('seance-live');
+      liveSessionStartTs = Date.now();
+      timerReset();
+      renderLive();
+      acquireWakeLock();
+    }
     function endLive(){
       if (liveSessionStartTs) {
-        const durationMin = Math.round((Date.now() - liveSessionStartTs) / 60000);
-        if (durationMin > 0) saveSessionDuration(todayStr(), chosenDay, durationMin);
+        const elapsedMin = Math.round((Date.now() - liveSessionStartTs) / 60000);
+        if (elapsedMin > 0) saveSessionDuration(todayStr(), chosenDay, loadSessionDurationMin(todayStr(), chosenDay) + elapsedMin);
         liveSessionStartTs = null;
       }
+      clearOpenSession();
       releaseWakeLock();
       clearInterval(timerInterval);
       document.body.classList.remove('seance-live');
@@ -1407,6 +1575,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     }
     function renderLive(){
       const ex = queue[currentIdx];
+      saveOpenSession(chosenDay, ex.id);
       const day = days.find(d => d.id === chosenDay);
       const last = lastLogFor(state, ex.id);
       if (!(ex.id in setCounts)) setCounts[ex.id] = 1;

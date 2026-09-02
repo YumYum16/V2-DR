@@ -746,11 +746,28 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // ---- adaptive weekly program (client-side, recomputed off real weigh-ins) ----
   // Garthe et al. (2011): athletes losing weight at 0.7%/week on a moderate
   // deficit GAINED lean mass and strength vs. 1.4%/week, which did not —
-  // that 0.5-0.7%/week band is the target this program steers toward.
+  // that 0.5-0.7%/week band is the target this program steers toward for a
+  // cut. For a bulk, Iraki et al. (2019)'s off-season review recommends
+  // 0.25-0.5%/week gain to stay lean rather than maximize fat along with
+  // muscle — that's the band the bulk side steers toward instead. Both
+  // directions share one program object (deficitPct for cut, surplusPct
+  // for bulk) so switching modes doesn't discard the other mode's
+  // calibrated setting.
   function loadProgram() {
     const p = loadJSON(PROGRAM_KEY, null);
-    if (p && typeof p.deficitPct === 'number') return p;
-    return { deficitPct: 20, lastChecked: null, lastAdjustedDate: null, history: [] };
+    if (p && typeof p.deficitPct === 'number') {
+      if (p.mode !== 'bulk') p.mode = 'cut';
+      if (typeof p.surplusPct !== 'number') p.surplusPct = 10;
+      return p;
+    }
+    return { mode: 'cut', deficitPct: 20, surplusPct: 10, lastChecked: null, lastAdjustedDate: null, history: [] };
+  }
+  function setProgramMode(mode) {
+    const program = loadProgram();
+    if (program.mode === mode) return;
+    program.mode = mode;
+    program.lastChecked = null; // re-evaluate today's trend under the new mode right away
+    saveJSON(PROGRAM_KEY, program);
   }
   // Re-checks the trend EVERY DAY, not once per calendar week — previously
   // a clear uptrend seen today/yesterday just sat un-adjusted until the
@@ -758,8 +775,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // is still the same smoothed 7-day-vs-prior-7-day comparison (Garthe et
   // al., 2011's protocol — daily weight is too noisy on its own, dominated
   // by water/glycogen, not fat), only the cadence changed. An actual
-  // deficit change is still throttled to at most once every 3 days so a
-  // single noisy weigh-in can't whipsaw it back and forth day to day.
+  // deficit/surplus change is still throttled to at most once every 3 days
+  // so a single noisy weigh-in can't whipsaw it back and forth day to day.
   function tickProgram(profile) {
     const program = loadProgram();
     const today = todayStr();
@@ -767,24 +784,32 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const recent = weeklyAvgWeightKg(0, 7);
     const prior = weeklyAvgWeightKg(7, 14);
     if (recent != null && prior != null && prior > 0) {
-      const pctChange = ((recent - prior) / prior) * 100; // negative = losing
+      const pctChange = ((recent - prior) / prior) * 100; // negative = losing, positive = gaining
       const daysSinceAdjust = program.lastAdjustedDate
         ? Math.round((Date.now() - new Date(program.lastAdjustedDate + 'T00:00:00').getTime()) / DAY_MS)
         : Infinity;
       let note, delta = 0;
-      if (pctChange > 0) { delta = 4; note = 'Poids en hausse — déficit augmenté.'; }
-      else if (pctChange > -0.4) { delta = 3; note = 'Perte trop lente (' + pctChange.toFixed(1) + '%/sem) — déficit augmenté.'; }
-      else if (pctChange < -1.0) { delta = -4; note = 'Perte trop rapide (' + pctChange.toFixed(1) + '%/sem, risque pour le muscle) — déficit réduit.'; }
-      else { delta = 0; note = 'Perte dans la zone optimale (' + pctChange.toFixed(1) + '%/sem, Garthe et al. 2011) — inchangé.'; }
+      if (program.mode === 'bulk') {
+        if (pctChange < 0) { delta = 3; note = 'Poids en baisse pendant une prise de masse — surplus augmenté.'; }
+        else if (pctChange < 0.15) { delta = 2; note = 'Prise trop lente (' + pctChange.toFixed(1) + '%/sem) — surplus augmenté.'; }
+        else if (pctChange > 0.5) { delta = -3; note = 'Prise trop rapide (' + pctChange.toFixed(1) + '%/sem, risque de prendre surtout du gras) — surplus réduit.'; }
+        else { delta = 0; note = 'Prise dans la zone optimale (' + pctChange.toFixed(1) + '%/sem, Iraki et al. 2019) — inchangé.'; }
+      } else {
+        if (pctChange > 0) { delta = 4; note = 'Poids en hausse — déficit augmenté.'; }
+        else if (pctChange > -0.4) { delta = 3; note = 'Perte trop lente (' + pctChange.toFixed(1) + '%/sem) — déficit augmenté.'; }
+        else if (pctChange < -1.0) { delta = -4; note = 'Perte trop rapide (' + pctChange.toFixed(1) + '%/sem, risque pour le muscle) — déficit réduit.'; }
+        else { delta = 0; note = 'Perte dans la zone optimale (' + pctChange.toFixed(1) + '%/sem, Garthe et al. 2011) — inchangé.'; }
+      }
       if (delta !== 0 && daysSinceAdjust < 3) {
         note += ' Ajustement mis en attente (dernier changement il y a ' + daysSinceAdjust + ' jour(s), min. 3 pour éviter de réagir au bruit).';
         delta = 0;
       }
       if (delta !== 0) {
-        program.deficitPct = Math.max(10, Math.min(30, program.deficitPct + delta));
+        if (program.mode === 'bulk') program.surplusPct = Math.max(5, Math.min(20, program.surplusPct + delta));
+        else program.deficitPct = Math.max(10, Math.min(30, program.deficitPct + delta));
         program.lastAdjustedDate = today;
       }
-      program.history = (program.history || []).concat([{ date: today, pctChange: Math.round(pctChange * 100) / 100, deficitPct: program.deficitPct, note }]).slice(-8);
+      program.history = (program.history || []).concat([{ date: today, mode: program.mode, pctChange: Math.round(pctChange * 100) / 100, deficitPct: program.deficitPct, surplusPct: program.surplusPct, note }]).slice(-8);
     }
     program.lastChecked = today;
     saveJSON(PROGRAM_KEY, program);
@@ -807,19 +832,22 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const liveWeight = readLiveWeightKg();
     const weightKg = liveWeight || profile.weightKg || 75;
     const restDay = isRestDayToday();
-    const calibration = actualMaintenanceCalibration(profile);
+    const calWindow = calibrationWindow();
+    const calibration = actualMaintenanceCalibration(profile, calWindow);
     const tdee = computeTDEE(profile, weightKg, restDay) * (calibration ? calibration.ratio : 1);
     const cardioKcal = cardioKcalOn(todayStr());
     const tdeeWithCardio = tdee + cardioKcal;
     const program = tickProgram(profile);
-    const target = tdeeWithCardio * (1 - program.deficitPct / 100);
+    const target = program.mode === 'bulk'
+      ? tdeeWithCardio * (1 + program.surplusPct / 100)
+      : tdeeWithCardio * (1 - program.deficitPct / 100);
     const proteinG = Math.round(weightKg * 2.2);
     const proteinKcal = proteinG * 4;
     const fatKcal = Math.max(target * 0.25, weightKg * 0.6 * 9); // floor ~0.6g/kg
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), cardioKcal: Math.round(cardioKcal), target: Math.round(target), proteinG, fatG, carbsG, program, profile, calibration };
+    return { weightKg, weightIsLive: !!liveWeight, restDay, tdee: Math.round(tdee), cardioKcal: Math.round(cardioKcal), target: Math.round(target), proteinG, fatG, carbsG, program, profile, calibration, calibrationWindow: calWindow };
   }
 
   // ================================================================
@@ -847,13 +875,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const override = overrides[dateKey];
     return override ? /repos|rest/i.test(override) : true;
   }
-  function deficitPctOn(program, dateKey) {
+  // Reconstructs which mode+pct was actually active on a given past day,
+  // from the program's own history — a mode switch mid-cut/mid-bulk means
+  // earlier days must keep scoring against what was active then, not
+  // today's mode.
+  function programStateOn(program, dateKey) {
     const hist = (program.history || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
-    const exact = hist.find(h => h.date === dateKey);
-    if (exact) return exact.deficitPct;
-    const earlier = hist.filter(h => h.date < dateKey);
-    if (earlier.length) return earlier[earlier.length - 1].deficitPct;
-    return program.deficitPct;
+    const pick = hist.find(h => h.date === dateKey) || hist.filter(h => h.date < dateKey).slice(-1)[0] || program;
+    const mode = pick.mode === 'bulk' ? 'bulk' : 'cut';
+    return { mode, pct: mode === 'bulk' ? pick.surplusPct : pick.deficitPct };
   }
   function computeTargetsForDate(dateKey) {
     const profile = readProfile();
@@ -862,15 +892,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const calibration = actualMaintenanceCalibration(profile);
     const tdee = computeTDEE(profile, weightKg, restDay) * (calibration ? calibration.ratio : 1) + cardioKcalOn(dateKey);
     const program = loadProgram();
-    const deficitPct = deficitPctOn(program, dateKey);
-    const target = tdee * (1 - deficitPct / 100);
+    const { mode, pct } = programStateOn(program, dateKey);
+    const target = mode === 'bulk' ? tdee * (1 + pct / 100) : tdee * (1 - pct / 100);
     const proteinG = Math.round(weightKg * 2.2);
     const proteinKcal = proteinG * 4;
     const fatKcal = Math.max(target * 0.25, weightKg * 0.6 * 9);
     const fatG = Math.round(fatKcal / 9);
     const carbsKcal = Math.max(0, target - proteinKcal - fatG * 9);
     const carbsG = Math.round(carbsKcal / 4);
-    return { weightKg, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, deficitPct, profile };
+    return { weightKg, restDay, tdee: Math.round(tdee), target: Math.round(target), proteinG, fatG, carbsG, mode, pct, profile };
   }
 
   // ================================================================
@@ -890,9 +920,31 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // metabolic variance rarely exceeds that, so a bigger implied gap is
   // more likely a logging gap or a one-off (illness, travel, a big
   // restaurant weekend) than a genuine maintenance shift.
+  //
+  // The window itself is adaptive, not a fixed 14/30 days: forcing a full
+  // month before calibrating means someone who started logging a week ago
+  // gets nothing but empty days folded into the average. Instead the
+  // window grows with how far real logging actually reaches back — 7 days
+  // once a week exists, climbing towards a 4-week (28-day) cycle as more
+  // weeks accumulate — so it always calibrates off real data density, not
+  // a calendar assumption.
   // ================================================================
-  const CALIBRATION_WINDOW_DAYS = 14;
-  const CALIBRATION_MIN_LOGGED_DAYS = 10;
+  const CALIBRATION_MIN_WINDOW_DAYS = 7;
+  const CALIBRATION_MAX_WINDOW_DAYS = 28;
+  const CALIBRATION_MIN_LOGGED_RATIO = 0.7; // ~10/14, same bar as before
+  function foodLogHistoryDays(maxLookback) {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    let furthest = -1;
+    for (let i = 0; i < maxLookback; i++) {
+      if ((log[daysAgoStr(i)] || []).length) furthest = i;
+    }
+    return furthest + 1;
+  }
+  function calibrationWindow() {
+    const history = foodLogHistoryDays(CALIBRATION_MAX_WINDOW_DAYS);
+    const W = Math.max(CALIBRATION_MIN_WINDOW_DAYS, Math.min(CALIBRATION_MAX_WINDOW_DAYS, history));
+    return { W, minLoggedDays: Math.ceil(W * CALIBRATION_MIN_LOGGED_RATIO) };
+  }
   function formulaAvgTDEEOverWindow(profile, days) {
     let total = 0;
     for (let i = 0; i < days; i++) {
@@ -902,16 +954,17 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     }
     return total / days;
   }
-  function actualMaintenanceCalibration(profile) {
-    const W = CALIBRATION_WINDOW_DAYS;
+  function actualMaintenanceCalibration(profile, windowInfo) {
+    const { W, minLoggedDays } = windowInfo || calibrationWindow();
     let loggedDays = 0, totalKcal = 0;
     for (let i = 0; i < W; i++) {
       const entries = entriesForDate(daysAgoStr(i));
       if (entries.length) { loggedDays++; totalKcal += totalsFor(entries).kcal; }
     }
-    if (loggedDays < CALIBRATION_MIN_LOGGED_DAYS) return null;
-    const recentW = weeklyAvgWeightKg(0, 7);
-    const olderW = weeklyAvgWeightKg(W, W + 7); // centers ~14 days apart, matching the intake window
+    if (loggedDays < minLoggedDays) return null;
+    const half = Math.floor(W / 2);
+    const recentW = weeklyAvgWeightKg(0, half);
+    const olderW = weeklyAvgWeightKg(half, W);
     if (recentW == null || olderW == null) return null;
     const avgIntake = totalKcal / loggedDays;
     const deltaKg = recentW - olderW;
@@ -919,7 +972,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const formulaAvg = formulaAvgTDEEOverWindow(profile, W);
     if (!formulaAvg) return null;
     const ratio = Math.max(0.75, Math.min(1.25, measured / formulaAvg));
-    return { ratio, measured: Math.round(measured), formulaAvg: Math.round(formulaAvg), avgIntake: Math.round(avgIntake), deltaKg, loggedDays };
+    return { ratio, measured: Math.round(measured), formulaAvg: Math.round(formulaAvg), avgIntake: Math.round(avgIntake), deltaKg, loggedDays, windowDays: W };
   }
 
   // ================================================================
@@ -1063,8 +1116,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       .sort((a, b) => (b.gapG / b.targetG) - (a.gapG / a.targetG))
       .slice(0, 2);
     const tips = [];
-    const volNote = weeklyVolumeNote();
-    if (volNote) tips.push(volNote);
+    if (targets.program.mode !== 'bulk') {
+      const volNote = weeklyVolumeNote();
+      if (volNote) tips.push(volNote);
+    }
     const mealTip = proteinMealTip(entries, targets);
     if (mealTip) tips.push(mealTip);
     gaps.forEach(g => {
@@ -1501,12 +1556,20 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
     const banner = flashMsg ? '<div class="gm-card save-banner">' + escapeHtml(flashMsg) + '</div>' : '';
     flashMsg = '';
+    const isBulk = targets.program.mode === 'bulk';
     let html = '<h1 class="dash-title">Alimentation</h1>' +
       banner +
-      '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta vraie perte de poids.</p>' +
+      '<div class="seg-toggle" id="modeToggle">' +
+      '<button type="button" data-mode="cut" class="' + (isBulk ? '' : 'active') + '">🔥 Sèche</button>' +
+      '<button type="button" data-mode="bulk" class="' + (isBulk ? 'active' : '') + '">💪 Prise de masse</button>' +
+      '</div>' +
+      '<p class="dash-sub">Objectifs calculés à partir de ton poids réel (Fitness) et de ton profil (Eau) — recalculés à chaque visite, ajustés chaque semaine selon ta ' + (isBulk ? 'vraie prise de poids' : 'vraie perte de poids') + '.</p>' +
       '<details class="info"><summary>D\'où viennent ces chiffres (études citées)</summary>' +
       '<p><strong>Dépense calorique (TDEE)</strong> : équation de <strong>Mifflin-St Jeor (1990)</strong> pour le métabolisme de base — jugée la plus fiable par la comparaison de <strong>Frankenfield et al. (2005)</strong> — multipliée par un facteur d\'activité selon tes heures d\'entraînement/semaine (Eau). Une séance de cardio enregistrée dans <a href="seance.html" style="color:var(--text-primary)">Séance</a> (marche/course sur tapis avec vitesse+pente, formule ACSM ; ou vélo/elliptique/rameur/natation via MET, Ainsworth et al. 2011) s\'ajoute par-dessus, en kcal réellement calculées — le facteur d\'activité hebdomadaire reste une moyenne, ça, c\'est la dépense mesurée du jour. Pour éviter de compter ce même cardio deux fois (une fois dans les heures/semaine du profil, une fois dans le calcul précis), les heures de cardio réellement loguées sur les 7 derniers jours sont retirées des heures/semaine avant de choisir le palier d\'activité — le palier ne représente donc plus que la muscu.</p>' +
-      '<p><strong>Déficit adaptatif</strong> : <strong>Garthe et al. (2011)</strong> ont montré que des athlètes perdant du poids à <strong>0.7%/semaine</strong> gagnaient de la masse maigre et de la force pendant leur sèche, contrairement à ceux perdant 1.4%/semaine. Ce programme vise 0.5-0.7%/semaine et ajuste ton déficit chaque semaine selon ta perte réelle (Fitness → Poids), pas une estimation figée.</p>' +
+      (isBulk ?
+        '<p><strong>Surplus adaptatif</strong> : <strong>Iraki et al. (2019)</strong>, revue sur la nutrition hors-saison des bodybuilders, recommande une prise de poids de <strong>0.25-0.5%/semaine</strong> pour rester dans la masse maigre plutôt que de maximiser le gras avec le muscle. Ce programme vise cette zone et ajuste ton surplus chaque semaine selon ta vraie prise de poids (Fitness → Poids), pas une estimation figée.</p>'
+        :
+        '<p><strong>Déficit adaptatif</strong> : <strong>Garthe et al. (2011)</strong> ont montré que des athlètes perdant du poids à <strong>0.7%/semaine</strong> gagnaient de la masse maigre et de la force pendant leur sèche, contrairement à ceux perdant 1.4%/semaine. Ce programme vise 0.5-0.7%/semaine et ajuste ton déficit chaque semaine selon ta perte réelle (Fitness → Poids), pas une estimation figée.</p>') +
       '<p><strong>Protéines</strong> : <strong>Helms, Aragon &amp; Fitschen (2014)</strong>, revue systématique — 1.8 à 2.7 g/kg de poids de corps pendant une restriction calorique chez les athlètes entraînés en résistance ; 2.2 g/kg utilisé ici. Le reste des calories est réparti entre lipides (plancher ~25% pour la santé hormonale) et glucides (le reste, pour soutenir l\'intensité à l\'entraînement).</p>' +
       '<p><strong>Débloat (sodium/potassium)</strong> : l\'<strong>OMS</strong> recommande &lt; 2000 mg de sodium (5g de sel) et ≥ 3510 mg de potassium par jour — ces deux seuils donnent, une fois atteints, un ratio sodium:potassium molaire d\'environ 1.0, que l\'OMS cite explicitement comme objectif. Un ratio élevé (sodium dominant, potassium faible) est associé à la rétention d\'eau dans la littérature physiologique — pas juste "trop de sel" isolément. Le sodium ici vient de tes aliments (Alimentation), pas d\'une estimation séparée.</p>' +
       '<p><strong>Lien avec l\'eau</strong> : la relation sodium→besoin en eau est débattue scientifiquement (revue <strong>Rakova et al., Annals of Nutrition &amp; Metabolism</strong>) — à apport modéré, les reins concentrent simplement l\'urine sans changer le volume d\'eau nécessaire. Mais au-delà d\'un certain seuil, les reins ne peuvent plus concentrer l\'urine davantage et un volume d\'eau supplémentaire est nécessaire pour évacuer l\'excès. C\'est pourquoi Eau n\'ajoute de l\'eau que pour le sel <strong>au-delà</strong> de l\'objectif de 5g/jour, pas proportionnellement à chaque gramme.</p>' +
@@ -1550,19 +1613,19 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '</div>';
 
     html += '<div class="gm-card">' +
-      '<div class="section-title">Programme (sèche adaptative)</div>' +
-      '<span class="program-badge">Déficit actuel : -' + targets.program.deficitPct + '%</span>' +
+      '<div class="section-title">Programme (' + (isBulk ? 'prise de masse adaptative' : 'sèche adaptative') + ')</div>' +
+      '<span class="program-badge">' + (isBulk ? 'Surplus actuel : +' + targets.program.surplusPct : 'Déficit actuel : -' + targets.program.deficitPct) + '%</span>' +
       (targets.restDay ? ' <span class="program-badge warn">Jour de repos — activité réduite</span>' : '') +
       '<div class="program-row"><span>Poids utilisé</span><span>' + targets.weightKg.toFixed(1) + ' kg' + (targets.weightIsLive ? ' (Fitness, live)' : ' (profil Eau)') + '</span></div>' +
       '<div class="program-row"><span>TDEE ' + (targets.calibration ? 'calibré (données réelles)' : 'estimé (formule)') + (targets.restDay ? ' — repos' : '') + '</span><span>' + targets.tdee + ' kcal</span></div>' +
       (targets.cardioKcal > 0 ? '<div class="program-row"><span>🏃 Cardio (Séance)</span><span>+' + targets.cardioKcal + ' kcal</span></div>' : '') +
       '<div class="program-row"><span>Objectif</span><span>' + targets.target + ' kcal</span></div>' +
       (targets.calibration ?
-        '<div class="program-note">Maintenance recalculée sur tes ' + targets.calibration.loggedDays + ' derniers jours réels (' + targets.calibration.avgIntake + ' kcal/j mangées en moyenne, poids ' + (targets.calibration.deltaKg >= 0 ? '+' : '') + targets.calibration.deltaKg.toFixed(1) + ' kg sur 14j) plutôt que la seule formule (' + targets.calibration.formulaAvg + ' kcal) — écart de ' + Math.round((targets.calibration.ratio - 1) * 100) + '%.</div>' :
-        '<div class="program-note">Pas encore assez de jours journalisés (min. ' + CALIBRATION_MIN_LOGGED_DAYS + ' sur les 14 derniers) pour calculer ta vraie maintenance — le TDEE reste sur la formule seule en attendant.</div>') +
+        '<div class="program-note">Maintenance recalculée sur tes ' + targets.calibration.loggedDays + ' derniers jours réels (' + targets.calibration.avgIntake + ' kcal/j mangées en moyenne, poids ' + (targets.calibration.deltaKg >= 0 ? '+' : '') + targets.calibration.deltaKg.toFixed(1) + ' kg sur ' + targets.calibration.windowDays + 'j) plutôt que la seule formule (' + targets.calibration.formulaAvg + ' kcal) — écart de ' + Math.round((targets.calibration.ratio - 1) * 100) + '%.</div>' :
+        '<div class="program-note">Pas encore assez de jours journalisés (min. ' + targets.calibrationWindow.minLoggedDays + ' sur les ' + targets.calibrationWindow.W + ' derniers) pour calculer ta vraie maintenance — le TDEE reste sur la formule seule en attendant. Cette fenêtre grandit avec ton historique réel (une semaine pour commencer, jusqu\'à 4 semaines).</div>') +
       (targets.program.history && targets.program.history.length ?
         '<div class="program-note">' + escapeHtml(targets.program.history[targets.program.history.length-1].note) + '</div>' :
-        '<div class="program-note">Pas encore assez de semaines de pesées pour ajuster automatiquement — le déficit de départ (-20%) est utilisé tel quel.</div>') +
+        '<div class="program-note">Pas encore assez de semaines de pesées pour ajuster automatiquement — ' + (isBulk ? 'le surplus de départ (+10%)' : 'le déficit de départ (-20%)') + ' est utilisé tel quel.</div>') +
       '</div>';
 
     html += renderPredictionCard(targets, totals);
@@ -1577,6 +1640,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     html += CROSS_NAV;
     app.innerHTML = html;
 
+    app.querySelectorAll('#modeToggle [data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => { setProgramMode(btn.dataset.mode); renderMain(); });
+    });
     document.getElementById('addFoodBtn').addEventListener('click', () => openAddFoodModal());
     document.getElementById('manageFoodsBtn').addEventListener('click', openManageFoodsModal);
     app.querySelectorAll('[data-del]').forEach(btn => {
