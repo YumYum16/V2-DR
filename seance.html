@@ -131,25 +131,25 @@ body::after {
 .hist-fail-tag { color: var(--danger); font-size: 10.5px; font-weight: 700; }
 .hist-rest-tag { color: var(--text-tertiary); font-size: 10.5px; font-weight: 700; }
 .hist-critique p { margin: 0 0 4px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
-.hist-add-ex { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); }
-.hist-add-ex-toggle {
-  width: 100%; padding: 9px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.14);
+.hist-edit-btn {
+  width: 100%; margin-top: 10px; padding: 9px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.14);
   background: transparent; color: var(--text-tertiary); font-family: inherit;
   font-size: 11.5px; font-weight: 700; cursor: pointer;
 }
-.hist-add-ex-toggle:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.24); }
-.hist-add-ex-form { margin-top: 10px; }
+.hist-edit-btn:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.24); }
 .hist-add-ex-select {
-  width: 100%; padding: 9px 10px; margin-bottom: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  width: 100%; padding: 9px 10px; margin-bottom: 4px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
   background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: inherit; font-size: 13px;
-}
-.hist-add-ex-save {
-  width: 100%; margin-top: 10px; padding: 12px; border: 0; border-radius: 12px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
-  font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
 }
 .resume-card { border: 1px solid rgba(255,107,107,0.35); background: rgba(255,107,107,0.06); }
 .resume-card p { text-align: left; }
+.set-warmup-btn {
+  flex-shrink: 0; padding: 8px 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-tertiary);
+  font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.set-warmup-btn.active { background: rgba(242,192,99,0.14); color: var(--warning); border-color: rgba(242,192,99,0.4); }
 
 /* ---- Day picker (shared by desktop form + mobile step 1) ---- */
 .day-grid { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -198,7 +198,7 @@ body::after {
   padding: 8px 10px; border-radius: 10px; background: rgba(107,227,164,0.06);
   border: 1px solid rgba(107,227,164,0.16);
 }
-.set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .set-idx {
   width: 22px; flex-shrink: 0; text-align: center; font-family: var(--font-mono);
   font-size: 12px; color: var(--text-tertiary);
@@ -693,7 +693,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         if (!l.dayId || !l.date) return; // older/manual entries without a séance context are skipped
         const key = l.date + '|' + l.dayId;
         const s = map[key] = map[key] || { date: l.date, dayId: l.dayId, lastTime: '', sets: [] };
-        s.sets.push({ exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side, rir: (l.rir != null ? l.rir : null), warmup: !!l.warmup });
+        s.sets.push({ id: l.id, exId: ex.id, exName: ex.name, weight: l.weight || 0, reps: l.reps || 0, failed: !!l.failed, restSec: l.restSec, side: l.side, rir: (l.rir != null ? l.rir : null), warmup: !!l.warmup });
         if (l.time && l.time > s.lastTime) s.lastTime = l.time;
       });
     });
@@ -904,10 +904,10 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
     });
   }
 
-  // Options for the "add an exercise to this session" picker — the day's
-  // own planned exercises first (most likely pick), then every other
-  // exercise, since a finished session sometimes needs one that wasn't
-  // originally planned for that day.
+  // Options for the "add an exercise" pickers — the day's own planned
+  // exercises first (most likely pick), then every other exercise, since a
+  // finished session sometimes needs one that wasn't originally planned
+  // for that day.
   function exerciseOptionsHtml(state, dayId){
     const all = state.exercises || [];
     const planned = all.filter(e => Array.isArray(e.days) && e.days.includes(dayId));
@@ -937,62 +937,145 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           '<div class="hist-detail hidden" id="histDetail-' + i + '">' +
             '<ul class="hist-set-list">' + s.sets.map(x => '<li>' + escapeHtml(x.exName) + (x.side ? ' (' + (x.side === 'G' ? 'gauche' : 'droite') + ')' : '') + ' — ' + x.weight + ' ' + unit + ' × ' + x.reps + (x.rir != null ? ' <span class="hist-rest-tag">RIR ' + x.rir + '</span>' : '') + (x.failed ? ' <span class="hist-fail-tag">échec</span>' : '') + (x.restSec ? ' <span class="hist-rest-tag">repos ' + fmtRestSec(x.restSec) + '</span>' : '') + (x.warmup ? ' <span class="hist-rest-tag">échauffement</span>' : '') + '</li>').join('') + '</ul>' +
             '<div class="hist-critique">' + a.critique.map(c => '<p>' + escapeHtml(c) + '</p>').join('') + '</div>' +
-            '<div class="hist-add-ex">' +
-              '<button type="button" class="hist-add-ex-toggle" data-hist-add-toggle="' + i + '">+ Ajouter un exercice à cette séance</button>' +
-              '<div class="hist-add-ex-form hidden" id="histAddForm-' + i + '">' +
-                '<select class="hist-add-ex-select">' + exerciseOptionsHtml(state, s.dayId) + '</select>' +
-                '<div class="live-input-row">' +
-                  '<div class="live-input-col"><label>Poids (' + unit + ')</label><input type="number" step="0.1" inputmode="decimal" class="hist-add-weight"></div>' +
-                  '<div class="live-input-col"><label>Reps</label><input type="number" inputmode="numeric" class="hist-add-reps"></div>' +
-                  '<div class="live-input-col"><label>RIR</label><input type="number" min="0" inputmode="numeric" class="hist-add-rir" placeholder="—"></div>' +
-                '</div>' +
-                '<label class="ls-fail-row"><input type="checkbox" class="hist-add-fail"> Échec</label>' +
-                '<button type="button" class="hist-add-ex-save" data-date="' + s.date + '" data-day="' + s.dayId + '">✓ Ajouter la série</button>' +
-              '</div>' +
-            '</div>' +
+            '<button type="button" class="hist-edit-btn" data-edit-date="' + s.date + '" data-edit-day="' + s.dayId + '">✎ Modifier cette séance</button>' +
           '</div>' +
         '</div>';
     });
     html += '</div></div>';
     return html;
   }
-  // onChange, if given, re-renders whatever screen called this after a set
-  // is added to a past session — the history card itself has no owned
-  // container to patch in place, so the caller's own render function is
-  // the simplest way to reflect the new set immediately.
-  function wireHistoryToggles(onChange){
+  // onChange, if given, re-renders whatever screen called this once the
+  // history card's own state changes underneath it (nothing does today,
+  // kept for symmetry with the other wire* helpers). onEdit(date, dayId)
+  // opens the full session editor for that session.
+  function wireHistoryToggles(onChange, onEdit){
     document.querySelectorAll('.hist-row').forEach(row => {
       row.addEventListener('click', (e) => {
-        // Clicks inside the detail block (including the add-exercise form)
-        // must not collapse the row they're typing into.
+        // Clicks inside the detail block (including the edit button) must
+        // not collapse the row they're interacting with.
         if (e.target.closest('.hist-detail')) return;
         const detail = row.querySelector('.hist-detail');
         if (detail) detail.classList.toggle('hidden');
       });
     });
-    document.querySelectorAll('.hist-add-ex-toggle').forEach(btn => {
+    document.querySelectorAll('.hist-edit-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const form = btn.nextElementSibling;
-        if (form) form.classList.toggle('hidden');
+        if (onEdit) onEdit(btn.dataset.editDate, btn.dataset.editDay);
       });
     });
-    document.querySelectorAll('.hist-add-ex-save').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const wrap = btn.closest('.hist-add-ex-form');
-        const exId = wrap.querySelector('.hist-add-ex-select').value;
-        const reps = parseInt(wrap.querySelector('.hist-add-reps').value, 10);
-        if (!exId || !reps) return;
-        const weight = parseFloat(wrap.querySelector('.hist-add-weight').value);
-        const rirRaw = wrap.querySelector('.hist-add-rir').value;
-        const rir = rirRaw === '' ? null : Math.max(0, parseInt(rirRaw, 10) || 0);
-        const failed = wrap.querySelector('.hist-add-fail').checked;
-        const date = btn.dataset.date, dayId = btn.dataset.day;
-        state.logs = state.logs || {};
-        state.logs[exId] = state.logs[exId] || [];
-        state.logs[exId].push({ id: uid(), date: date, time: nowTimeStr(), dayId: dayId, weight: isNaN(weight) ? 0 : weight, reps: reps, failed: failed, rir: rir });
-        if (saveGym(state) && onChange) onChange();
+  }
+
+  // ================================================================
+  // SESSION EDITOR — full retroactive edit of an already-logged (and
+  // possibly already-"terminée") session: every set on every exercise is
+  // editable (weight/reps/RIR/échec/échauffement) or deletable, and new
+  // sets or whole new exercises can be added to it. Shared by both the
+  // desktop form and the mobile live flow's history card — editing a past
+  // session isn't a "live" action, so it gets its own simple screen
+  // instead of being bolted onto either boot mode.
+  // ================================================================
+  function addSetEntry(exId, date, dayId, weight, reps, rir, failed, warmup){
+    if (!exId || !reps) return false;
+    state.logs = state.logs || {};
+    state.logs[exId] = state.logs[exId] || [];
+    state.logs[exId].push({ id: uid(), date: date, time: nowTimeStr(), dayId: dayId, weight: isNaN(weight) ? 0 : weight, reps: reps, failed: !!failed, rir: (rir == null ? null : rir), warmup: !!warmup });
+    return saveGym(state);
+  }
+  // Merges into fresh localStorage state like saveGym/updateLastSetPatch
+  // do, instead of overwriting the whole blob from the in-memory `state`.
+  function deleteLogEntry(exId, id){
+    try {
+      const fresh = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+      fresh.logs = fresh.logs || {};
+      fresh.logs[exId] = (fresh.logs[exId] || []).filter(l => l.id !== id);
+      localStorage.setItem(LS_KEY, JSON.stringify(fresh));
+      if (state.logs && state.logs[exId]) state.logs[exId] = state.logs[exId].filter(l => l.id !== id);
+      pcPushNow();
+    } catch (e) { console.error('deleteLogEntry failed', e); }
+  }
+  function editorSetRowHtml(exId, s, idx, unit){
+    return '<div class="set-row" data-ex="' + exId + '" data-id="' + (s.id || '') + '">' +
+      '<span class="set-idx">' + (s.side ? (s.side === 'G' ? 'G' : 'D') : idx) + '</span>' +
+      '<input type="number" step="0.1" inputmode="decimal" class="set-weight" value="' + s.weight + '" title="Poids (' + unit + ')">' +
+      '<input type="number" inputmode="numeric" class="set-reps" value="' + s.reps + '" title="Reps">' +
+      '<input type="number" min="0" inputmode="numeric" class="set-rir" value="' + (s.rir != null ? s.rir : '') + '" placeholder="RIR" title="RIR">' +
+      '<button type="button" class="set-fail-btn' + (s.failed ? ' active' : '') + '">Échec</button>' +
+      '<button type="button" class="set-warmup-btn' + (s.warmup ? ' active' : '') + '" title="Échauffement">🔥</button>' +
+      '<button type="button" class="set-del-btn" aria-label="Supprimer">×</button>' +
+      '</div>';
+  }
+  function buildSessionEditorHtml(session, dayName, unit){
+    const byEx = {}, order = [];
+    session.sets.forEach(s => {
+      if (!byEx[s.exId]) { byEx[s.exId] = { name: s.exName, sets: [] }; order.push(s.exId); }
+      byEx[s.exId].sets.push(s);
+    });
+    let html =
+      '<h1 class="dash-title">Séance</h1>' +
+      '<div class="day-chosen-row"><span class="day-chosen-name">' + escapeHtml(dayName) + ' — ' + formatHistDate(session.date) + '</span>' +
+      '<button type="button" class="day-change-link" id="editorBackBtn">← Retour</button></div>';
+    order.forEach(exId => {
+      const group = byEx[exId];
+      html +=
+        '<div class="gm-card ex-form-card" data-ex-id="' + exId + '">' +
+        '<div class="ex-form-head"><span class="ex-form-name">' + escapeHtml(group.name) + '</span></div>' +
+        '<div class="set-rows">' + group.sets.map((s, i) => editorSetRowHtml(exId, s, i + 1, unit)).join('') + '</div>' +
+        '<button type="button" class="add-set-btn" data-add-ex="' + exId + '">+ Série</button>' +
+        '</div>';
+    });
+    html +=
+      '<div class="gm-card">' +
+      '<div class="section-title">Ajouter un exercice à cette séance</div>' +
+      '<select class="hist-add-ex-select" id="editorNewExSelect">' + exerciseOptionsHtml(state, session.dayId) + '</select>' +
+      '<button type="button" class="add-set-btn" id="editorAddExBtn" style="margin-top:8px;">+ Ajouter</button>' +
+      '</div>' +
+      CROSS_NAV;
+    return html;
+  }
+  function wireSessionEditor(session, onExit, onRefresh){
+    document.getElementById('editorBackBtn').addEventListener('click', onExit);
+    function commitRow(row){
+      const exId = row.dataset.ex, id = row.dataset.id;
+      if (!id) return; // sets logged before the .id field existed can't be targeted for an in-place edit
+      const weight = parseFloat(row.querySelector('.set-weight').value);
+      const reps = parseInt(row.querySelector('.set-reps').value, 10);
+      const rirRaw = row.querySelector('.set-rir').value;
+      const rir = rirRaw === '' ? null : Math.max(0, parseInt(rirRaw, 10) || 0);
+      const failed = row.querySelector('.set-fail-btn').classList.contains('active');
+      const warmup = row.querySelector('.set-warmup-btn').classList.contains('active');
+      updateLastSetPatch(exId, id, { weight: isNaN(weight) ? 0 : weight, reps: isNaN(reps) ? 0 : reps, rir: rir, failed: failed, warmup: warmup });
+    }
+    app.querySelectorAll('.set-row').forEach(row => {
+      row.querySelectorAll('.set-weight, .set-reps, .set-rir').forEach(inp => inp.addEventListener('blur', () => commitRow(row)));
+      row.querySelector('.set-fail-btn').addEventListener('click', (e) => { e.currentTarget.classList.toggle('active'); commitRow(row); });
+      row.querySelector('.set-warmup-btn').addEventListener('click', (e) => { e.currentTarget.classList.toggle('active'); commitRow(row); });
+      row.querySelector('.set-del-btn').addEventListener('click', () => {
+        if (row.dataset.id) deleteLogEntry(row.dataset.ex, row.dataset.id);
+        onRefresh();
       });
     });
+    app.querySelectorAll('[data-add-ex]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Prefill from that exercise's last set already in this session —
+        // matching last time beats starting from a blank 0kg x 1 rep row.
+        const exId = btn.dataset.addEx;
+        const groupSets = session.sets.filter(s => s.exId === exId);
+        const last = groupSets[groupSets.length - 1];
+        if (addSetEntry(exId, session.date, session.dayId, last ? last.weight : 0, last ? last.reps : 1, last ? last.rir : null, false, false)) onRefresh();
+      });
+    });
+    const addExBtn = document.getElementById('editorAddExBtn');
+    if (addExBtn) addExBtn.addEventListener('click', () => {
+      const exId = document.getElementById('editorNewExSelect').value;
+      if (exId && addSetEntry(exId, session.date, session.dayId, 0, 1, null, false, false)) onRefresh();
+    });
+  }
+  function openSessionEditor(date, dayId, onExit){
+    const session = buildSessionsHistory(state).find(s => s.date === date && s.dayId === dayId);
+    if (!session || !session.sets.length) { onExit(); return; }
+    const day = (state.days || []).find(d => d.id === dayId);
+    app.innerHTML = buildSessionEditorHtml(session, day ? day.name : dayId, unit);
+    wireSessionEditor(session, onExit, () => openSessionEditor(date, dayId, onExit));
   }
 
   const CROSS_NAV =
@@ -1052,7 +1135,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         '<div class="day-grid">' + days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '">' + escapeHtml(d.name) + '</button>').join('') + '</div>' +
         '</div>' +
         CROSS_NAV;
-      wireHistoryToggles(renderDayPick);
+      wireHistoryToggles(renderDayPick, (date, dayId) => openSessionEditor(date, dayId, renderDayPick));
       wireCardioCard(renderDayPick);
       app.querySelectorAll('.day-btn').forEach(b => {
         b.addEventListener('click', () => { chosenDay = b.dataset.day; render(); });
@@ -1246,7 +1329,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         days.map(d => '<button type="button" class="day-btn" data-day="' + d.id + '" style="padding:18px;">' + escapeHtml(d.name) + '</button>').join('') +
         '</div>' +
         CROSS_NAV;
-      wireHistoryToggles(renderDayPick);
+      wireHistoryToggles(renderDayPick, (date, dayId) => openSessionEditor(date, dayId, renderDayPick));
       wireCardioCard(renderDayPick);
       const resumeBtn = document.getElementById('resumeSessionBtn');
       if (resumeBtn) resumeBtn.addEventListener('click', () => resumeSession(open));

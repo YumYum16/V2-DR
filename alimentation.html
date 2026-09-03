@@ -711,24 +711,32 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // not captured) still counts, at a flat 60min typical-session estimate,
   // rather than as zero — dropping it entirely would understate real
   // training volume more than a rough estimate does.
+  //
+  // The rest time actually taken between sets (l.restSec, from Séance's
+  // live rest timer) is subtracted out of that duration — standing around
+  // resting isn't training exertion, so only the time actually spent
+  // lifting should count toward the activity tier that drives TDEE.
   const TYPICAL_SESSION_MIN = 60;
   function weeklyStrengthHours() {
     const gym = loadJSON(GYM_KEY, {});
     const meta = gym.sessionMeta || {};
     const logs = gym.logs || {};
     const cutoffMs = Date.now() - 7 * 86400000;
-    const seen = new Set();
-    let totalMin = 0;
+    const restSecBySession = {}; // date|dayId -> total rest seconds taken
     Object.keys(logs).forEach(exId => {
       (logs[exId] || []).forEach(l => {
         if (!l.date || !l.dayId) return;
         if (new Date(l.date + 'T00:00:00').getTime() < cutoffMs) return;
         const key = l.date + '|' + l.dayId;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const m = meta[key];
-        totalMin += (m && m.durationMin) ? m.durationMin : TYPICAL_SESSION_MIN;
+        restSecBySession[key] = (restSecBySession[key] || 0) + (l.restSec || 0);
       });
+    });
+    let totalMin = 0;
+    Object.keys(restSecBySession).forEach(key => {
+      const m = meta[key];
+      const durationMin = (m && m.durationMin) ? m.durationMin : TYPICAL_SESSION_MIN;
+      const restMin = restSecBySession[key] / 60;
+      totalMin += Math.max(0, durationMin - restMin);
     });
     return totalMin / 60;
   }

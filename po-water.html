@@ -617,6 +617,7 @@ html, body {
         <div class="field">
           <label>Activité (heures d'entraînement par semaine)</label>
           <input type="number" id="setActivity" min="0" max="40" step="0.5">
+          <p id="setActivitySyncNote" style="display:none;font-size:11px;color:var(--text-3);margin:4px 0 0;">Synchronisé depuis les séances réelles (Séance) — rien à saisir ici.</p>
         </div>
         <div class="field">
           <label>Taille (cm)</label>
@@ -805,6 +806,67 @@ html, body {
     weightSyncedFromFitness = true;
   }
 
+  // ============================================================
+  // ACTIVITY — same idea as weight: "heures d'entraînement/semaine" is
+  // reconstructed from Séance's own logged sessions (seance.html, same
+  // po_coach_v1 storage) instead of being typed once in Settings and
+  // never revisited, which used to silently drift away from real
+  // training load. A "session" is the date+dayId grouping Séance itself
+  // uses; its captured start→end duration (sessionMeta, from the live
+  // flow's timer or the retroactive form's start time) counts, minus the
+  // rest time actually taken between sets (l.restSec, from Séance's rest
+  // timer) — standing around resting isn't exertion, only the time spent
+  // actually lifting should drive the water need here. A session with no
+  // captured duration still counts, at a flat 60min estimate, rather than
+  // zero. Cardio (seance.html's cardio card) adds its own logged minutes
+  // on top, unchanged since that's already exact per session.
+  // ============================================================
+  const TYPICAL_SESSION_MIN = 60;
+  function readGymState() {
+    try { return JSON.parse(localStorage.getItem('po_coach_v1')) || {}; }
+    catch (e) { return {}; }
+  }
+  function weeklyStrengthHours(gym) {
+    const meta = gym.sessionMeta || {};
+    const logs = gym.logs || {};
+    const cutoffMs = Date.now() - 7 * 86400000;
+    const restSecBySession = {}; // date|dayId -> total rest seconds taken
+    Object.keys(logs).forEach(exId => {
+      (logs[exId] || []).forEach(l => {
+        if (!l.date || !l.dayId) return;
+        if (new Date(l.date + 'T00:00:00').getTime() < cutoffMs) return;
+        const key = l.date + '|' + l.dayId;
+        restSecBySession[key] = (restSecBySession[key] || 0) + (l.restSec || 0);
+      });
+    });
+    let totalMin = 0;
+    Object.keys(restSecBySession).forEach(key => {
+      const m = meta[key];
+      const durationMin = (m && m.durationMin) ? m.durationMin : TYPICAL_SESSION_MIN;
+      const restMin = restSecBySession[key] / 60;
+      totalMin += Math.max(0, durationMin - restMin);
+    });
+    return totalMin / 60;
+  }
+  function weeklyCardioHours(gym) {
+    const cutoffMs = Date.now() - 7 * 86400000;
+    const totalMin = (Array.isArray(gym.cardio) ? gym.cardio : [])
+      .filter(c => new Date(c.date + 'T00:00:00').getTime() >= cutoffMs)
+      .reduce((sum, c) => sum + (c.durationMin || 0), 0);
+    return totalMin / 60;
+  }
+  let activitySyncedFromSeance = false;
+  function syncActivityFromSeance() {
+    const gym = readGymState();
+    // Only takes over once Séance has actually been set up (days
+    // configured) — otherwise a brand-new install with no séances yet
+    // would sync to a permanent 0 instead of letting the manual field work.
+    if (!Array.isArray(gym.days) || !gym.days.length) { activitySyncedFromSeance = false; return; }
+    const hrs = weeklyStrengthHours(gym) + weeklyCardioHours(gym);
+    state.profile.activityHrsPerWeek = Math.round(hrs * 10) / 10;
+    activitySyncedFromSeance = true;
+  }
+
   // Helpers
   function dateKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -967,7 +1029,7 @@ html, body {
     let html = '';
     html += '<div class="why-row"><span class="why-label">Base (' + wDisp + ' ' + u + ' × 35 ml)</span><span class="why-val">' + fmtMl(calc.base) + '</span></div>';
     if (calc.exercise > 0)
-      html += '<div class="why-row"><span class="why-label">+ Exercice (' + state.profile.activityHrsPerWeek + ' h/sem)</span><span class="why-val">+ ' + fmtMl(calc.exercise) + '</span></div>';
+      html += '<div class="why-row"><span class="why-label">+ Exercice (' + state.profile.activityHrsPerWeek.toFixed(1) + ' h/sem' + (activitySyncedFromSeance ? ', Séance' : '') + ')</span><span class="why-val">+ ' + fmtMl(calc.exercise) + '</span></div>';
     if (calc.caffeine > 0)
       html += '<div class="why-row"><span class="why-label">+ Caféine (' + state.caffeineMgPerDay + ' mg/jour)</span><span class="why-val">+ ' + fmtMl(calc.caffeine) + '</span></div>';
     (state.substances || []).forEach(s => {
@@ -1053,7 +1115,7 @@ html, body {
     svg.innerHTML = html;
   }
 
-  function renderAll() { syncWeightFromFitness(); renderDayPill(); renderWater(); }
+  function renderAll() { syncWeightFromFitness(); syncActivityFromSeance(); renderDayPill(); renderWater(); }
 
   // ============================================================
   // EVENT WIRING
@@ -1092,6 +1154,8 @@ html, body {
     $('setWeightSyncNote').style.display = weightSyncedFromFitness ? 'block' : 'none';
     $('setAge').value = state.profile.age;
     $('setActivity').value = state.profile.activityHrsPerWeek;
+    $('setActivity').disabled = activitySyncedFromSeance;
+    $('setActivitySyncNote').style.display = activitySyncedFromSeance ? 'block' : 'none';
     $('setHeight').value = state.profile.heightCm;
     $('setCaffeine').value = state.caffeineMgPerDay;
     $('setBottleMl').value = state.bottleMl;
@@ -1263,9 +1327,10 @@ html, body {
   // BOOT
   renderAll();
 
-  // Re-sync the weight from Fitness whenever a new one might have been
-  // logged elsewhere (another tab, or the app coming back to foreground).
-  window.addEventListener('storage', (e) => { if (!e.key || e.key === 'po_coach_weights') renderAll(); });
+  // Re-sync weight/activity from Fitness/Séance whenever new data might
+  // have been logged elsewhere (another tab, or the app coming back to
+  // foreground).
+  window.addEventListener('storage', (e) => { if (!e.key || e.key === 'po_coach_weights' || e.key === 'po_coach_v1') renderAll(); });
   window.addEventListener('focus', renderAll);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) renderAll(); });
 })();
