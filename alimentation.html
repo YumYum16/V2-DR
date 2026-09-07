@@ -177,6 +177,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .cal-cell.today { box-shadow: inset 0 0 0 1px rgba(132,204,22,0.45); }
 .cal-cell.picked { box-shadow: inset 0 0 0 2px var(--lime); background: rgba(132,204,22,0.14); }
 .cal-cell.is-source { opacity: 0.35; }
+.cal-cell.cheat { background: rgba(242,192,99,0.14); border-left-color: var(--warning) !important; opacity: 1; }
+.cal-cell.cheat .cal-day { color: var(--warning); }
 .cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
 .cal-score { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cal-score-empty { color: var(--text-tertiary); font-weight: 400; }
@@ -311,6 +313,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const FOOD_LOG_KEY = 'po_food_log_v1';
   const PROGRAM_KEY = 'po_nutrition_program_v1';
   const MOOD_KEY = 'po_motivation_v1';
+  const CHEAT_DAY_KEY = 'po_food_cheatdays_v1';
   const DAY_MS = 86400000;
 
   // iOS Safari's on-screen keyboard shrinks the *visual* viewport but not
@@ -343,7 +346,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const PC_APP_KEY = 'nutrition';
   const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
   const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
-  const PC_SYNCED_KEYS = [FOOD_DB_KEY, FOOD_LOG_KEY, PROGRAM_KEY];
+  const PC_SYNCED_KEYS = [FOOD_DB_KEY, FOOD_LOG_KEY, PROGRAM_KEY, CHEAT_DAY_KEY];
   // Marks "the last push to the cloud didn't confirm" (offline, request
   // failed, etc). Never itself synced — purely a local flag. Without this,
   // a save made while offline would sit correctly in localStorage but
@@ -1039,6 +1042,17 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     if (count) saveJSON(FOOD_LOG_KEY, log);
     return count;
   }
+  // ---- cheat meal days — a day flagged this way just shows 🍔 in yellow
+  // on the calendar instead of the usual green/red score; it doesn't
+  // touch the food log or the score math, purely a visual "planned/OK
+  // detour" marker so a bad-looking score day isn't confused with a real
+  // off-plan slip.
+  function isCheatDay(dk) { return !!loadJSON(CHEAT_DAY_KEY, {})[dk]; }
+  function setCheatDay(dk, on) {
+    const days = loadJSON(CHEAT_DAY_KEY, {});
+    if (on) days[dk] = true; else delete days[dk];
+    return saveJSON(CHEAT_DAY_KEY, days);
+  }
   function todayTotals() {
     const entries = todaysEntries();
     return entries.reduce((acc, e) => ({
@@ -1423,13 +1437,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const hasLog = !!(log[dk] && log[dk].length);
       const isToday = dk === todayKey;
       const isFuture = dk > todayKey;
+      const cheat = isCheatDay(dk);
       const score = hasLog ? dayScore(dk) : null;
       const color = hasLog ? scoreColor(score) : null;
-      const cls = 'cal-cell' + (isToday ? ' today' : '') + (hasLog ? ' logged' : ' empty');
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (hasLog ? ' logged' : ' empty') + (cheat ? ' cheat' : '');
       html += '<button type="button" class="' + cls + '"' +
-        (isFuture ? ' disabled' : ' data-date="' + dk + '"' + (hasLog ? ' style="border-left-color:' + color + ';"' : '')) + '>' +
+        (isFuture ? ' disabled' : ' data-date="' + dk + '"' + (!cheat && hasLog ? ' style="border-left-color:' + color + ';"' : '')) + '>' +
         '<span class="cal-day">' + d + '</span>' +
-        (hasLog ? '<span class="cal-score" style="color:' + color + '">' + score + '</span>' : '<span class="cal-score cal-score-empty">·</span>') +
+        (cheat ? '<span class="cal-score">🍔</span>' : hasLog ? '<span class="cal-score" style="color:' + color + '">' + score + '</span>' : '<span class="cal-score cal-score-empty">·</span>') +
         '</button>';
     }
     html += '</div>' +
@@ -1437,6 +1452,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--success)"></span>Proche des objectifs</span>' +
       '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--danger)"></span>Loin des objectifs</span>' +
       '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:rgba(255,255,255,0.15)"></span>Rien enregistré</span>' +
+      '<span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--warning)"></span>🍔 Cheat meal</span>' +
       '</div>' +
       '<div class="program-note">Note = distance aux kcal/macros de ce jour-là (poids, repos/entraînement et déficit reconstitués rétroactivement) — vert proche de la cible, rouge loin (trop ou pas assez). Touche un jour noté pour voir le détail.</div>' +
       '</div>';
@@ -1618,9 +1634,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const dateLabel = formatDateLabel(dk);
       const fiberTarget = fiberTargetG(targets.profile);
       const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
+      const cheat = isCheatDay(dk);
 
       inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">' + escapeHtml(dateLabel) +
-        '<span style="display:flex;gap:6px;">' +
+        '<span style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button type="button" class="gm-ghost" id="cheatDayBtn" style="' + (cheat ? 'background:rgba(242,192,99,0.16);color:var(--warning);border-color:rgba(242,192,99,0.35);' : '') + '">🍔 ' + (cheat ? 'Cheat meal ✓' : 'Marquer cheat meal') + '</button>' +
         (entries.length ? '<button type="button" class="gm-ghost" id="copyDayBtn">' + (copyMode ? '✕ Annuler' : '📋 Copier vers…') + '</button>' : '') +
         '<button type="button" class="gm-ghost" id="addFoodForDayBtn">+ Ajouter</button>' +
         '</span></h3>' +
@@ -1630,6 +1648,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '<div class="day-detail-badges">' +
         '<span class="program-badge' + (restDay ? ' warn' : '') + '">' + (restDay ? '😴 ' : '💪 ') + escapeHtml(dayTypeLabel) + '</span>' +
         (mood ? '<span class="program-badge">Humeur ' + (MOOD_EMOJI[mood.mood] || '') + '</span>' : '') +
+        (cheat ? '<span class="program-badge warn">🍔 Cheat meal</span>' : '') +
         '</div>' +
         '</div>' +
         '<div class="kcal-total" style="margin-bottom:14px;"><strong>' + Math.round(totals.kcal) + '</strong> / ' + targets.target + ' kcal' +
@@ -1645,6 +1664,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeDayDetail">Fermer</button></div>';
       document.getElementById('closeDayDetail').addEventListener('click', closeModal);
       document.getElementById('addFoodForDayBtn').addEventListener('click', () => openAddFoodModal(dk));
+      document.getElementById('cheatDayBtn').addEventListener('click', () => {
+        setCheatDay(dk, !isCheatDay(dk));
+        render();
+        renderMain();
+      });
       const copyBtn = document.getElementById('copyDayBtn');
       if (copyBtn) copyBtn.addEventListener('click', () => { copyMode = !copyMode; if (!copyMode) copySelected = new Set(); render(); });
       if (copyMode) wireCopyPicker();
