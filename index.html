@@ -73,6 +73,19 @@ body::after {
   100% { transform: translate3d(var(--dx, 12px), var(--dy, -100vh), 0); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .atmo-particles span { animation: none; } }
+/* Every tile below uses backdrop-filter, which forces the GPU to re-blur
+   whatever's rendered behind it on every single frame that backdrop
+   changes — here, body::before's 36s drift and ~20 drifting particles,
+   both running forever. That cost scales with pixel area, so on a small
+   phone viewport it's invisible but on a big desktop monitor (way more
+   tiles + way more pixels under blur) it shows up as constant jank.
+   Freezing the moving backdrop on wide screens removes the per-frame
+   invalidation entirely — the static gradient look stays, just no longer
+   animated. */
+@media (min-width: 900px) {
+  body::before { animation: none; }
+  .atmo-particles { display: none; }
+}
 
 .page { max-width: 1100px; margin: 0 auto; position: relative; z-index: 5; }
 .dash-title {
@@ -657,6 +670,10 @@ body::after {
     var root = document.getElementById('atmoParticles');
     if (!root) return;
     root.innerHTML = '';
+    // Matches the CSS media query above that hides/freezes this layer on
+    // wide screens for perf — no point spawning DOM nodes that'll never
+    // be shown there.
+    if (window.innerWidth >= 900) return;
     var N = window.innerWidth < 640 ? 12 : 20;
     for (var i = 0; i < N; i++) {
       var s = document.createElement('span');
