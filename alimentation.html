@@ -175,6 +175,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .cal-cell:disabled { cursor: default; opacity: 0.3; }
 .cal-cell:disabled:hover { background: rgba(255,255,255,0.03); }
 .cal-cell.today { box-shadow: inset 0 0 0 1px rgba(132,204,22,0.45); }
+.cal-cell.picked { box-shadow: inset 0 0 0 2px var(--lime); background: rgba(132,204,22,0.14); }
+.cal-cell.is-source { opacity: 0.35; }
 .cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
 .cal-score { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cal-score-empty { color: var(--text-tertiary); font-weight: 400; }
@@ -1014,29 +1016,28 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     log[k] = (log[k] || []).filter(e => e.id !== id);
     return saveJSON(FOOD_LOG_KEY, log);
   }
-  function shiftDateKey(dk, days) {
-    const [y, m, d] = dk.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setDate(date.getDate() + days);
-    return dateStr(date);
-  }
-  // Copies (never moves) one day's entries onto another day, appending to
-  // whatever's already logged there rather than overwriting it. Each
-  // copied entry gets a fresh uid() — reusing the source ids would collide
-  // if that source day is ever copied again, or corrupt data if the same
-  // entry ends up in two days sharing one id (e.g. delete-in-one-place
-  // silently removing it from both). saveJSON (not a raw localStorage
-  // write) is what pushes the change to Supabase, same as every other
-  // food-log write on this page.
-  function copyDayEntriesTo(sourceDk, targetDk) {
-    if (!targetDk || !/^\d{4}-\d{2}-\d{2}$/.test(targetDk)) { alert('Date cible invalide.'); return false; }
-    if (targetDk === sourceDk) { alert('Choisis une date différente de celle-ci.'); return false; }
+  // Copies (never moves) one day's entries onto one or more other days,
+  // appending to whatever's already logged there rather than overwriting
+  // it. Each copied entry gets a fresh uid() — reusing the source ids
+  // would collide if the source day is ever copied again, or corrupt data
+  // if the same entry ends up on two days sharing one id (e.g. deleting
+  // it in one place silently removing it from both). All target days are
+  // folded into ONE saveJSON call (not one per day) so a multi-day pick
+  // only pushes to Supabase once instead of racing several concurrent
+  // pushes against each other.
+  function copyDayEntriesToMany(sourceDk, targetDks) {
     const log = loadJSON(FOOD_LOG_KEY, {});
     const sourceEntries = log[sourceDk] || [];
-    if (!sourceEntries.length) { alert('Rien à copier pour cette journée.'); return false; }
-    const copies = sourceEntries.map(e => Object.assign({}, e, { id: uid() }));
-    log[targetDk] = (log[targetDk] || []).concat(copies);
-    return saveJSON(FOOD_LOG_KEY, log);
+    if (!sourceEntries.length) { alert('Rien à copier pour cette journée.'); return 0; }
+    let count = 0;
+    targetDks.forEach(targetDk => {
+      if (!targetDk || targetDk === sourceDk) return;
+      const copies = sourceEntries.map(e => Object.assign({}, e, { id: uid() }));
+      log[targetDk] = (log[targetDk] || []).concat(copies);
+      count++;
+    });
+    if (count) saveJSON(FOOD_LOG_KEY, log);
+    return count;
   }
   function todayTotals() {
     const entries = todaysEntries();
@@ -1533,6 +1534,75 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
     let copyMode = false;
+    let copyMonthOffset = 0;
+    let copySelected = new Set();
+
+    // Tappable month grid (reuses the same cal-cell markup as the main food
+    // calendar) instead of a native <input type="date"> — on phone that
+    // native picker pops up its own zoomed wheel/sheet UI, one date at a
+    // time, which is exactly the "trop compliqué" flow this replaces. Here
+    // you just tap the days you want (any number of them) and confirm once.
+    function copyPickerHtml(entryCount) {
+      const now = new Date();
+      const base = new Date(now.getFullYear(), now.getMonth() + copyMonthOffset, 1);
+      const y = base.getFullYear(), m = base.getMonth();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7;
+      const todayKey = todayStr();
+      let html = '<div class="gm-card" style="margin-bottom:14px;">' +
+        '<div class="section-title">Copier vers — choisis un ou plusieurs jours</div>' +
+        '<div class="cal-head">' +
+        '<button type="button" class="cal-nav-btn" id="copyCalPrev" aria-label="Mois précédent">‹</button>' +
+        '<span class="cal-month">' + MONTH_NAMES[m] + ' ' + y + '</span>' +
+        '<button type="button" class="cal-nav-btn" id="copyCalNext" aria-label="Mois suivant">›</button>' +
+        '</div>' +
+        '<div class="cal-weekdays">' + WEEKDAY_LABELS.map(d => '<div class="cal-weekday">' + d + '</div>').join('') + '</div>' +
+        '<div class="cal-grid">';
+      for (let i = 0; i < firstWeekday; i++) html += '<div></div>';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const cellDk = dateStr(new Date(y, m, d));
+        const isToday = cellDk === todayKey;
+        const isSource = cellDk === dk;
+        const isPicked = copySelected.has(cellDk);
+        const cls = 'cal-cell' + (isToday ? ' today' : '') + (isPicked ? ' picked' : '') + (isSource ? ' is-source' : '');
+        html += '<button type="button" class="' + cls + '"' + (isSource ? ' disabled' : ' data-pickdate="' + cellDk + '"') + '>' +
+          '<span class="cal-day">' + d + '</span>' +
+          '<span class="cal-score' + (isPicked ? '' : ' cal-score-empty') + '" style="' + (isPicked ? 'color:var(--lime);' : '') + '">' + (isPicked ? '✓' : '·') + '</span>' +
+          '</button>';
+      }
+      html += '</div>' +
+        '<div class="program-note">Ajoute une copie des ' + entryCount + ' entrée(s) de cette journée à chaque jour sélectionné, sans toucher à ce qui y est déjà enregistré.</div>' +
+        '<div class="modal-actions">' +
+        '<button type="button" class="btn-secondary" id="cancelCopyDay">Annuler</button>' +
+        '<button type="button" class="btn-primary" id="confirmCopyDay"' + (copySelected.size ? '' : ' disabled') + '>Confirmer (' + copySelected.size + ')</button>' +
+        '</div></div>';
+      return html;
+    }
+    function wireCopyPicker() {
+      const prevBtn = document.getElementById('copyCalPrev');
+      if (prevBtn) prevBtn.addEventListener('click', () => { copyMonthOffset--; render(); });
+      const nextBtn = document.getElementById('copyCalNext');
+      if (nextBtn) nextBtn.addEventListener('click', () => { copyMonthOffset++; render(); });
+      inner.querySelectorAll('[data-pickdate]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cellDk = btn.dataset.pickdate;
+          if (copySelected.has(cellDk)) copySelected.delete(cellDk); else copySelected.add(cellDk);
+          render();
+        });
+      });
+      const cancelCopyBtn = document.getElementById('cancelCopyDay');
+      if (cancelCopyBtn) cancelCopyBtn.addEventListener('click', () => { copyMode = false; copySelected = new Set(); render(); });
+      const confirmCopyBtn = document.getElementById('confirmCopyDay');
+      if (confirmCopyBtn) confirmCopyBtn.addEventListener('click', () => {
+        if (!copySelected.size) return;
+        const count = copyDayEntriesToMany(dk, Array.from(copySelected));
+        if (!count) return;
+        copyMode = false; copySelected = new Set();
+        flashMsg = '✓ Copié vers ' + count + ' jour' + (count > 1 ? 's' : '') + ' et synchronisé.';
+        closeModal();
+        renderMain();
+      });
+    }
 
     function render() {
       const entries = entriesForDate(dk);
@@ -1554,12 +1624,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         (entries.length ? '<button type="button" class="gm-ghost" id="copyDayBtn">' + (copyMode ? '✕ Annuler' : '📋 Copier vers…') + '</button>' : '') +
         '<button type="button" class="gm-ghost" id="addFoodForDayBtn">+ Ajouter</button>' +
         '</span></h3>' +
-        (copyMode ? '<div class="gm-card" style="margin-bottom:14px;">' +
-          '<div class="section-title">Copier ce journal vers une autre date</div>' +
-          '<div class="field-row"><div class="field-col" style="flex:1 1 100%"><label>Date cible</label><input type="date" id="copyTargetDate" value="' + shiftDateKey(dk, 1) + '"></div></div>' +
-          '<div class="program-note">Ajoute une copie des ' + entries.length + ' entrée(s) de cette journée à la date choisie, sans toucher à ce qui y est déjà enregistré.</div>' +
-          '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelCopyDay">Annuler</button><button type="button" class="btn-primary" id="confirmCopyDay">Copier</button></div>' +
-          '</div>' : '') +
+        (copyMode ? copyPickerHtml(entries.length) : '') +
         '<div class="day-detail-head">' +
         '<div class="day-detail-score" style="color:' + color + ';border-color:' + color + ';background:' + color.replace('rgb', 'rgba').replace(')', ',0.14)') + ';">' + score + '</div>' +
         '<div class="day-detail-badges">' +
@@ -1581,19 +1646,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       document.getElementById('closeDayDetail').addEventListener('click', closeModal);
       document.getElementById('addFoodForDayBtn').addEventListener('click', () => openAddFoodModal(dk));
       const copyBtn = document.getElementById('copyDayBtn');
-      if (copyBtn) copyBtn.addEventListener('click', () => { copyMode = !copyMode; render(); });
-      const cancelCopyBtn = document.getElementById('cancelCopyDay');
-      if (cancelCopyBtn) cancelCopyBtn.addEventListener('click', () => { copyMode = false; render(); });
-      const confirmCopyBtn = document.getElementById('confirmCopyDay');
-      if (confirmCopyBtn) confirmCopyBtn.addEventListener('click', () => {
-        const targetInput = document.getElementById('copyTargetDate');
-        const targetDk = targetInput && targetInput.value;
-        if (!targetDk) { alert('Choisis une date.'); return; }
-        if (!copyDayEntriesTo(dk, targetDk)) return;
-        flashMsg = '✓ Copié vers ' + formatDateLabel(targetDk) + ' et synchronisé.';
-        closeModal();
-        renderMain();
-      });
+      if (copyBtn) copyBtn.addEventListener('click', () => { copyMode = !copyMode; if (!copyMode) copySelected = new Set(); render(); });
+      if (copyMode) wireCopyPicker();
       inner.querySelectorAll('[data-daydel]').forEach(btn => {
         btn.addEventListener('click', () => {
           removeLogEntry(btn.dataset.daydel, dk);
