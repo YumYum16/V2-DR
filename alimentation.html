@@ -1280,6 +1280,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     CATEGORY_ORDER.forEach(cat => { if (groups[cat]) groups[cat].sort((a, b) => a.name.localeCompare(b.name)); });
     return groups;
   }
+  // Small "🍳 Recette : X, Y, Z" suffix shown wherever a composite food
+  // (created via the recipe builder) appears in a picker/manage list —
+  // the ingredient names are a snapshot taken at creation time, not a
+  // live reference, so this stays accurate even if a source ingredient
+  // is later renamed or deleted.
+  function recipeIngredientNote(f) {
+    if (!f.isRecipe || !f.recipeIngredients || !f.recipeIngredients.length) return '';
+    return ' · 🍳 ' + f.recipeIngredients.map(i => escapeHtml(i.name)).join(', ');
+  }
   function foodListHtml(db, rowFn) {
     const groups = groupFoodsByCategory(db);
     let html = '';
@@ -1709,6 +1718,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     let selectedFood = null;
     let catFilter = 'Tous';
     let qtyMode = 'unit'; // 'unit' | 'grams' — only meaningful when the selected food has a servingGrams unit
+    let newMode = 'simple'; // 'simple' | 'recipe' — only relevant when mode === 'new'
+    let recipeName = '';
+    let recipePortions = '';
+    let recipeIngredients = []; // [{foodId, grams}] — resolved against FOOD_DB_KEY at render/save time
+    let recipePickerOpen = false;
+    let recipeCatFilter = 'Tous';
 
     function renderModal() {
       const db = loadJSON(FOOD_DB_KEY, []);
@@ -1731,7 +1746,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           ).join('') + '</div>' +
           '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
             '<div class="food-pick-item' + (selectedFood && selectedFood.id===f.id ? ' active':'') + '" data-id="' + f.id + '">' +
-            '<div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<div style="flex:1"><div class="food-pick-name">' + (f.isRecipe ? '🍳 ' : '') + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + recipeIngredientNote(f) + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
             '</div>'
           ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' +
@@ -1759,54 +1774,205 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         wireQuantityForm(body);
       } else {
         body.innerHTML =
-          '<div class="field-row">' +
-          '<div class="field-col" style="flex:1 1 100%"><label>Nom</label><input type="text" id="newFoodName" placeholder="ex. Steak haché 5%"></div>' +
+          '<div class="seg-toggle" style="margin-bottom:14px;">' +
+          '<button type="button" data-nm="simple" class="' + (newMode==='simple'?'active':'') + '">Aliment simple</button>' +
+          '<button type="button" data-nm="recipe" class="' + (newMode==='recipe'?'active':'') + '">Recette (plusieurs ingrédients)</button>' +
           '</div>' +
-          '<div class="field-row">' +
-          '<div class="field-col"><label>Kcal /100g</label><input type="number" id="newFoodKcal" step="1"></div>' +
-          '<div class="field-col"><label>Protéines /100g</label><input type="number" id="newFoodP" step="0.1"></div>' +
-          '</div>' +
-          '<div class="field-row">' +
-          '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1"></div>' +
-          '<div class="field-col"><label>dont Sucres /100g</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5"></div>' +
-          '</div>' +
-          '<div class="field-row">' +
-          '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
-          '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="newFoodFiber" step="0.1" placeholder="ex. 3"></div>' +
-          '</div>' +
-          '<div class="field-row">' +
-          '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
-          '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="newFoodK" step="1" placeholder="ex. 350"></div>' +
-          '</div>' +
-          '<div class="field-row">' +
-          '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150"></div>' +
-          '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="newFoodServingLabel" placeholder="ex. steak"></div>' +
-          '</div>' +
-          '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelNewFood">Annuler</button><button type="button" class="btn-primary" id="saveNewFood">Créer</button></div>';
-        document.getElementById('cancelNewFood').addEventListener('click', closeModal);
-        document.getElementById('saveNewFood').addEventListener('click', () => {
-          const name = document.getElementById('newFoodName').value.trim();
-          const kcalPer100g = parseFloat(document.getElementById('newFoodKcal').value) || 0;
-          if (!name || !kcalPer100g) { alert('Nom et kcal/100g requis.'); return; }
-          const food = {
-            id: uid(), name,
-            kcalPer100g,
-            proteinPer100g: parseFloat(document.getElementById('newFoodP').value) || 0,
-            carbsPer100g: parseFloat(document.getElementById('newFoodC').value) || 0,
-            sugarPer100g: parseFloat(document.getElementById('newFoodSugar').value) || 0,
-            fatPer100g: parseFloat(document.getElementById('newFoodF').value) || 0,
-            fiberPer100g: document.getElementById('newFoodFiber').value.trim() === '' ? null : parseFloat(document.getElementById('newFoodFiber').value) || 0,
-            saltPer100g: parseFloat(document.getElementById('newFoodSalt').value) || 0,
-            potassiumPer100g: parseFloat(document.getElementById('newFoodK').value) || 0,
-            servingGrams: parseFloat(document.getElementById('newFoodServingG').value) || null,
-            servingLabel: document.getElementById('newFoodServingLabel').value.trim() || null
-          };
-          const list = loadJSON(FOOD_DB_KEY, []).concat([food]);
-          saveJSON(FOOD_DB_KEY, list);
-          selectedFood = food; mode = 'pick'; qtyMode = 'unit';
+          '<div id="newFoodBody"></div>';
+        body.querySelectorAll('[data-nm]').forEach(b => b.addEventListener('click', () => { newMode = b.dataset.nm; renderModal(); }));
+        const sub = document.getElementById('newFoodBody');
+        if (newMode === 'simple') { sub.innerHTML = simpleFormHtml(); wireSimpleForm(sub); }
+        else { sub.innerHTML = recipeFormHtml(); wireRecipeForm(sub); }
+      }
+    }
+
+    function simpleFormHtml() {
+      return '<div class="field-row">' +
+        '<div class="field-col" style="flex:1 1 100%"><label>Nom</label><input type="text" id="newFoodName" placeholder="ex. Steak haché 5%"></div>' +
+        '</div>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>Kcal /100g</label><input type="number" id="newFoodKcal" step="1"></div>' +
+        '<div class="field-col"><label>Protéines /100g</label><input type="number" id="newFoodP" step="0.1"></div>' +
+        '</div>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1"></div>' +
+        '<div class="field-col"><label>dont Sucres /100g</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5"></div>' +
+        '</div>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
+        '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="newFoodFiber" step="0.1" placeholder="ex. 3"></div>' +
+        '</div>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
+        '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="newFoodK" step="1" placeholder="ex. 350"></div>' +
+        '</div>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150"></div>' +
+        '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="newFoodServingLabel" placeholder="ex. steak"></div>' +
+        '</div>' +
+        '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelNewFood">Annuler</button><button type="button" class="btn-primary" id="saveNewFood">Créer</button></div>';
+    }
+    function wireSimpleForm(sub) {
+      sub.querySelector('#cancelNewFood').addEventListener('click', closeModal);
+      sub.querySelector('#saveNewFood').addEventListener('click', () => {
+        const name = sub.querySelector('#newFoodName').value.trim();
+        const kcalPer100g = parseFloat(sub.querySelector('#newFoodKcal').value) || 0;
+        if (!name || !kcalPer100g) { alert('Nom et kcal/100g requis.'); return; }
+        const food = {
+          id: uid(), name,
+          kcalPer100g,
+          proteinPer100g: parseFloat(sub.querySelector('#newFoodP').value) || 0,
+          carbsPer100g: parseFloat(sub.querySelector('#newFoodC').value) || 0,
+          sugarPer100g: parseFloat(sub.querySelector('#newFoodSugar').value) || 0,
+          fatPer100g: parseFloat(sub.querySelector('#newFoodF').value) || 0,
+          fiberPer100g: sub.querySelector('#newFoodFiber').value.trim() === '' ? null : parseFloat(sub.querySelector('#newFoodFiber').value) || 0,
+          saltPer100g: parseFloat(sub.querySelector('#newFoodSalt').value) || 0,
+          potassiumPer100g: parseFloat(sub.querySelector('#newFoodK').value) || 0,
+          servingGrams: parseFloat(sub.querySelector('#newFoodServingG').value) || null,
+          servingLabel: sub.querySelector('#newFoodServingLabel').value.trim() || null
+        };
+        const list = loadJSON(FOOD_DB_KEY, []).concat([food]);
+        saveJSON(FOOD_DB_KEY, list);
+        selectedFood = food; mode = 'pick'; qtyMode = 'unit';
+        renderModal();
+      });
+    }
+
+    // ---- recipe builder: 1 aliment = somme de plusieurs ingrédients déjà
+    // créés, avec les macros/100g recalculées à partir des quantités
+    // entrées (poids total = somme des grammes des ingrédients). Le
+    // résultat est enregistré comme un aliment normal dans FOOD_DB — donc
+    // sélectionnable/journalisable exactement comme les autres — avec en
+    // plus un instantané des ingrédients (recipeIngredients) juste pour
+    // l'affichage ("🍳 Recette : ..."), sans lien vivant vers l'aliment
+    // source (le renommer/supprimer ensuite n'affecte pas la recette).
+    function recipeIngredientTotals(db) {
+      const totals = { kcal: 0, protein: 0, carbs: 0, sugar: 0, fat: 0, fiber: 0, salt: 0, potassium: 0 };
+      let fiberUnknown = false;
+      const totalGrams = recipeIngredients.reduce((s, i) => s + (i.grams || 0), 0);
+      recipeIngredients.forEach(ing => {
+        const f = db.find(x => x.id === ing.foodId);
+        if (!f) return;
+        const ratio = (ing.grams || 0) / 100;
+        totals.kcal += (f.kcalPer100g || 0) * ratio;
+        totals.protein += (f.proteinPer100g || 0) * ratio;
+        totals.carbs += (f.carbsPer100g || 0) * ratio;
+        totals.sugar += (f.sugarPer100g || 0) * ratio;
+        totals.fat += (f.fatPer100g || 0) * ratio;
+        if (f.fiberPer100g == null) fiberUnknown = true; else totals.fiber += f.fiberPer100g * ratio;
+        totals.salt += (f.saltPer100g || 0) * ratio;
+        totals.potassium += (f.potassiumPer100g || 0) * ratio;
+      });
+      return { totals, totalGrams, fiberUnknown };
+    }
+    function recipeFormHtml() {
+      const db = loadJSON(FOOD_DB_KEY, []);
+      const { totals, totalGrams, fiberUnknown } = recipeIngredientTotals(db);
+      const shown = recipeCatFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === recipeCatFilter);
+      return '<div class="field-row"><div class="field-col" style="flex:1 1 100%"><label>Nom de la recette</label>' +
+        '<input type="text" id="recipeName" placeholder="ex. Pâtes bolognaise maison" value="' + escapeHtml(recipeName) + '"></div></div>' +
+        '<div class="section-title">Ingrédients' + (totalGrams ? ' — ' + Math.round(totalGrams) + ' g au total' : '') + '</div>' +
+        (recipeIngredients.length ?
+          '<div class="food-pick-list" style="max-height:none;">' + recipeIngredients.map((ing, idx) => {
+            const f = db.find(x => x.id === ing.foodId);
+            return '<div class="food-pick-item" style="cursor:default;">' +
+              '<div style="flex:1"><div class="food-pick-name">' + escapeHtml(f ? f.name : '?') + '</div>' +
+              '<div class="food-pick-macro">' + (f ? f.kcalPer100g : 0) + ' kcal/100g</div></div>' +
+              '<input type="number" class="recipe-ing-grams" data-idx="' + idx + '" value="' + ing.grams + '" step="1" min="0" ' +
+              'style="width:64px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.28);color:var(--text-primary);font-family:inherit;font-size:14px;">' +
+              '<span style="font-size:11px;color:var(--text-tertiary);">g</span>' +
+              '<button type="button" class="food-pick-del" data-ridx="' + idx + '">🗑</button>' +
+              '</div>';
+          }).join('') + '</div>'
+          : '<p class="empty-note">Aucun ingrédient ajouté.</p>') +
+        '<button type="button" class="gm-ghost" id="toggleIngPicker" style="margin:10px 0;">' + (recipePickerOpen ? '− Fermer la liste' : '+ Ajouter un ingrédient') + '</button>' +
+        (recipePickerOpen ?
+          '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
+            '<button type="button" class="cat-filter-btn' + (recipeCatFilter===cat?' active':'') + '" data-rcat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
+          ).join('') + '</div>' +
+          '<div class="food-pick-list">' + (db.length ? (shown.length ? foodListHtml(shown, f =>
+            '<div class="food-pick-item" data-pickid="' + f.id + '"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
+            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g</div></div></div>'
+          ) : '<p class="empty-note">Rien dans cette catégorie.</p>') : '<p class="empty-note">Aucun aliment créé — crée d\'abord un ou plusieurs aliments simples.</p>') + '</div>'
+          : '') +
+        (totalGrams > 0 ?
+          '<div class="gm-card" style="margin-top:10px;">' +
+          '<div class="section-title">Aperçu — pour 100 g du résultat</div>' +
+          '<div class="program-row"><span>Kcal</span><span>' + Math.round(totals.kcal / totalGrams * 100) + '</span></div>' +
+          '<div class="program-row"><span>Protéines</span><span>' + (totals.protein / totalGrams * 100).toFixed(1) + ' g</span></div>' +
+          '<div class="program-row"><span>Glucides</span><span>' + (totals.carbs / totalGrams * 100).toFixed(1) + ' g</span></div>' +
+          '<div class="program-row"><span>Lipides</span><span>' + (totals.fat / totalGrams * 100).toFixed(1) + ' g</span></div>' +
+          '<div class="program-row"><span>Sel</span><span>' + (totals.salt / totalGrams * 100).toFixed(2) + ' g</span></div>' +
+          '<div class="program-row"><span>Potassium</span><span>' + Math.round(totals.potassium / totalGrams * 100) + ' mg</span></div>' +
+          (fiberUnknown ? '<div class="program-note">Fibres non calculées — un des ingrédients n\'a pas de valeur renseignée.</div>' : '') +
+          '</div>'
+          : '') +
+        '<div class="field-row" style="margin-top:10px;">' +
+        '<div class="field-col"><label>Nombre de portions (optionnel)</label><input type="number" id="recipePortions" step="1" min="1" placeholder="ex. 4" value="' + escapeHtml(recipePortions) + '"></div>' +
+        '</div>' +
+        '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelNewFood">Annuler</button><button type="button" class="btn-primary" id="saveRecipe">Créer la recette</button></div>';
+    }
+    function wireRecipeForm(sub) {
+      const nameEl = sub.querySelector('#recipeName');
+      if (nameEl) nameEl.addEventListener('input', () => { recipeName = nameEl.value; });
+      const portionsEl = sub.querySelector('#recipePortions');
+      if (portionsEl) portionsEl.addEventListener('input', () => { recipePortions = portionsEl.value; });
+      sub.querySelectorAll('.recipe-ing-grams').forEach(inp => {
+        inp.addEventListener('change', () => {
+          const idx = parseInt(inp.dataset.idx, 10);
+          recipeIngredients[idx].grams = Math.max(0, parseFloat(inp.value) || 0);
           renderModal();
         });
-      }
+      });
+      sub.querySelectorAll('[data-ridx]').forEach(btn => {
+        btn.addEventListener('click', () => { recipeIngredients.splice(parseInt(btn.dataset.ridx, 10), 1); renderModal(); });
+      });
+      const toggleBtn = sub.querySelector('#toggleIngPicker');
+      if (toggleBtn) toggleBtn.addEventListener('click', () => { recipePickerOpen = !recipePickerOpen; renderModal(); });
+      sub.querySelectorAll('[data-rcat]').forEach(b => {
+        b.addEventListener('click', () => { recipeCatFilter = b.dataset.rcat; renderModal(); });
+      });
+      sub.querySelectorAll('[data-pickid]').forEach(el => {
+        el.addEventListener('click', () => {
+          const existing = recipeIngredients.find(i => i.foodId === el.dataset.pickid);
+          if (existing) existing.grams += 100;
+          else recipeIngredients.push({ foodId: el.dataset.pickid, grams: 100 });
+          renderModal();
+        });
+      });
+      sub.querySelector('#cancelNewFood').addEventListener('click', closeModal);
+      sub.querySelector('#saveRecipe').addEventListener('click', () => {
+        const name = recipeName.trim();
+        if (!name) { alert('Nom requis.'); return; }
+        if (!recipeIngredients.length) { alert('Ajoute au moins un ingrédient.'); return; }
+        const db = loadJSON(FOOD_DB_KEY, []);
+        const { totals, totalGrams, fiberUnknown } = recipeIngredientTotals(db);
+        if (!totalGrams) { alert('Quantités invalides.'); return; }
+        const ingSnapshot = recipeIngredients
+          .map(ing => { const f = db.find(x => x.id === ing.foodId); return f ? { foodId: f.id, name: f.name, grams: ing.grams } : null; })
+          .filter(Boolean);
+        const portions = parseFloat(recipePortions) || 0;
+        const food = {
+          id: uid(), name,
+          kcalPer100g: totals.kcal / totalGrams * 100,
+          proteinPer100g: totals.protein / totalGrams * 100,
+          carbsPer100g: totals.carbs / totalGrams * 100,
+          sugarPer100g: totals.sugar / totalGrams * 100,
+          fatPer100g: totals.fat / totalGrams * 100,
+          fiberPer100g: fiberUnknown ? null : totals.fiber / totalGrams * 100,
+          saltPer100g: totals.salt / totalGrams * 100,
+          potassiumPer100g: totals.potassium / totalGrams * 100,
+          servingGrams: portions > 0 ? totalGrams / portions : null,
+          servingLabel: portions > 0 ? 'portion' : null,
+          isRecipe: true,
+          recipeIngredients: ingSnapshot,
+          recipeTotalGrams: totalGrams
+        };
+        saveJSON(FOOD_DB_KEY, db.concat([food]));
+        selectedFood = food; mode = 'pick'; qtyMode = 'unit';
+        recipeName = ''; recipePortions = ''; recipeIngredients = []; recipePickerOpen = false;
+        renderModal();
+      });
     }
 
     function renderQuantityForm(food) {
@@ -1888,8 +2054,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
             '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
           ).join('') + '</div>' +
           '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
-            '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + escapeHtml(f.name) + '</div>' +
-            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' Fi' + (f.fiberPer100g == null ? '?' : f.fiberPer100g) + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + '</div></div>' +
+            '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + (f.isRecipe ? '🍳 ' : '') + escapeHtml(f.name) + '</div>' +
+            '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' Fi' + (f.fiberPer100g == null ? '?' : f.fiberPer100g) + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + recipeIngredientNote(f) + '</div></div>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
           ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
