@@ -130,6 +130,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .cal-cell.train { border-left-color: var(--indigo); }
 .cal-cell.rest { border-left-color: rgba(255,255,255,0.18); }
 .cal-cell.today { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.4); }
+.cal-cell.done { background: rgba(107,227,164,0.14); border-color: rgba(107,227,164,0.4); border-left-color: var(--success); }
 .cal-cell.manual { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); }
 .cal-day { font-size: 10.5px; font-weight: 700; color: var(--text-primary); }
 .cal-split { font-size: 7.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary); text-align: center; line-height: 1.15; }
@@ -140,6 +141,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .cal-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 .cal-legend-dot.train { background: var(--indigo); }
 .cal-legend-dot.rest { background: rgba(255,255,255,0.25); }
+.cal-legend-dot.done { background: var(--success); }
 
 /* ---- today summary ---- */
 .today-row { display: flex; align-items: center; gap: 14px; }
@@ -419,10 +421,24 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   let monthOffset = 0;
   let shiftAmount = 0; // armed via the shift bar — next cell click shifts from that day onward
 
+  // Dates where a séance was actually logged (any set, any exercise) in
+  // Fitness/Séance — independent of what's placed here as the day's
+  // planned type, so a real workout still shows green even on a day left
+  // at the "Repos" default, or one placed as a different split than what
+  // actually got logged.
+  function loggedSessionDates(gym) {
+    const dates = new Set();
+    Object.keys(gym.logs || {}).forEach(exId => {
+      (gym.logs[exId] || []).forEach(l => { if (l.date) dates.add(l.date); });
+    });
+    return dates;
+  }
+
   function render() {
     const app = document.getElementById('app');
     const gym = loadJSON(GYM_KEY, {});
     const overrides = loadJSON(OVERRIDES_KEY, {});
+    const doneDates = loggedSessionDates(gym);
     const kcal = dayKcalTargets();
     const now = new Date();
     const todayKey = dateKey(now);
@@ -465,9 +481,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const split = overrides[dk] || REST_DEFAULT_LABEL;
       const rest = isRestLabel(split);
       const isToday = dk === todayKey;
-      const cls = 'cal-cell' + (isToday ? ' today' : '') + (isManual ? ' manual' : '') + (rest ? ' rest' : ' train');
+      const done = doneDates.has(dk);
+      const cls = 'cal-cell' + (isToday ? ' today' : '') + (isManual ? ' manual' : '') + (rest ? ' rest' : ' train') + (done ? ' done' : '');
       const dayTarget = rest ? kcal.rest : kcal.train;
-      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split) + (isManual ? ' (placé par toi)' : ' (par défaut — touche pour changer)') + ' · ' + dayTarget.kcal + ' kcal (P' + dayTarget.proteinG + ' G' + dayTarget.carbsG + ' L' + dayTarget.fatG + ')' + '">' +
+      html += '<button type="button" class="' + cls + '" data-date="' + dk + '" title="' + escapeHtml(split) + (isManual ? ' (placé par toi)' : ' (par défaut — touche pour changer)') + (done ? ' · séance réalisée ✓' : '') + ' · ' + dayTarget.kcal + ' kcal (P' + dayTarget.proteinG + ' G' + dayTarget.carbsG + ' L' + dayTarget.fatG + ')' + '">' +
         '<span class="cal-day">' + d + '</span>' +
         '<span class="cal-split">' + escapeHtml(split) + '</span>' +
         '<span class="cal-kcal">' + dayTarget.kcal + '</span>' +
@@ -477,7 +494,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       '<div class="cal-legend">' +
       '<span class="cal-legend-item"><span class="cal-legend-dot train"></span>Entraînement · ~' + kcal.train.kcal + ' kcal · P' + kcal.train.proteinG + ' G' + kcal.train.carbsG + ' L' + kcal.train.fatG + '</span>' +
       '<span class="cal-legend-item"><span class="cal-legend-dot rest"></span>Repos · ~' + kcal.rest.kcal + ' kcal · P' + kcal.rest.proteinG + ' G' + kcal.rest.carbsG + ' L' + kcal.rest.fatG + '</span>' +
-      '</div><div class="program-note">Un jour non placé compte comme repos par défaut (kcal et macros adaptées) — touche-le pour dire qu\'il s\'agit d\'un jour d\'entraînement. Mêmes chiffres que dans Alimentation (protéines 2.2g/kg, lipides plancher 25%, glucides le reste) — pas deux calculs différents. Seuls les jours que tu places réellement apparaissent dans l\'abonnement téléphone.</div></div>';
+      '<span class="cal-legend-item"><span class="cal-legend-dot done"></span>Séance réalisée</span>' +
+      '</div><div class="program-note">Un jour non placé compte comme repos par défaut (kcal et macros adaptées) — touche-le pour dire qu\'il s\'agit d\'un jour d\'entraînement. Mêmes chiffres que dans Alimentation (protéines 2.2g/kg, lipides plancher 25%, glucides le reste) — pas deux calculs différents. Le vert marque les jours où une séance a réellement été loggée dans Séance, indépendamment du type placé ici. Seuls les jours que tu places réellement apparaissent dans l\'abonnement téléphone.</div></div>';
 
     // today summary — placed day if there is one, Repos by default otherwise
     const todayManual = !!overrides[todayKey];
