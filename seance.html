@@ -473,6 +473,45 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
   // next save or the next full page load.
   window.addEventListener('online', () => { if (localStorage.getItem(PC_PENDING_KEY)) pcPushNow(); });
 
+  // saveGym()'s pcPushNow() is fire-and-forget so the UI never blocks on the
+  // network — but on a phone, backgrounding the tab mid-set (to check a
+  // notification, switch apps, or let the screen lock) can freeze/kill the
+  // page before that in-flight request resolves. PC_PENDING_KEY only ever
+  // gets set from pcPushNow()'s catch block, i.e. only once the request
+  // actually fails — never while it's simply still in flight. So the next
+  // load's pcPullOnce() would see no pending flag, trust the cloud, and
+  // silently overwrite the just-validated set(s) with the older copy —
+  // exactly the "disappearing reps/séries" bug. Marking pending BEFORE
+  // firing a keepalive fetch (which survives the page unloading) closes
+  // that window: worst case the retry on next load just re-sends data
+  // that already landed.
+  function pcFlushPushOnUnload() {
+    if (!pcSupa) return;
+    const out = {};
+    PC_SYNCED_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v == null) return;
+      try { out[k] = JSON.parse(v); } catch (e) { out[k] = v; }
+    });
+    try { localStorage.setItem(PC_PENDING_KEY, '1'); } catch (e) {}
+    try {
+      fetch(PC_SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
+        method: 'POST',
+        headers: {
+          'apikey': PC_SUPABASE_KEY,
+          'Authorization': 'Bearer ' + PC_SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({ key: PC_APP_KEY, data: out, updated_at: new Date().toISOString() }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (e) {}
+  }
+  window.addEventListener('pagehide', pcFlushPushOnUnload);
+  window.addEventListener('beforeunload', pcFlushPushOnUnload);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pcFlushPushOnUnload(); });
+
   function loadGym(){
     try { const raw = JSON.parse(localStorage.getItem(LS_KEY)); return (raw && typeof raw === 'object') ? raw : null; }
     catch(e){ return null; }
@@ -1310,6 +1349,39 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       return null;
     }
 
+    // In-progress set fields (weight/reps/RIR/échec/échauffement, per side)
+    // aren't real data until "Valider la série" is tapped and pushed into
+    // state.logs — until then they're plain DOM input values, gone the
+    // instant the tab reloads or gets killed in the background. On a phone
+    // that happens constantly (app-switch, screen lock, low-memory reclaim
+    // mid-set), which is exactly the "ça oublie des séries" complaint: the
+    // rest of the session was saved fine, but whatever was mid-typing when
+    // it died never made it in. Mirroring those fields into localStorage on
+    // every keystroke — and restoring them in renderLive() — means reopening
+    // mid-set picks back up instead of starting blank.
+    const LIVE_DRAFT_KEY = 'po_seance_live_draft_v1';
+    function loadLiveDrafts(){
+      try { return JSON.parse(localStorage.getItem(LIVE_DRAFT_KEY)) || {}; } catch(e){ return {}; }
+    }
+    function saveLiveDraft(exId, suffix, patch){
+      try {
+        const all = loadLiveDrafts();
+        all[exId] = all[exId] || {};
+        all[exId][suffix] = Object.assign({}, all[exId][suffix], patch);
+        localStorage.setItem(LIVE_DRAFT_KEY, JSON.stringify(all));
+      } catch(e){}
+    }
+    function clearLiveDraft(exId){
+      try {
+        const all = loadLiveDrafts();
+        delete all[exId];
+        localStorage.setItem(LIVE_DRAFT_KEY, JSON.stringify(all));
+      } catch(e){}
+    }
+    function clearAllLiveDrafts(){
+      try { localStorage.removeItem(LIVE_DRAFT_KEY); } catch(e){}
+    }
+
     renderDayPick();
 
     function renderDayPick(){
@@ -1585,6 +1657,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         liveSessionStartTs = null;
       }
       clearOpenSession();
+      clearAllLiveDrafts();
       releaseWakeLock();
       clearInterval(timerInterval);
       document.body.classList.remove('seance-live');
@@ -1676,6 +1749,12 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       const sessionMaxWeight = todaySets.length ? Math.max.apply(null, todaySets.map(l => l.weight || 0)) : null;
       const prefWeight = sessionMaxWeight != null ? sessionMaxWeight : (target ? target.weight : (last ? last.weight : ''));
       const prefReps = '';
+      // Whatever was still being typed for this exercise's in-progress set
+      // when the page last died (see LIVE_DRAFT_KEY above) wins over the
+      // usual pre-fills, so resuming doesn't silently drop it.
+      const draft = loadLiveDrafts()[ex.id] || {};
+      const draftWeight = (suffix) => { const d = draft[suffix]; return (d && d.weight != null && d.weight !== '') ? d.weight : prefWeight; };
+      const draftReps = (suffix) => { const d = draft[suffix]; return (d && d.reps != null && d.reps !== '') ? d.reps : prefReps; };
 
       app.innerHTML =
         '<div class="live-view">' +
@@ -1699,13 +1778,13 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
         exSettingsHtml(ex) +
         (ex.unilateral ?
           '<div class="live-set-form">' +
-          sideBlockHtml('G', 'Gauche — ', prefWeight, prefReps) +
-          '<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">' + sideBlockHtml('D', 'Droite — ', prefWeight, prefReps) + '</div>' +
+          sideBlockHtml('G', 'Gauche — ', draftWeight('G'), draftReps('G')) +
+          '<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">' + sideBlockHtml('D', 'Droite — ', draftWeight('D'), draftReps('D')) + '</div>' +
           '<button type="button" class="live-validate-btn" id="liveValidateSet" style="margin-top:10px;">✓ Valider la série</button>' +
           '</div>'
         :
           '<div class="live-set-form">' +
-          sideBlockHtml('', '', prefWeight, prefReps) +
+          sideBlockHtml('', '', draftWeight(''), draftReps('')) +
           '<button type="button" class="live-validate-btn" id="liveValidateSet" style="margin-top:10px;">✓ Valider la série</button>' +
           '</div>'
         ) + '</div>' +
@@ -1725,8 +1804,24 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       document.getElementById('timerReset').addEventListener('click', timerReset);
       const sides = ex.unilateral ? ['G', 'D'] : [''];
       sides.forEach(suffix => {
-        document.getElementById('liveFailToggle' + suffix).addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
-        document.getElementById('liveWarmupToggle' + suffix).addEventListener('click', (e) => e.currentTarget.classList.toggle('active'));
+        const d = draft[suffix] || {};
+        const weightEl = document.getElementById('liveWeight' + suffix);
+        const repsEl = document.getElementById('liveReps' + suffix);
+        const rirEl = document.getElementById('liveRir' + suffix);
+        const failEl = document.getElementById('liveFailToggle' + suffix);
+        const warmupEl = document.getElementById('liveWarmupToggle' + suffix);
+        if (d.rir != null) {
+          rirEl.value = d.rir;
+          app.querySelectorAll('.live-rir-btn[data-rir-target="' + suffix + '"]').forEach(b => b.classList.toggle('active', b.dataset.rirVal === String(d.rir)));
+        }
+        if (d.fail) failEl.classList.add('active');
+        if (d.warmup) warmupEl.classList.add('active');
+        const persist = (patch) => saveLiveDraft(ex.id, suffix, patch);
+        weightEl.addEventListener('input', () => persist({ weight: weightEl.value }));
+        repsEl.addEventListener('input', () => persist({ reps: repsEl.value }));
+        rirEl.addEventListener('input', () => persist({ rir: rirEl.value === '' ? null : rirEl.value }));
+        failEl.addEventListener('click', (e) => { e.currentTarget.classList.toggle('active'); persist({ fail: failEl.classList.contains('active') }); });
+        warmupEl.addEventListener('click', (e) => { e.currentTarget.classList.toggle('active'); persist({ warmup: warmupEl.classList.contains('active') }); });
       });
       app.querySelectorAll('.live-rir-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1735,6 +1830,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
           const wasActive = btn.classList.contains('active');
           input.value = wasActive ? '' : val;
           app.querySelectorAll('.live-rir-btn[data-rir-target="' + suffix + '"]').forEach(b => b.classList.toggle('active', !wasActive && b === btn));
+          saveLiveDraft(ex.id, suffix, { rir: wasActive ? null : val });
         });
       });
       document.getElementById('liveValidateSet').addEventListener('click', validateSet);
@@ -1840,6 +1936,7 @@ body.seance-live .topbar, body.seance-live .bottombar { display: none !important
       lastSetSeverity[ex.id] = sev;
 
       saveGym(state);
+      clearLiveDraft(ex.id); // this exercise's set just got persisted for real — drop the in-progress draft
       setCounts[ex.id] = (setCounts[ex.id] || 1) + 1;
       timerReset();
       timerStartPause(); // auto-starts the rest timer for the next set

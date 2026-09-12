@@ -1832,6 +1832,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     bg.innerHTML = '<div class="modal" id="foodModalInner"></div>';
     document.body.appendChild(bg);
     bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
+    // On phones the keyboard eats a big chunk of the sheet's remaining height;
+    // waiting for the keyboard-open resize (visualViewport) then nudging the
+    // focused field into view keeps whatever's below it (e.g. the "Ajouter"
+    // button) from staying stranded off-screen with no way to scroll to it.
+    bg.addEventListener('focusin', (e) => {
+      if (!e.target.matches('input, select, textarea')) return;
+      const field = e.target;
+      setTimeout(() => { field.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 300);
+    });
     return bg;
   }
   function closeModal() { const bg = document.getElementById('foodModalBg'); if (bg) bg.classList.remove('show'); unlockBodyScroll(); }
@@ -1853,6 +1862,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     let recipeCatFilter = 'Tous';
 
     function renderModal() {
+      const scrollPos = inner.scrollTop;
+      requestAnimationFrame(() => { inner.scrollTop = scrollPos; });
       const db = loadJSON(FOOD_DB_KEY, []);
       inner.innerHTML =
         '<h3>Ajouter un aliment' + (isPastDate ? ' — ' + escapeHtml(formatDateLabel(dateKey)) : '') + '</h3>' +
