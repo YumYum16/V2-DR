@@ -234,6 +234,13 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   font-size: 12px; font-weight: 700; padding: 9px 16px; cursor: pointer;
 }
 .seg-toggle button.active { background: rgba(132,204,22,0.16); color: var(--lime); }
+.food-search-input {
+  display: block; width: 100%; padding: 11px 14px; margin-bottom: 12px;
+  border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.28); color: var(--text-primary);
+  font-family: inherit; font-size: 16px; /* 16px avoids iOS auto-zoom on focus */
+}
+.food-search-input::placeholder { color: var(--text-tertiary); }
 .cat-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .cat-filter-btn {
   border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.035); color: var(--text-tertiary);
@@ -448,9 +455,34 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
 
   // ---- storage helpers ----
-  function loadJSON(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } }
+  // Read-through cache: the food calendar used to trigger a fresh
+  // JSON.parse of the ENTIRE food log dozens of times per day shown (each
+  // day's score independently re-deriving the same maintenance calibration
+  // from scratch, which itself loops back up to 28 days re-reading that
+  // same log) — thousands of redundant parses on one render of a month
+  // with real history. Every localStorage write in this file goes through
+  // saveJSON below (verified: the only raw localStorage.setItem calls are
+  // the one-time cloud pull at startup, before the first render), so
+  // caching parsed values here and keeping them in sync on write is safe
+  // for the life of the tab — no per-render clearing needed.
+  const __jsonCache = {};
+  function loadJSON(k, fallback) {
+    let raw;
+    if (Object.prototype.hasOwnProperty.call(__jsonCache, k)) {
+      raw = __jsonCache[k];
+    } else {
+      try { raw = JSON.parse(localStorage.getItem(k)); } catch (e) { raw = null; }
+      __jsonCache[k] = raw;
+    }
+    return raw == null ? fallback : raw;
+  }
   function saveJSON(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); if (PC_SYNCED_KEYS.indexOf(k) !== -1) pcPushNow(k); return true; }
+    try {
+      localStorage.setItem(k, JSON.stringify(v));
+      __jsonCache[k] = v;
+      if (PC_SYNCED_KEYS.indexOf(k) !== -1) pcPushNow(k);
+      return true;
+    }
     catch (e) {
       console.error('save failed', k, e);
       if (!window.__lastSaveFailAlert || Date.now() - window.__lastSaveFailAlert > 60000) {
@@ -466,6 +498,10 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function formatDateLabel(dk){ const [yy,mm,dd]=dk.split('-').map(Number); return new Date(yy,mm-1,dd).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); }
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function uid(){ return 'f_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
+  // Accent/case-insensitive match — "creme" should find "Crème", not just
+  // an exact-diacritic substring.
+  function normalizeSearch(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function matchesSearch(name, query) { return !query || normalizeSearch(name).indexOf(normalizeSearch(query)) !== -1; }
 
   await Promise.all([pcPullOnce(), pcPullOverridesOnce()]);
 
@@ -695,13 +731,20 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // matching intake to that day's real expenditure, rather than a fixed
   // weekly average every day. Not a hard rule backed by an outcome
   // trial — just aligning input with actual output.
+  // Memoized: this page never writes GYM_KEY (Fitness/Séance own it), so
+  // the result is constant for the life of the tab — but computeTDEE()
+  // calls this on every computeTargetsForDate() (once per logged day shown
+  // in the food calendar), so without caching it re-filters the same
+  // 7-day cardio window dozens of times per render for an identical answer.
+  let __weeklyCardioHoursCache = null;
   function weeklyCardioHours() {
+    if (__weeklyCardioHoursCache != null) return __weeklyCardioHoursCache;
     const gym = loadJSON(GYM_KEY, {});
     const cutoffMs = Date.now() - 7 * 86400000;
     const totalMin = (Array.isArray(gym.cardio) ? gym.cardio : [])
       .filter(c => new Date(c.date + 'T00:00:00').getTime() >= cutoffMs)
       .reduce((sum, c) => sum + (c.durationMin || 0), 0);
-    return totalMin / 60;
+    return __weeklyCardioHoursCache = totalMin / 60;
   }
   // Actual weekly strength-training hours, reconstructed from Séance's own
   // logged sessions instead of the profile's manually-typed "heures
@@ -722,7 +765,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // resting isn't training exertion, so only the time actually spent
   // lifting should count toward the activity tier that drives TDEE.
   const TYPICAL_SESSION_MIN = 60;
+  let __weeklyStrengthHoursCache = null; // see weeklyCardioHours() for why this is memoized
   function weeklyStrengthHours() {
+    if (__weeklyStrengthHoursCache != null) return __weeklyStrengthHoursCache;
     const gym = loadJSON(GYM_KEY, {});
     const meta = gym.sessionMeta || {};
     const logs = gym.logs || {};
@@ -743,7 +788,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const restMin = restSecBySession[key] / 60;
       totalMin += Math.max(0, durationMin - restMin);
     });
-    return totalMin / 60;
+    return __weeklyStrengthHoursCache = totalMin / 60;
   }
   function computeTDEE(profile, weightKg, restDay) {
     const tiers = [1.2, 1.375, 1.55, 1.725, 1.9];
@@ -960,11 +1005,18 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const pct = mode === 'bulk' ? pick.surplusPct : mode === 'reverse' ? pick.reversePct : pick.deficitPct;
     return { mode, pct };
   }
-  function computeTargetsForDate(dateKey) {
+  // precomputedCalibration: the calendar renders this for every logged day
+  // in a month, and the calibration ratio itself doesn't depend on WHICH
+  // day is being scored (it's always "now vs. the last N days"), so
+  // re-deriving it from scratch per day was pure waste — the caller
+  // (renderFoodCalendarCard) computes it once and passes it through here.
+  // Standalone callers (the day-detail modal) omit it and it's computed
+  // fresh, same as before.
+  function computeTargetsForDate(dateKey, precomputedCalibration) {
     const profile = readProfile();
     const weightKg = weightKgOnOrBefore(dateKey) || profile.weightKg || 75;
     const restDay = isRestDayOn(dateKey);
-    const calibration = actualMaintenanceCalibration(profile);
+    const calibration = precomputedCalibration !== undefined ? precomputedCalibration : actualMaintenanceCalibration(profile);
     const tdee = computeTDEE(profile, weightKg, restDay) * (calibration ? calibration.ratio : 1) + cardioKcalOn(dateKey);
     const program = loadProgram();
     const { mode, pct } = programStateOn(program, dateKey);
@@ -1062,6 +1114,26 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const log = loadJSON(FOOD_LOG_KEY, {});
     return log[dateKey] || [];
   }
+  // Most-recently-logged distinct foods, newest first — the same handful
+  // of foods get logged over and over in practice, so surfacing these as
+  // one-tap shortcuts (ahead of scrolling/searching the whole database)
+  // is the single biggest speed-up for the actual daily habit of logging.
+  function recentlyLoggedFoods(maxDays, maxItems) {
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const dbById = {};
+    db.forEach(f => { dbById[f.id] = f; });
+    const seen = new Map(); // foodId -> food
+    for (let i = 0; i < maxDays && seen.size < maxItems; i++) {
+      const entries = log[daysAgoStr(i)] || [];
+      for (let j = entries.length - 1; j >= 0 && seen.size < maxItems; j--) {
+        const e = entries[j];
+        const f = e.foodId && dbById[e.foodId];
+        if (f && !seen.has(f.id)) seen.set(f.id, f);
+      }
+    }
+    return Array.from(seen.values());
+  }
   function totalsFor(entries) {
     return entries.reduce((acc, e) => ({
       kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
@@ -1116,15 +1188,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     if (on) days[dk] = true; else delete days[dk];
     return saveJSON(CHEAT_DAY_KEY, days);
   }
-  function todayTotals() {
-    const entries = todaysEntries();
-    return entries.reduce((acc, e) => ({
-      kcal: acc.kcal + (e.kcal||0), protein: acc.protein + (e.protein||0),
-      carbs: acc.carbs + (e.carbs||0), fat: acc.fat + (e.fat||0),
-      salt: acc.salt + (e.salt||0), potassium: acc.potassium + (e.potassium||0),
-      sugar: acc.sugar + (e.sugar||0), fiber: acc.fiber + (e.fiber||0)
-    }), { kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0, fiber: 0 });
-  }
+  function todayTotals() { return totalsFor(todaysEntries()); }
   // Institute of Medicine (2005), Dietary Reference Intakes for Energy,
   // Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino
   // Acids — Adequate Intake for fiber, by age/sex (not a per-kcal rule of
@@ -1281,11 +1345,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const dist = Math.abs(pct - 1);
     return Math.max(0, 100 - dist * 140);
   }
-  function dayScore(dateKey) {
+  function dayScore(dateKey, precomputedCalibration) {
     const entries = entriesForDate(dateKey);
     if (!entries.length) return null;
     const totals = totalsFor(entries);
-    const targets = computeTargetsForDate(dateKey);
+    const targets = computeTargetsForDate(dateKey, precomputedCalibration);
     const kcalPct = targets.target ? totals.kcal / targets.target : 0;
     const proteinPct = targets.proteinG ? totals.protein / targets.proteinG : 0;
     const carbsPct = targets.carbsG ? totals.carbs / targets.carbsG : 0;
@@ -1484,6 +1548,9 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7;
     const log = loadJSON(FOOD_LOG_KEY, {});
+    // Computed once for the whole month instead of once per day cell — see
+    // computeTargetsForDate's precomputedCalibration comment.
+    const monthCalibration = actualMaintenanceCalibration(readProfile());
 
     let html = '<div class="gm-card"><div class="section-title">Calendrier alimentaire</div>' +
       '<div class="cal-head">' +
@@ -1501,7 +1568,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const isToday = dk === todayKey;
       const isFuture = dk > todayKey;
       const cheat = isCheatDay(dk);
-      const score = hasLog ? dayScore(dk) : null;
+      const score = hasLog ? dayScore(dk, monthCalibration) : null;
       const color = hasLog ? scoreColor(score) : null;
       const cls = 'cal-cell' + (isToday ? ' today' : '') + (hasLog ? ' logged' : ' empty') + (cheat ? ' cheat' : '');
       html += '<button type="button" class="' + cls + '"' +
@@ -1737,7 +1804,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       if (copyMode) wireCopyPicker();
       inner.querySelectorAll('[data-daydel]').forEach(btn => {
         btn.addEventListener('click', () => {
-          removeLogEntry(btn.dataset.daydel, dk);
+          const idx = entries.findIndex(e => e.id === btn.dataset.daydel);
+          if (idx !== -1) deleteWithUndo(entries[idx], dk, idx);
           render();
           renderMain();
         });
@@ -1748,7 +1816,33 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     showModal(bg);
   }
 
+  // Undo for log-entry deletion — a bare "×" with no confirmation is fast
+  // to log with, but also fast to fat-finger on a cramped phone row; this
+  // gives a few seconds to reverse it instead of forcing a full re-add
+  // (which, for an old day, means re-finding the food and re-typing the
+  // quantity). Re-inserted at its original index so the entry list isn't
+  // reordered by an undo.
   let flashMsg = '';
+  let pendingUndo = null; // { entry, dateKey, index }
+  let pendingUndoTimer = null;
+  function deleteWithUndo(entry, dateKey, index) {
+    removeLogEntry(entry.id, dateKey);
+    if (pendingUndoTimer) clearTimeout(pendingUndoTimer);
+    pendingUndo = { entry, dateKey, index };
+    pendingUndoTimer = setTimeout(() => { pendingUndo = null; pendingUndoTimer = null; renderMain(); }, 6000);
+  }
+  function undoDelete() {
+    if (!pendingUndo) return;
+    if (pendingUndoTimer) { clearTimeout(pendingUndoTimer); pendingUndoTimer = null; }
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    const k = pendingUndo.dateKey || todayStr();
+    const arr = (log[k] || []).slice();
+    arr.splice(Math.min(pendingUndo.index, arr.length), 0, pendingUndo.entry);
+    log[k] = arr;
+    saveJSON(FOOD_LOG_KEY, log);
+    pendingUndo = null;
+    renderMain();
+  }
   function renderMain() {
     const targets = computeTargets();
     const totals = todayTotals();
@@ -1761,7 +1855,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const pF = targets.fatG ? totals.fat / targets.fatG : 0;
     const sugarTargetG = (targets.target * SUGAR_TARGET_PCT) / 4;
 
-    const banner = flashMsg ? '<div class="gm-card save-banner">' + escapeHtml(flashMsg) + '</div>' : '';
+    const banner = pendingUndo
+      ? '<div class="gm-card save-banner" style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;">' +
+        '<span>🗑 « ' + escapeHtml(pendingUndo.entry.foodName) + ' » supprimé.</span>' +
+        '<button type="button" class="gm-ghost" id="undoDeleteBtn" style="padding:6px 14px;">↩ Annuler</button>' +
+        '</div>'
+      : flashMsg ? '<div class="gm-card save-banner">' + escapeHtml(flashMsg) + '</div>' : '';
     flashMsg = '';
     const mode = targets.program.mode;
     const isBulk = mode === 'bulk';
@@ -1862,8 +1961,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     });
     document.getElementById('addFoodBtn').addEventListener('click', () => openAddFoodModal());
     document.getElementById('manageFoodsBtn').addEventListener('click', openManageFoodsModal);
+    const undoBtn = document.getElementById('undoDeleteBtn');
+    if (undoBtn) undoBtn.addEventListener('click', undoDelete);
     app.querySelectorAll('[data-del]').forEach(btn => {
-      btn.addEventListener('click', () => { removeLogEntry(btn.dataset.del); renderMain(); });
+      btn.addEventListener('click', () => {
+        const idx = entries.findIndex(e => e.id === btn.dataset.del);
+        if (idx !== -1) deleteWithUndo(entries[idx], todayStr(), idx);
+        renderMain();
+      });
     });
     document.getElementById('foodCalPrev').addEventListener('click', () => { foodCalMonthOffset--; renderMain(); });
     document.getElementById('foodCalNext').addEventListener('click', () => { foodCalMonthOffset++; renderMain(); });
@@ -1926,6 +2031,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     let mode = startMode || 'pick'; // 'pick' | 'new'
     let selectedFood = null;
     let catFilter = 'Tous';
+    let searchQuery = '';
     let qtyMode = 'unit'; // 'unit' | 'grams' — only meaningful when the selected food has a servingGrams unit
     let newMode = 'simple'; // 'simple' | 'recipe' — only relevant when mode === 'new'
     let recipeName = '';
@@ -1950,18 +2056,40 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           body.innerHTML = '<p class="empty-note">Aucun aliment créé. Passe sur "Créer" pour en ajouter un.</p>';
           return;
         }
-        const shown = catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter);
+        const shown = (catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter))
+          .filter(f => matchesSearch(f.name, searchQuery));
+        // Recent-first shortcuts: skipped once a search/category narrows
+        // things down, since at that point the picker below is already the
+        // short list and a duplicate "Récents" row would just add noise.
+        const recents = (!searchQuery && catFilter === 'Tous')
+          ? recentlyLoggedFoods(14, 8).filter(f => db.some(x => x.id === f.id))
+          : [];
+        const pickItemHtml = f =>
+          '<div class="food-pick-item' + (selectedFood && selectedFood.id===f.id ? ' active':'') + '" data-id="' + f.id + '">' +
+          '<div style="flex:1"><div class="food-pick-name">' + (f.isRecipe ? '🍳 ' : '') + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + recipeIngredientNote(f) + '</div></div>' +
+          '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
+          '</div>';
         body.innerHTML =
+          '<input type="search" id="foodSearchInput" class="food-search-input" placeholder="🔎 Rechercher un aliment…" value="' + escapeHtml(searchQuery) + '">' +
+          (recents.length ? '<div class="food-cat-label">⏱ Récents</div><div class="food-pick-list" style="margin-bottom:12px;">' + recents.map(pickItemHtml).join('') + '</div>' : '') +
           '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
             '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
           ).join('') + '</div>' +
-          '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
-            '<div class="food-pick-item' + (selectedFood && selectedFood.id===f.id ? ' active':'') + '" data-id="' + f.id + '">' +
-            '<div style="flex:1"><div class="food-pick-name">' + (f.isRecipe ? '🍳 ' : '') + escapeHtml(f.name) + '</div><div class="food-pick-macro">' + f.kcalPer100g + ' kcal/100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + recipeIngredientNote(f) + '</div></div>' +
-            '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
-            '</div>'
-          ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' +
+          '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, pickItemHtml) :
+            '<p class="empty-note">' + (searchQuery ? 'Aucun résultat pour « ' + escapeHtml(searchQuery) + ' ».' : 'Rien dans cette catégorie.') + '</p>') + '</div>' +
           (selectedFood ? renderQuantityForm(selectedFood) : '');
+        const searchEl = body.querySelector('#foodSearchInput');
+        if (searchEl) {
+          searchEl.addEventListener('input', () => {
+            searchQuery = searchEl.value;
+            const pos = searchEl.selectionStart;
+            renderModal();
+            requestAnimationFrame(() => {
+              const el2 = document.getElementById('foodSearchInput');
+              if (el2) { el2.focus(); el2.setSelectionRange(pos, pos); }
+            });
+          });
+        }
         body.querySelectorAll('[data-cat]').forEach(b => {
           b.addEventListener('click', () => { catFilter = b.dataset.cat; selectedFood = null; renderModal(); });
         });
@@ -2007,7 +2135,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         '</div>' +
         '<div class="field-row">' +
         '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1"></div>' +
-        '<div class="field-col"><label>dont Sucres /100g</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5"></div>' +
+        '<div class="field-col"><label>dont Sucres /100g (compris dans les glucides ci-dessus, pas un ajout)</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5"></div>' +
         '</div>' +
         '<div class="field-row">' +
         '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
@@ -2294,27 +2422,49 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const bg = ensureModal();
     const inner = document.getElementById('foodModalInner');
     let catFilter = 'Tous';
+    let searchQuery = '';
     function render() {
       const db = loadJSON(FOOD_DB_KEY, []);
-      const shown = catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter);
+      const shown = (catFilter === 'Tous' ? db : db.filter(f => dominantCategory(f) === catFilter))
+        .filter(f => matchesSearch(f.name, searchQuery));
       inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">Mes aliments<span style="display:flex;gap:6px;">' + (db.length ? '<button type="button" class="gm-ghost" id="exportFoodsBtn">🖨 PDF</button>' : '') + '<button type="button" class="gm-ghost" id="createFoodBtn">+ Créer</button></span></h3>' +
         (db.length ?
+          '<input type="search" id="manageFoodSearchInput" class="food-search-input" placeholder="🔎 Rechercher un aliment…" value="' + escapeHtml(searchQuery) + '">' +
           '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
             '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
           ).join('') + '</div>' +
           '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + (f.isRecipe ? '🍳 ' : '') + escapeHtml(f.name) + '</div>' +
             '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' Fi' + (f.fiberPer100g == null ? '?' : f.fiberPer100g) + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + recipeIngredientNote(f) + '</div></div>' +
-            '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '">🗑</button></div>'
-          ) : '<p class="empty-note">Rien dans cette catégorie.</p>') + '</div>' :
+            '<button type="button" class="food-pick-del" data-fedit2="' + f.id + '" aria-label="Modifier" style="margin-right:2px;">✎</button>' +
+            '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '" aria-label="Supprimer">🗑</button></div>'
+          ) : '<p class="empty-note">' + (searchQuery ? 'Aucun résultat pour « ' + escapeHtml(searchQuery) + ' ».' : 'Rien dans cette catégorie.') + '</p>') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="closeManage">Fermer</button></div>';
       document.getElementById('closeManage').addEventListener('click', closeModal);
       document.getElementById('createFoodBtn').addEventListener('click', () => openAddFoodModal(todayStr(), 'new'));
       const exportBtn = document.getElementById('exportFoodsBtn');
       if (exportBtn) exportBtn.addEventListener('click', () => exportFoodsPdf(db));
+      const searchEl = document.getElementById('manageFoodSearchInput');
+      if (searchEl) {
+        searchEl.addEventListener('input', () => {
+          searchQuery = searchEl.value;
+          const pos = searchEl.selectionStart;
+          render();
+          requestAnimationFrame(() => {
+            const el2 = document.getElementById('manageFoodSearchInput');
+            if (el2) { el2.focus(); el2.setSelectionRange(pos, pos); }
+          });
+        });
+      }
       inner.querySelectorAll('[data-cat]').forEach(b => {
         b.addEventListener('click', () => { catFilter = b.dataset.cat; render(); });
+      });
+      inner.querySelectorAll('[data-fedit2]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const f = loadJSON(FOOD_DB_KEY, []).find(x => x.id === btn.dataset.fedit2);
+          if (f) openEditFoodModal(f);
+        });
       });
       inner.querySelectorAll('[data-fdel2]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -2325,6 +2475,72 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       });
     }
     render();
+    showModal(bg);
+  }
+
+  // Editing was delete-then-recreate before this — fine for a typo in a
+  // never-logged food, painful for one already used across weeks of
+  // history (recreating it gets a new id, silently detaching it from
+  // every past log entry's foodId). This mutates the existing entry in
+  // place instead, so its id — and therefore its logged history — stays
+  // intact.
+  function editFoodFormHtml(food) {
+    return '<div class="field-row">' +
+      '<div class="field-col" style="flex:1 1 100%"><label>Nom</label><input type="text" id="editFoodName" value="' + escapeHtml(food.name) + '"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>Kcal /100g</label><input type="number" id="editFoodKcal" step="1" value="' + (food.kcalPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Protéines /100g</label><input type="number" id="editFoodP" step="0.1" value="' + (food.proteinPer100g||0) + '"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>Glucides /100g</label><input type="number" id="editFoodC" step="0.1" value="' + (food.carbsPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>dont Sucres /100g (compris dans les glucides ci-dessus, pas un ajout)</label><input type="number" id="editFoodSugar" step="0.1" value="' + (food.sugarPer100g||0) + '"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>Lipides /100g</label><input type="number" id="editFoodF" step="0.1" value="' + (food.fatPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="editFoodFiber" step="0.1" value="' + (food.fiberPer100g == null ? '' : food.fiberPer100g) + '"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="editFoodSalt" step="0.01" value="' + (food.saltPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="editFoodK" step="1" value="' + (food.potassiumPer100g||0) + '"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="editFoodServingG" step="1" value="' + (food.servingGrams || '') + '"></div>' +
+      '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="editFoodServingLabel" value="' + escapeHtml(food.servingLabel || '') + '"></div>' +
+      '</div>' +
+      (food.isRecipe ? '<p class="empty-note" style="text-align:left;padding:0 2px 10px;">🍳 Recette — modifier ici change directement les valeurs finales, pas la liste d\'ingrédients d\'origine.</p>' : '') +
+      '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelEditFood">Annuler</button><button type="button" class="btn-primary" id="saveEditFood">Enregistrer</button></div>';
+  }
+  function wireEditFoodForm(sub, food) {
+    sub.querySelector('#cancelEditFood').addEventListener('click', openManageFoodsModal);
+    sub.querySelector('#saveEditFood').addEventListener('click', () => {
+      const name = sub.querySelector('#editFoodName').value.trim();
+      const kcalPer100g = parseFloat(sub.querySelector('#editFoodKcal').value) || 0;
+      if (!name || !kcalPer100g) { alert('Nom et kcal/100g requis.'); return; }
+      const updated = Object.assign({}, food, {
+        name, kcalPer100g,
+        proteinPer100g: parseFloat(sub.querySelector('#editFoodP').value) || 0,
+        carbsPer100g: parseFloat(sub.querySelector('#editFoodC').value) || 0,
+        sugarPer100g: parseFloat(sub.querySelector('#editFoodSugar').value) || 0,
+        fatPer100g: parseFloat(sub.querySelector('#editFoodF').value) || 0,
+        fiberPer100g: sub.querySelector('#editFoodFiber').value.trim() === '' ? null : (parseFloat(sub.querySelector('#editFoodFiber').value) || 0),
+        saltPer100g: parseFloat(sub.querySelector('#editFoodSalt').value) || 0,
+        potassiumPer100g: parseFloat(sub.querySelector('#editFoodK').value) || 0,
+        servingGrams: parseFloat(sub.querySelector('#editFoodServingG').value) || null,
+        servingLabel: sub.querySelector('#editFoodServingLabel').value.trim() || null
+      });
+      const list = loadJSON(FOOD_DB_KEY, []).map(f => f.id === food.id ? updated : f);
+      saveJSON(FOOD_DB_KEY, list);
+      openManageFoodsModal();
+    });
+  }
+  function openEditFoodModal(food) {
+    const bg = ensureModal();
+    const inner = document.getElementById('foodModalInner');
+    inner.innerHTML = '<h3>Modifier — ' + escapeHtml(food.name) + '</h3><div id="editFoodBody"></div>';
+    const sub = document.getElementById('editFoodBody');
+    sub.innerHTML = editFoodFormHtml(food);
+    wireEditFoodForm(sub, food);
     showModal(bg);
   }
 
