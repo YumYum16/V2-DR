@@ -15,15 +15,43 @@
 :root {
   --text-primary: #FAFAFA;
   --text-secondary: #B8B6B0;
-  --text-tertiary: #76746E;
+  /* #76746E measured 4.36:1 on the page background — fails WCAG AA's 4.5:1
+     for normal text despite being used everywhere for labels/meta. Lifted
+     to 4.9:1, same hue, barely perceptible change. */
+  --text-tertiary: #7E7C76;
   --success: #6BE3A4;
   --warning: #F2C063;
   --danger:  #FF6B6B;
   --lime: #84CC16;
+  --focus-ring: rgba(132,204,22,0.55);
   --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
+/* Keyboard focus — nothing in this file styled :focus at all before, so
+   keyboard/switch-control users got either an invisible or browser-default
+   ring with no relation to the design. One consistent lime ring for every
+   interactive element, only shown for actual keyboard focus (not a mouse
+   click) via :focus-visible. */
+a, button, input, select, textarea, summary, [tabindex] {
+  transition: outline-color .12s ease;
+}
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2.5px solid var(--focus-ring); outline-offset: 2px;
+}
+/* Touch feedback — -webkit-tap-highlight-color is disabled throughout this
+   file (to kill the default grey flash rectangle) but nothing replaced it,
+   so every tap on a phone gave zero visual feedback that the press
+   registered. This is the shared replacement: a quick scale/opacity dip
+   on press, restored to full context by the per-component :active rules
+   below and reduced-motion users skip the scale entirely. */
+@media (prefers-reduced-motion: no-preference) {
+  button, .food-pick-item, .cal-cell:not(:disabled) {
+    transition: transform .1s ease, background .12s ease, opacity .12s ease, border-color .12s ease;
+  }
+  button:active, .food-pick-item:active, .cal-cell:not(:disabled):active { transform: scale(0.96); }
+}
 html, body {
   margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
   font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
@@ -97,6 +125,7 @@ body::after {
   transition: background 0.15s, border-color 0.15s;
 }
 .gm-ghost:hover { background: rgba(255,255,255,0.07); }
+.gm-ghost:active { background: rgba(255,255,255,0.11); }
 .gm-add {
   padding: 12px 18px; border: 0; border-radius: 12px;
   background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
@@ -137,6 +166,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 }
 .program-badge.warn { background: rgba(242,192,99,0.14); color: var(--warning); }
 .program-badge.bad { background: rgba(255,107,107,0.14); color: var(--danger); }
+/* Wrapper for a run of badges that can grow (reverse diet added two more
+   possible badges alongside the mode/rest-day ones) — plain inline flow
+   wrapped mid-badge on narrow phones; this wraps as whole badges with a
+   clean gap instead. */
+.program-badges-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.program-badges-row .program-badge { margin-bottom: 0; }
 .program-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12.5px; }
 .program-row:last-child { border-bottom: 0; }
 .program-row span:first-child { color: var(--text-tertiary); }
@@ -153,11 +188,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 /* ---- food calendar ---- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
 .cal-nav-btn {
-  width: 32px; height: 32px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.04); color: var(--text-primary); font-size: 16px; line-height: 1;
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-primary); font-size: 17px; line-height: 1;
   cursor: pointer; -webkit-tap-highlight-color: transparent; flex-shrink: 0;
 }
 .cal-nav-btn:hover { background: rgba(255,255,255,0.08); }
+.cal-nav-btn:active { background: rgba(255,255,255,0.12); }
 .cal-month { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
 .cal-weekday { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.06em; }
@@ -200,8 +236,16 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .log-name { flex: 1; font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
 .log-meta { font-size: 11px; color: var(--text-tertiary); }
 .log-macros { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.log-del { border: 0; background: none; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px 6px; }
-.log-del:hover { color: var(--danger); }
+.log-del {
+  border: 0; background: none; color: var(--text-tertiary); font-size: 18px; cursor: pointer;
+  /* min-width/height (not just padding) guarantees a real tap target
+     regardless of how narrow the "×" glyph itself renders — was ~24px
+     before, under the 44px comfort target for a destructive action. */
+  min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+}
+.log-del:hover { color: var(--danger); background: rgba(255,107,107,0.08); }
+.log-del:active { color: var(--danger); background: rgba(255,107,107,0.14); }
 
 /* ---- add-food form ---- */
 .field-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -211,6 +255,15 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
   background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 16px;
 }
+.field-details { margin: 4px 0 14px; }
+.field-details summary {
+  cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--text-secondary);
+  padding: 10px 2px; display: flex; align-items: center; gap: 6px; min-height: 40px;
+}
+.field-details summary::-webkit-details-marker { display: none; }
+.field-details summary::before { content: '▸'; color: var(--text-tertiary); font-size: 11px; transition: transform .15s ease; }
+.field-details[open] summary::before { transform: rotate(90deg); }
+.field-details summary:hover { color: var(--text-primary); }
 .food-pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 10px; }
 .food-cat-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
@@ -223,17 +276,28 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .food-pick-item:hover { background: rgba(255,255,255,0.07); }
+.food-pick-item:active { background: rgba(255,255,255,0.10); }
 .food-pick-item.active { border-color: rgba(132,204,22,0.4); background: rgba(132,204,22,0.08); }
 .food-pick-name { flex: 1; font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
 .food-pick-macro { font-size: 10.5px; color: var(--text-tertiary); }
-.food-pick-del { border: 0; background: none; color: var(--text-tertiary); font-size: 14px; cursor: pointer; padding: 2px 6px; }
-.food-pick-del:hover { color: var(--danger); }
+.food-pick-del {
+  border: 0; background: none; color: var(--text-tertiary); font-size: 15px; cursor: pointer;
+  min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; flex-shrink: 0;
+}
+.food-pick-del:hover { color: var(--danger); background: rgba(255,107,107,0.08); }
+.food-pick-del:active { color: var(--danger); background: rgba(255,107,107,0.14); }
+.food-pick-edit { color: var(--text-tertiary); }
+.food-pick-edit:hover { color: var(--lime); background: rgba(132,204,22,0.10); }
+.food-pick-edit:active { color: var(--lime); background: rgba(132,204,22,0.16); }
 .seg-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.10); border-radius: 999px; overflow: hidden; background: rgba(0,0,0,0.25); margin-bottom: 14px; }
 .seg-toggle button {
   border: 0; background: transparent; color: var(--text-tertiary); font-family: inherit;
-  font-size: 12px; font-weight: 700; padding: 9px 16px; cursor: pointer;
+  font-size: 12px; font-weight: 700; padding: 9px 16px; cursor: pointer; min-height: 40px;
 }
 .seg-toggle button.active { background: rgba(132,204,22,0.16); color: var(--lime); }
+.seg-toggle button:active { background: rgba(255,255,255,0.06); }
+.seg-toggle button.active:active { background: rgba(132,204,22,0.24); }
 .food-search-input {
   display: block; width: 100%; padding: 11px 14px; margin-bottom: 12px;
   border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
@@ -244,11 +308,13 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 .cat-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .cat-filter-btn {
   border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.035); color: var(--text-tertiary);
-  font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; padding: 8px 12px; min-height: 36px; border-radius: 999px; cursor: pointer;
   transition: background .15s, color .15s, border-color .15s;
 }
 .cat-filter-btn:hover { color: var(--text-primary); }
+.cat-filter-btn:active { background: rgba(255,255,255,0.08); }
 .cat-filter-btn.active { background: rgba(132,204,22,0.16); color: var(--lime); border-color: rgba(132,204,22,0.35); }
+.cat-filter-btn.active:active { background: rgba(132,204,22,0.24); }
 .modal-bg {
   display: none; position: fixed; left: 0; right: 0;
   top: var(--vvt, 0px); height: var(--vvh, 100dvh);
@@ -271,9 +337,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 }
 .modal h3 { margin: 0 0 14px; font-size: 16px; color: var(--text-primary); }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
-.modal-actions button { flex: 1; padding: 12px; border-radius: 12px; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.modal-actions button { flex: 1; padding: 13px 12px; min-height: 46px; border-radius: 12px; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
 .btn-secondary { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-primary); }
+.btn-secondary:active { background: rgba(255,255,255,0.10); }
 .btn-primary { border: 0; background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B; }
+.btn-primary:active { background: linear-gradient(180deg, #F0EEE8 0%, #DAD7CD 100%); }
+.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.45; cursor: default; }
 
 .cross-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .cross-nav a {
@@ -1926,10 +1995,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Programme (' + (isBulk ? 'prise de masse adaptative' : isReverse ? 'reverse diet' : 'sèche adaptative') + ')</div>' +
+      '<div class="program-badges-row">' +
       '<span class="program-badge">' + (isBulk ? 'Surplus actuel : +' + targets.program.surplusPct : isReverse ? 'Déficit actuel : -' + targets.program.reversePct : 'Déficit actuel : -' + targets.program.deficitPct) + '%</span>' +
-      (isReverse ? ' <span class="program-badge">Maintenance dans ~' + Math.ceil(targets.program.reversePct / REVERSE_STEP_PCT) + ' semaine(s)</span>' : '') +
-      (targets.restDay ? ' <span class="program-badge warn">Jour de repos — activité réduite</span>' : '') +
-      (targets.floorApplied ? ' <span class="program-badge bad">⚠️ Plancher de sécurité appliqué</span>' : '') +
+      (isReverse ? '<span class="program-badge">Maintenance dans ~' + Math.ceil(targets.program.reversePct / REVERSE_STEP_PCT) + ' semaine(s)</span>' : '') +
+      (targets.restDay ? '<span class="program-badge warn">Jour de repos — activité réduite</span>' : '') +
+      (targets.floorApplied ? '<span class="program-badge bad">⚠️ Plancher de sécurité appliqué</span>' : '') +
+      '</div>' +
       '<div class="program-row"><span>Poids utilisé</span><span>' + targets.weightKg.toFixed(1) + ' kg' + (targets.weightIsLive ? ' (Fitness, live)' : ' (profil Eau)') + '</span></div>' +
       '<div class="program-row"><span>TDEE ' + (targets.calibration ? 'calibré (données réelles)' : 'estimé (formule)') + (targets.restDay ? ' — repos' : '') + '</span><span>' + targets.tdee + ' kcal</span></div>' +
       (targets.cardioKcal > 0 ? '<div class="program-row"><span>🏃 Cardio (Séance)</span><span>+' + targets.cardioKcal + ' kcal</span></div>' : '') +
@@ -2070,7 +2141,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           '<button type="button" class="food-pick-del" data-fdel="' + f.id + '">🗑</button>' +
           '</div>';
         body.innerHTML =
-          '<input type="search" id="foodSearchInput" class="food-search-input" placeholder="🔎 Rechercher un aliment…" value="' + escapeHtml(searchQuery) + '">' +
+          '<input type="search" id="foodSearchInput" class="food-search-input" placeholder="🔎 Rechercher un aliment…" aria-label="Rechercher un aliment" value="' + escapeHtml(searchQuery) + '">' +
           (recents.length ? '<div class="food-cat-label">⏱ Récents</div><div class="food-pick-list" style="margin-bottom:12px;">' + recents.map(pickItemHtml).join('') + '</div>' : '') +
           '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
             '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
@@ -2120,35 +2191,51 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
           '<div id="newFoodBody"></div>';
         body.querySelectorAll('[data-nm]').forEach(b => b.addEventListener('click', () => { newMode = b.dataset.nm; renderModal(); }));
         const sub = document.getElementById('newFoodBody');
-        if (newMode === 'simple') { sub.innerHTML = simpleFormHtml(); wireSimpleForm(sub); }
+        if (newMode === 'simple') {
+          sub.innerHTML = simpleFormHtml();
+          wireSimpleForm(sub);
+          // One less tap before typing — nothing in this form re-triggers
+          // renderModal() while filling it in, so this only fires on
+          // actually opening/switching into "Créer", never mid-keystroke.
+          requestAnimationFrame(() => { const nameEl = document.getElementById('newFoodName'); if (nameEl) nameEl.focus(); });
+        }
         else { sub.innerHTML = recipeFormHtml(); wireRecipeForm(sub); }
       }
     }
 
+    // Essential fields (nom/kcal/protéines/glucides/lipides — what the
+    // app's rings and daily targets actually track) shown up front; the
+    // rest (sucres, fibres, sel, potassium, portion) behind a collapsed
+    // <details> — a 10-field wall to fill in before you can log a single
+    // bite was the single biggest friction point in "just tracking a
+    // meal". A native <details> needs no JS state: nothing in this form
+    // triggers a re-render while typing, so its open/closed state can't
+    // get reset mid-entry.
     function simpleFormHtml() {
       return '<div class="field-row">' +
         '<div class="field-col" style="flex:1 1 100%"><label>Nom</label><input type="text" id="newFoodName" placeholder="ex. Steak haché 5%"></div>' +
         '</div>' +
         '<div class="field-row">' +
-        '<div class="field-col"><label>Kcal /100g</label><input type="number" id="newFoodKcal" step="1"></div>' +
-        '<div class="field-col"><label>Protéines /100g</label><input type="number" id="newFoodP" step="0.1"></div>' +
+        '<div class="field-col"><label>Kcal /100g</label><input type="number" id="newFoodKcal" step="1" inputmode="decimal"></div>' +
+        '<div class="field-col"><label>Protéines /100g</label><input type="number" id="newFoodP" step="0.1" inputmode="decimal"></div>' +
         '</div>' +
         '<div class="field-row">' +
-        '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1"></div>' +
-        '<div class="field-col"><label>dont Sucres /100g (compris dans les glucides ci-dessus, pas un ajout)</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5"></div>' +
+        '<div class="field-col"><label>Glucides /100g</label><input type="number" id="newFoodC" step="0.1" inputmode="decimal"></div>' +
+        '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1" inputmode="decimal"></div>' +
+        '</div>' +
+        '<details class="field-details"><summary>Plus de détails (sucres, fibres, sel, potassium, portion)</summary>' +
+        '<div class="field-row">' +
+        '<div class="field-col"><label>dont Sucres /100g (compris dans les glucides ci-dessus, pas un ajout)</label><input type="number" id="newFoodSugar" step="0.1" placeholder="ex. 5" inputmode="decimal"></div>' +
+        '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="newFoodFiber" step="0.1" placeholder="ex. 3" inputmode="decimal"></div>' +
         '</div>' +
         '<div class="field-row">' +
-        '<div class="field-col"><label>Lipides /100g</label><input type="number" id="newFoodF" step="0.1"></div>' +
-        '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="newFoodFiber" step="0.1" placeholder="ex. 3"></div>' +
+        '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2" inputmode="decimal"></div>' +
+        '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="newFoodK" step="1" placeholder="ex. 350" inputmode="decimal"></div>' +
         '</div>' +
         '<div class="field-row">' +
-        '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="newFoodSalt" step="0.01" placeholder="ex. 1.2"></div>' +
-        '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="newFoodK" step="1" placeholder="ex. 350"></div>' +
-        '</div>' +
-        '<div class="field-row">' +
-        '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150"></div>' +
+        '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="newFoodServingG" step="1" placeholder="ex. 150" inputmode="decimal"></div>' +
         '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="newFoodServingLabel" placeholder="ex. steak"></div>' +
-        '</div>' +
+        '</div></details>' +
         '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelNewFood">Annuler</button><button type="button" class="btn-primary" id="saveNewFood">Créer</button></div>';
     }
     function wireSimpleForm(sub) {
@@ -2429,14 +2516,14 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         .filter(f => matchesSearch(f.name, searchQuery));
       inner.innerHTML = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">Mes aliments<span style="display:flex;gap:6px;">' + (db.length ? '<button type="button" class="gm-ghost" id="exportFoodsBtn">🖨 PDF</button>' : '') + '<button type="button" class="gm-ghost" id="createFoodBtn">+ Créer</button></span></h3>' +
         (db.length ?
-          '<input type="search" id="manageFoodSearchInput" class="food-search-input" placeholder="🔎 Rechercher un aliment…" value="' + escapeHtml(searchQuery) + '">' +
+          '<input type="search" id="manageFoodSearchInput" class="food-search-input" placeholder="🔎 Rechercher un aliment…" aria-label="Rechercher un aliment" value="' + escapeHtml(searchQuery) + '">' +
           '<div class="cat-filter-row">' + ['Tous'].concat(CATEGORY_ORDER).map(cat =>
             '<button type="button" class="cat-filter-btn' + (catFilter===cat?' active':'') + '" data-cat="' + escapeHtml(cat) + '">' + (CATEGORY_ICON[cat] ? CATEGORY_ICON[cat] + ' ' : '') + escapeHtml(cat) + '</button>'
           ).join('') + '</div>' +
           '<div class="food-pick-list">' + (shown.length ? foodListHtml(shown, f =>
             '<div class="food-pick-item"><div style="flex:1"><div class="food-pick-name">' + (f.isRecipe ? '🍳 ' : '') + escapeHtml(f.name) + '</div>' +
             '<div class="food-pick-macro">' + f.kcalPer100g + ' kcal · P' + f.proteinPer100g + ' G' + f.carbsPer100g + ' L' + f.fatPer100g + ' Fi' + (f.fiberPer100g == null ? '?' : f.fiberPer100g) + ' S' + (f.saltPer100g||0) + ' K' + (f.potassiumPer100g||0) + 'mg /100g' + (f.servingGrams ? ' · 1 ' + escapeHtml(f.servingLabel||'unité') + ' = ' + f.servingGrams + 'g' : '') + recipeIngredientNote(f) + '</div></div>' +
-            '<button type="button" class="food-pick-del" data-fedit2="' + f.id + '" aria-label="Modifier" style="margin-right:2px;">✎</button>' +
+            '<button type="button" class="food-pick-del food-pick-edit" data-fedit2="' + f.id + '" aria-label="Modifier">✎</button>' +
             '<button type="button" class="food-pick-del" data-fdel2="' + f.id + '" aria-label="Supprimer">🗑</button></div>'
           ) : '<p class="empty-note">' + (searchQuery ? 'Aucun résultat pour « ' + escapeHtml(searchQuery) + ' ».' : 'Rien dans cette catégorie.') + '</p>') + '</div>' :
           '<p class="empty-note">Aucun aliment créé pour l\'instant.</p>') +
@@ -2485,29 +2572,34 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // place instead, so its id — and therefore its logged history — stays
   // intact.
   function editFoodFormHtml(food) {
+    // Defaults open when there's already something in there to see/fix —
+    // collapsing real data out of view on open would be actively unhelpful
+    // for an edit (unlike creating new, where it's all empty to start).
+    const hasDetails = !!(food.sugarPer100g || food.fiberPer100g || food.saltPer100g || food.potassiumPer100g || food.servingGrams);
     return '<div class="field-row">' +
       '<div class="field-col" style="flex:1 1 100%"><label>Nom</label><input type="text" id="editFoodName" value="' + escapeHtml(food.name) + '"></div>' +
       '</div>' +
       '<div class="field-row">' +
-      '<div class="field-col"><label>Kcal /100g</label><input type="number" id="editFoodKcal" step="1" value="' + (food.kcalPer100g||0) + '"></div>' +
-      '<div class="field-col"><label>Protéines /100g</label><input type="number" id="editFoodP" step="0.1" value="' + (food.proteinPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Kcal /100g</label><input type="number" id="editFoodKcal" step="1" inputmode="decimal" value="' + (food.kcalPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Protéines /100g</label><input type="number" id="editFoodP" step="0.1" inputmode="decimal" value="' + (food.proteinPer100g||0) + '"></div>' +
       '</div>' +
       '<div class="field-row">' +
-      '<div class="field-col"><label>Glucides /100g</label><input type="number" id="editFoodC" step="0.1" value="' + (food.carbsPer100g||0) + '"></div>' +
-      '<div class="field-col"><label>dont Sucres /100g (compris dans les glucides ci-dessus, pas un ajout)</label><input type="number" id="editFoodSugar" step="0.1" value="' + (food.sugarPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Glucides /100g</label><input type="number" id="editFoodC" step="0.1" inputmode="decimal" value="' + (food.carbsPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Lipides /100g</label><input type="number" id="editFoodF" step="0.1" inputmode="decimal" value="' + (food.fatPer100g||0) + '"></div>' +
+      '</div>' +
+      '<details class="field-details"' + (hasDetails ? ' open' : '') + '><summary>Plus de détails (sucres, fibres, sel, potassium, portion)</summary>' +
+      '<div class="field-row">' +
+      '<div class="field-col"><label>dont Sucres /100g (compris dans les glucides ci-dessus, pas un ajout)</label><input type="number" id="editFoodSugar" step="0.1" inputmode="decimal" value="' + (food.sugarPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="editFoodFiber" step="0.1" inputmode="decimal" value="' + (food.fiberPer100g == null ? '' : food.fiberPer100g) + '"></div>' +
       '</div>' +
       '<div class="field-row">' +
-      '<div class="field-col"><label>Lipides /100g</label><input type="number" id="editFoodF" step="0.1" value="' + (food.fatPer100g||0) + '"></div>' +
-      '<div class="field-col"><label>Fibres /100g (laisse vide si absent de l\'étiquette)</label><input type="number" id="editFoodFiber" step="0.1" value="' + (food.fiberPer100g == null ? '' : food.fiberPer100g) + '"></div>' +
+      '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="editFoodSalt" step="0.01" inputmode="decimal" value="' + (food.saltPer100g||0) + '"></div>' +
+      '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="editFoodK" step="1" inputmode="decimal" value="' + (food.potassiumPer100g||0) + '"></div>' +
       '</div>' +
       '<div class="field-row">' +
-      '<div class="field-col"><label>Sel /100g (g)</label><input type="number" id="editFoodSalt" step="0.01" value="' + (food.saltPer100g||0) + '"></div>' +
-      '<div class="field-col"><label>Potassium /100g (mg)</label><input type="number" id="editFoodK" step="1" value="' + (food.potassiumPer100g||0) + '"></div>' +
-      '</div>' +
-      '<div class="field-row">' +
-      '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="editFoodServingG" step="1" value="' + (food.servingGrams || '') + '"></div>' +
+      '<div class="field-col"><label>1 unité = ? g (optionnel)</label><input type="number" id="editFoodServingG" step="1" inputmode="decimal" value="' + (food.servingGrams || '') + '"></div>' +
       '<div class="field-col"><label>Nom de l\'unité</label><input type="text" id="editFoodServingLabel" value="' + escapeHtml(food.servingLabel || '') + '"></div>' +
-      '</div>' +
+      '</div></details>' +
       (food.isRecipe ? '<p class="empty-note" style="text-align:left;padding:0 2px 10px;">🍳 Recette — modifier ici change directement les valeurs finales, pas la liste d\'ingrédients d\'origine.</p>' : '') +
       '<div class="modal-actions"><button type="button" class="btn-secondary" id="cancelEditFood">Annuler</button><button type="button" class="btn-primary" id="saveEditFood">Enregistrer</button></div>';
   }
