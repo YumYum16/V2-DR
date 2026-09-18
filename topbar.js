@@ -393,12 +393,24 @@ body.topbar-modal-open {
     const s = p.sex === 'f' ? -161 : (p.sex === 'm' ? 5 : -78);
     const bmr = 10 * weightKg + 6.25 * (p.heightCm || 175) - 5 * (p.age || 25) + s;
     const tdee = bmr * mult;
-    let deficitPct = 20;
+    let mode = 'cut', deficitPct = 20, surplusPct = 10, reversePct = 20;
     try {
       const program = JSON.parse(localStorage.getItem('po_nutrition_program_v1'));
-      if (program && typeof program.deficitPct === 'number') deficitPct = program.deficitPct;
+      if (program) {
+        if (program.mode === 'bulk' || program.mode === 'reverse') mode = program.mode;
+        if (typeof program.deficitPct === 'number') deficitPct = program.deficitPct;
+        if (typeof program.surplusPct === 'number') surplusPct = program.surplusPct;
+        reversePct = typeof program.reversePct === 'number' ? program.reversePct : deficitPct;
+      }
     } catch (e) {}
-    const total = Math.round(tdee * (1 - deficitPct / 100));
+    const rawTotal = mode === 'bulk' ? tdee * (1 + surplusPct / 100)
+      : mode === 'reverse' ? tdee * (1 - reversePct / 100)
+      : tdee * (1 - deficitPct / 100);
+    // Same safety floor as alimentation.html's safeFloorKcal(): never below BMR
+    // or a flat sex-based minimum, so this pill can't show a starvation-level
+    // number the food page itself would refuse to actually use.
+    const floorKcal = Math.max(bmr, p.sex === 'f' ? 1200 : 1500);
+    const total = Math.round(Math.max(rawTotal, floorKcal));
     let done = 0;
     try {
       const log = JSON.parse(localStorage.getItem('po_food_log_v1'));

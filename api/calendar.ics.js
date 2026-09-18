@@ -70,9 +70,16 @@ export default async function handler(req, res) {
     return computeBMR(weightKg) * mult;
   }
   const weightKg = liveWeightKg() || profile.weightKg || 75;
-  const deficitPct = typeof program.deficitPct === 'number' ? program.deficitPct : 20;
-  const kcalTrain = Math.round(tdee(weightKg, false) * (1 - deficitPct / 100));
-  const kcalRest = Math.round(tdee(weightKg, true) * (1 - deficitPct / 100));
+  const progMode = program.mode === 'bulk' ? 'bulk' : program.mode === 'reverse' ? 'reverse' : 'cut';
+  const progPct = progMode === 'bulk' ? (typeof program.surplusPct === 'number' ? program.surplusPct : 10)
+    : progMode === 'reverse' ? (typeof program.reversePct === 'number' ? program.reversePct : (typeof program.deficitPct === 'number' ? program.deficitPct : 20))
+    : (typeof program.deficitPct === 'number' ? program.deficitPct : 20);
+  const applyPct = (t) => progMode === 'bulk' ? t * (1 + progPct / 100) : t * (1 - progPct / 100);
+  // Same safety floor as Alimentation's safeFloorKcal(): never below BMR or
+  // a flat sex-based minimum.
+  const floorKcal = Math.max(computeBMR(weightKg), profile.sex === 'f' ? 1200 : 1500);
+  const kcalTrain = Math.round(Math.max(applyPct(tdee(weightKg, false)), floorKcal));
+  const kcalRest = Math.round(Math.max(applyPct(tdee(weightKg, true)), floorKcal));
 
   const icsDate = (d) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
   const dateKey = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

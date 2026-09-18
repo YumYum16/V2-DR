@@ -375,9 +375,22 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     if (restDay) { const idx = Math.max(0, tiers.indexOf(mult) - 1); mult = tiers[idx]; }
     return computeBMR(profile, weightKg) * mult;
   }
-  function readDeficitPct() {
+  // Mode-aware pct + sign, mirroring Alimentation's program.mode handling
+  // (cut/bulk/reverse) — this used to always read deficitPct and always
+  // subtract, silently showing a deficit-shaped target during a bulk or a
+  // reverse diet.
+  function readProgramPct() {
     const p = loadJSON(PROGRAM_KEY, null);
-    return (p && typeof p.deficitPct === 'number') ? p.deficitPct : 20;
+    if (!p) return { mode: 'cut', pct: 20 };
+    if (p.mode === 'bulk') return { mode: 'bulk', pct: typeof p.surplusPct === 'number' ? p.surplusPct : 10 };
+    if (p.mode === 'reverse') return { mode: 'reverse', pct: typeof p.reversePct === 'number' ? p.reversePct : (typeof p.deficitPct === 'number' ? p.deficitPct : 20) };
+    return { mode: 'cut', pct: typeof p.deficitPct === 'number' ? p.deficitPct : 20 };
+  }
+  // Same safety floor as Alimentation's safeFloorKcal(): never below BMR or
+  // a flat sex-based minimum, so this page can't show a starvation-level
+  // target the food page itself would refuse to actually use.
+  function safeFloorKcal(profile, weightKg) {
+    return Math.max(computeBMR(profile, weightKg), profile.sex === 'f' ? 1200 : 1500);
   }
 
   // Same protein/fat/carb split as Alimentation's computeTargets() — kcal
@@ -396,9 +409,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   function dayKcalTargets() {
     const profile = readProfile();
     const weightKg = readLiveWeightKg() || profile.weightKg || 75;
-    const deficitPct = readDeficitPct();
-    const trainKcal = Math.round(computeTDEE(profile, weightKg, false) * (1 - deficitPct/100));
-    const restKcal = Math.round(computeTDEE(profile, weightKg, true) * (1 - deficitPct/100));
+    const { mode, pct } = readProgramPct();
+    const floorKcal = safeFloorKcal(profile, weightKg);
+    const applyPct = tdee => mode === 'bulk' ? tdee * (1 + pct / 100) : tdee * (1 - pct / 100);
+    const trainKcal = Math.round(Math.max(applyPct(computeTDEE(profile, weightKg, false)), floorKcal));
+    const restKcal = Math.round(Math.max(applyPct(computeTDEE(profile, weightKg, true)), floorKcal));
     return {
       train: Object.assign({ kcal: trainKcal }, macrosForKcal(weightKg, trainKcal)),
       rest: Object.assign({ kcal: restKcal }, macrosForKcal(weightKg, restKcal))
