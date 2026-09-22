@@ -701,6 +701,24 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_FIBER_PATCHED_2_KEY, true);
   }
 
+  // Fifth one-time import batch.
+  const STARTER_FOODS_5_SEEDED_KEY = 'po_food_seeded_batch5_v1';
+  const STARTER_FOODS_5 = [
+    { name: 'ESN Designer Bar White Chocolate Pistachio', kcalPer100g: 429, proteinPer100g: 31.1, carbsPer100g: 33.3, sugarPer100g: 3.8, fatPer100g: 21.1, saltPer100g: 0.5, potassiumPer100g: null, fiberPer100g: 2.9, servingGrams: 45, servingLabel: 'barre' },
+    // Not yet published by ESN at import time — kcal/lipides/protéines are the brand's stated per-bar maximums for
+    // the range, glucides is back-calculated from those via the calorie equation, and sucres/sel/potassium/fibres
+    // are unknown (null). Swap in real label values once the bar's nutrition table is published.
+    { name: 'ESN Designer Bar Speculoos (estimation)', kcalPer100g: 424, proteinPer100g: 33.3, carbsPer100g: 17.8, sugarPer100g: null, fatPer100g: 24.4, saltPer100g: null, potassiumPer100g: null, fiberPer100g: null, servingGrams: 45, servingLabel: 'barre' },
+    { name: 'Mélange seigle protéiné cru (farine seigle + œufs + skyr + whey ESN)', kcalPer100g: 175, proteinPer100g: 12.7, carbsPer100g: 24.6, fatPer100g: 2.9, saltPer100g: 0.60, potassiumPer100g: 180, fiberPer100g: 3.1, servingGrams: 305, servingLabel: 'portion' }
+  ];
+  if (!loadJSON(STARTER_FOODS_5_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const existingNames = new Set(db.map(f => f.name));
+    const toAdd = STARTER_FOODS_5.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
+    if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
+    saveJSON(STARTER_FOODS_5_SEEDED_KEY, true);
+  }
+
   // Log entries snapshot their macros at the moment they're logged, so
   // fixing the food's fiberPer100g above doesn't retroactively fix
   // portions already logged before the real value was known (e.g. pasta
