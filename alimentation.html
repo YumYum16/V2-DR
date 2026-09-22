@@ -703,12 +703,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
   // Fifth one-time import batch.
   const STARTER_FOODS_5_SEEDED_KEY = 'po_food_seeded_batch5_v1';
+  // Official values from ESN's own site (per 100g; polyols aren't a tracked
+  // field so they're folded into carbsPer100g/sugarPer100g as usual).
   const STARTER_FOODS_5 = [
-    { name: 'ESN Designer Bar White Chocolate Pistachio', kcalPer100g: 429, proteinPer100g: 31.1, carbsPer100g: 33.3, sugarPer100g: 3.8, fatPer100g: 21.1, saltPer100g: 0.5, potassiumPer100g: null, fiberPer100g: 2.9, servingGrams: 45, servingLabel: 'barre' },
-    // Not yet published by ESN at import time — kcal/lipides/protéines are the brand's stated per-bar maximums for
-    // the range, glucides is back-calculated from those via the calorie equation, and sucres/sel/potassium/fibres
-    // are unknown (null). Swap in real label values once the bar's nutrition table is published.
-    { name: 'ESN Designer Bar Speculoos (estimation)', kcalPer100g: 424, proteinPer100g: 33.3, carbsPer100g: 17.8, sugarPer100g: null, fatPer100g: 24.4, saltPer100g: null, potassiumPer100g: null, fiberPer100g: null, servingGrams: 45, servingLabel: 'barre' },
+    { name: 'ESN Designer Bar White Chocolate Pistachio', kcalPer100g: 407, proteinPer100g: 33, carbsPer100g: 34, sugarPer100g: 3.8, fatPer100g: 20, saltPer100g: 0.51, potassiumPer100g: null, fiberPer100g: 2.9, servingGrams: 45, servingLabel: 'barre' },
+    { name: 'ESN Designer Bar Speculoos', kcalPer100g: 393, proteinPer100g: 33, carbsPer100g: 32, sugarPer100g: 3.2, fatPer100g: 19, saltPer100g: 0.58, potassiumPer100g: null, fiberPer100g: 6.1, servingGrams: 45, servingLabel: 'barre' },
     { name: 'Mélange seigle protéiné cru (farine seigle + œufs + skyr + whey ESN)', kcalPer100g: 175, proteinPer100g: 12.7, carbsPer100g: 24.6, fatPer100g: 2.9, saltPer100g: 0.60, potassiumPer100g: 180, fiberPer100g: 3.1, servingGrams: 305, servingLabel: 'portion' }
   ];
   if (!loadJSON(STARTER_FOODS_5_SEEDED_KEY, false)) {
@@ -717,6 +716,53 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const toAdd = STARTER_FOODS_5.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
     if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
     saveJSON(STARTER_FOODS_5_SEEDED_KEY, true);
+  }
+
+  // One-time patch: the two ESN Designer Bar entries above were first seeded
+  // from an unpublished-at-the-time estimate (Speculoos) / a third-party label
+  // scan (Pistachio) — overwrite both with the real figures from ESN's own
+  // site, and drop the "(estimation)" suffix now that Speculoos is confirmed.
+  // Matched by old name so it only touches entries seeded before this patch.
+  const ESN_BARS_OFFICIAL_PATCHED_KEY = 'po_food_esn_bars_official_patched_v1';
+  if (!loadJSON(ESN_BARS_OFFICIAL_PATCHED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const patches = {
+      'ESN Designer Bar White Chocolate Pistachio': STARTER_FOODS_5[0],
+      'ESN Designer Bar Speculoos (estimation)': Object.assign({}, STARTER_FOODS_5[1], { name: 'ESN Designer Bar Speculoos' })
+    };
+    let changed = false;
+    db.forEach(f => {
+      const patch = patches[f.name];
+      if (patch) { Object.assign(f, patch); changed = true; }
+    });
+    if (changed) saveJSON(FOOD_DB_KEY, db);
+    saveJSON(ESN_BARS_OFFICIAL_PATCHED_KEY, true);
+  }
+
+  // One-time log entry: 1 bar of each (Speculoos + Pistachio) eaten on
+  // 2026-09-22, per-bar values straight from ESN's site. Hardcoded date
+  // (not todayStr()) so re-opening the app on a later day doesn't log it
+  // against the wrong day.
+  const ESN_BARS_LOG_2026_09_22_SEEDED_KEY = 'po_food_log_esn_bars_2026_09_22_v1';
+  if (!loadJSON(ESN_BARS_LOG_2026_09_22_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const speculoos = db.find(f => f.name === 'ESN Designer Bar Speculoos');
+    const pistachio = db.find(f => f.name === 'ESN Designer Bar White Chocolate Pistachio');
+    if (speculoos) {
+      addLogEntry({
+        foodId: speculoos.id, foodName: speculoos.name, grams: 45, time: '12:00',
+        kcal: 177, protein: 15, carbs: 15, fat: 8.3,
+        salt: 0.26, potassium: 0, sugar: 1.5, fiber: 2.7
+      }, '2026-09-22');
+    }
+    if (pistachio) {
+      addLogEntry({
+        foodId: pistachio.id, foodName: pistachio.name, grams: 45, time: '12:00',
+        kcal: 183, protein: 15, carbs: 15, fat: 9.1,
+        salt: 0.23, potassium: 0, sugar: 1.7, fiber: 1.3
+      }, '2026-09-22');
+    }
+    saveJSON(ESN_BARS_LOG_2026_09_22_SEEDED_KEY, true);
   }
 
   // One-time log entry: half the seigle mix batch (305g) eaten on 2026-09-22,
