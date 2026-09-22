@@ -915,14 +915,16 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   // resting isn't training exertion, so only the time actually spent
   // lifting should count toward the activity tier that drives TDEE.
   const TYPICAL_SESSION_MIN = 60;
-  // Séance stopped getting logged (confirmed 2026-09-22), so the reconstruction
-  // below silently returns 0 and the activity multiplier tanks to sedentary
-  // even though training didn't stop. Manual fallback for the routine actually
-  // being run when there's nothing in Séance's own log to reconstruct from:
-  // 5x/week, ~6 exercises x 2 sets to failure/RIR0, 1-1.5min/set (avg 1.25),
-  // 3-4min rest between sets — same "time actually lifting, rest excluded"
-  // definition as the log-derived calc above, so it stays comparable to it.
-  const MANUAL_WEEKLY_STRENGTH_HOURS_FALLBACK = 5 * 6 * 2 * 1.25 / 60; // ≈1.25h/week
+  // Séance stopped getting logged regularly (confirmed 2026-09-22), so this
+  // blends in a manual estimate for whichever sessions of the usual 5/week
+  // didn't get logged in the trailing 7 days, instead of an all-or-nothing
+  // switch to a flat fallback the moment one real session appears. Per-session
+  // estimate for the routine actually being run: ~6 exercises x 2 sets to
+  // failure/RIR0, 1-1.5min/set (avg 1.25) — same "time actually lifting, rest
+  // excluded" definition as the log-derived calc below, so the two stay
+  // comparable and blend without a seam.
+  const MANUAL_SESSION_STRENGTH_MIN = 6 * 2 * 1.25; // 15min/session
+  const MANUAL_WEEKLY_SESSION_COUNT = 5;
   let __weeklyStrengthHoursCache = null; // see weeklyCardioHours() for why this is memoized
   function weeklyStrengthHours() {
     if (__weeklyStrengthHoursCache != null) return __weeklyStrengthHoursCache;
@@ -939,7 +941,6 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         restSecBySession[key] = (restSecBySession[key] || 0) + (l.restSec || 0);
       });
     });
-    if (!Object.keys(restSecBySession).length) return __weeklyStrengthHoursCache = MANUAL_WEEKLY_STRENGTH_HOURS_FALLBACK;
     let totalMin = 0;
     Object.keys(restSecBySession).forEach(key => {
       const m = meta[key];
@@ -947,6 +948,8 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
       const restMin = restSecBySession[key] / 60;
       totalMin += Math.max(0, durationMin - restMin);
     });
+    const missingSessions = Math.max(0, MANUAL_WEEKLY_SESSION_COUNT - Object.keys(restSecBySession).length);
+    totalMin += missingSessions * MANUAL_SESSION_STRENGTH_MIN;
     return __weeklyStrengthHoursCache = totalMin / 60;
   }
   function computeTDEE(profile, weightKg, restDay) {
