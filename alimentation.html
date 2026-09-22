@@ -719,6 +719,23 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_5_SEEDED_KEY, true);
   }
 
+  // One-time log entry: half the seigle mix batch (305g) eaten on 2026-09-22,
+  // as noted on the recipe PDF. Hardcoded date (not todayStr()) so re-opening
+  // the app on a later day doesn't log it against the wrong day.
+  const SEIGLE_LOG_2026_09_22_SEEDED_KEY = 'po_food_log_seigle_2026_09_22_v1';
+  if (!loadJSON(SEIGLE_LOG_2026_09_22_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const food = db.find(f => f.name === 'Mélange seigle protéiné cru (farine seigle + œufs + skyr + whey ESN)');
+    if (food) {
+      addLogEntry({
+        foodId: food.id, foodName: food.name, grams: 305, time: '12:00',
+        kcal: 535, protein: 38.6, carbs: 75, fat: 8.85,
+        salt: 1.82, potassium: 550, sugar: 0, fiber: 9.5
+      }, '2026-09-22');
+    }
+    saveJSON(SEIGLE_LOG_2026_09_22_SEEDED_KEY, true);
+  }
+
   // Log entries snapshot their macros at the moment they're logged, so
   // fixing the food's fiberPer100g above doesn't retroactively fix
   // portions already logged before the real value was known (e.g. pasta
