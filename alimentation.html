@@ -808,6 +808,29 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(LOG_FIBER_PATCHED_KEY, true);
   }
 
+  // One-time patch: Mr Freeze (user-added, not a starter food) is pure sugar
+  // syrup — every gram of glucides is a gram of sucres. Fix both the food
+  // entry and any portions already logged (they snapshot macros at logging).
+  const MR_FREEZE_SUGAR_PATCHED_KEY = 'po_food_mr_freeze_sugar_patched_v1';
+  if (!loadJSON(MR_FREEZE_SUGAR_PATCHED_KEY, false)) {
+    const isFreeze = name => normalizeSearch(name).indexOf('freez') !== -1;
+    const db = loadJSON(FOOD_DB_KEY, []);
+    let dbChanged = false;
+    db.forEach(f => {
+      if (isFreeze(f.name) && f.carbsPer100g != null && f.sugarPer100g !== f.carbsPer100g) { f.sugarPer100g = f.carbsPer100g; dbChanged = true; }
+    });
+    if (dbChanged) saveJSON(FOOD_DB_KEY, db);
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    let logChanged = false;
+    Object.keys(log).forEach(dk => {
+      (log[dk] || []).forEach(e => {
+        if (isFreeze(e.foodName) && e.carbs != null && e.sugar !== e.carbs) { e.sugar = e.carbs; logChanged = true; }
+      });
+    });
+    if (logChanged) saveJSON(FOOD_LOG_KEY, log);
+    saveJSON(MR_FREEZE_SUGAR_PATCHED_KEY, true);
+  }
+
   // ================================================================
   // PROFILE + LIVE WEIGHT — reuses Eau's profile (age/sexe/activité/
   // taille) so nothing has to be entered twice; weight always follows
