@@ -390,6 +390,12 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const PROGRAM_KEY = 'po_nutrition_program_v1';
   const MOOD_KEY = 'po_motivation_v1';
   const CHEAT_DAY_KEY = 'po_food_cheatdays_v1';
+  // Quick "mémo" of foods typed by name only (no macros known yet). Each
+  // item also drops a placeholder entry into that day's log so the day
+  // shows it was eaten; Claude later looks up average values, creates the
+  // food, fills in the placeholder and marks the memo item done.
+  // Shape: [{ id, name, date, entryId, done }]
+  const FOOD_MEMO_KEY = 'po_food_memo_v1';
   const DAY_MS = 86400000;
 
   // iOS Safari's on-screen keyboard shrinks the *visual* viewport but not
@@ -422,7 +428,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   const PC_APP_KEY = 'nutrition';
   const PC_SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
   const PC_SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
-  const PC_SYNCED_KEYS = [FOOD_DB_KEY, FOOD_LOG_KEY, PROGRAM_KEY, CHEAT_DAY_KEY];
+  const PC_SYNCED_KEYS = [FOOD_DB_KEY, FOOD_LOG_KEY, PROGRAM_KEY, CHEAT_DAY_KEY, FOOD_MEMO_KEY];
   // Marks "the last push to the cloud didn't confirm" (offline, request
   // failed, etc). Never itself synced — purely a local flag. Without this,
   // a save made while offline would sit correctly in localStorage but
@@ -829,6 +835,37 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     });
     if (logChanged) saveJSON(FOOD_LOG_KEY, log);
     saveJSON(MR_FREEZE_SUGAR_PATCHED_KEY, true);
+  }
+
+  // Sixth one-time import batch. Pain au chocolat: French average values
+  // (Ciqual "pain au chocolat, préemballé ou artisanal"), ~60g per piece.
+  const STARTER_FOODS_6_SEEDED_KEY = 'po_food_seeded_batch6_v1';
+  const STARTER_FOODS_6 = [
+    { name: 'Pain au chocolat (croissant au chocolat)', kcalPer100g: 423, proteinPer100g: 7.8, carbsPer100g: 45.4, sugarPer100g: 14.5, fatPer100g: 22.6, saltPer100g: 0.83, potassiumPer100g: 140, fiberPer100g: 2.7, servingGrams: 60, servingLabel: 'pièce' }
+  ];
+  if (!loadJSON(STARTER_FOODS_6_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const existingNames = new Set(db.map(f => f.name));
+    const toAdd = STARTER_FOODS_6.filter(f => !existingNames.has(f.name)).map(f => Object.assign({ id: uid(), servingGrams: null, servingLabel: null }, f));
+    if (toAdd.length) saveJSON(FOOD_DB_KEY, db.concat(toAdd));
+    saveJSON(STARTER_FOODS_6_SEEDED_KEY, true);
+  }
+
+  // One-time log entry: 1 pain au chocolat (60g) eaten on 2026-09-26.
+  // Hardcoded date (not todayStr()) so re-opening the app on a later day
+  // doesn't log it against the wrong day.
+  const PAIN_CHOC_LOG_2026_09_26_SEEDED_KEY = 'po_food_log_pain_choc_2026_09_26_v1';
+  if (!loadJSON(PAIN_CHOC_LOG_2026_09_26_SEEDED_KEY, false)) {
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const food = db.find(f => f.name === 'Pain au chocolat (croissant au chocolat)');
+    if (food) {
+      addLogEntry({
+        foodId: food.id, foodName: food.name, grams: 60,
+        kcal: 253.8, protein: 4.68, carbs: 27.24, fat: 13.56,
+        salt: 0.5, potassium: 84, sugar: 8.7, fiber: 1.62
+      }, '2026-09-26');
+    }
+    saveJSON(PAIN_CHOC_LOG_2026_09_26_SEEDED_KEY, true);
   }
 
   // ================================================================
@@ -2102,11 +2139,29 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
 
     html += '<div class="gm-card">' +
       '<div class="section-title">Journal du jour<button type="button" class="gm-ghost" id="addFoodBtn">+ Ajouter</button></div>' +
-      (entries.length ? entries.map(e =>
+      (entries.length ? entries.map(e => e.memo ?
+        '<div class="log-row"><div><div class="log-name">📝 ' + escapeHtml(e.foodName) + '</div><div class="log-meta">mémo · en attente d\'estimation · ' + e.time + '</div></div>' +
+        '<span class="log-macros">? kcal</span>' +
+        '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
+        :
         '<div class="log-row"><div><div class="log-name">' + escapeHtml(e.foodName) + '</div><div class="log-meta">' + e.grams + ' g · ' + e.time + '</div></div>' +
         '<span class="log-macros">' + Math.round(e.kcal) + ' kcal<br>P' + Math.round(e.protein) + ' G' + Math.round(e.carbs) + ' L' + Math.round(e.fat) + ' S' + (e.salt||0).toFixed(1) + '</span>' +
         '<button type="button" class="log-del" data-del="' + e.id + '" aria-label="Supprimer">×</button></div>'
       ).join('') : '<p class="empty-note">' + (hasAnyPastLog ? 'Nouveau jour — rien enregistré depuis minuit. Rien n\'est perdu : ton historique des jours précédents est intact, juste en dessous dans le calendrier.' : 'Rien enregistré aujourd\'hui.') + '</p>') +
+      '</div>';
+
+    const pendingMemos = loadJSON(FOOD_MEMO_KEY, []).filter(m => !m.done);
+    html += '<div class="gm-card">' +
+      '<div class="section-title">📝 Mémo aliments' + (pendingMemos.length ? '<button type="button" class="gm-ghost" id="copyMemoBtn">Copier la liste</button>' : '') + '</div>' +
+      '<p class="empty-note" style="text-align:left;padding:0 0 10px;">Tape juste le nom de ce que tu as mangé — il est ajouté au journal du jour, et Claude le complète le soir avec des valeurs moyennes.</p>' +
+      '<form id="memoForm" style="display:flex;gap:8px;align-items:stretch;">' +
+        '<input type="text" id="memoInput" class="food-search-input" style="margin:0;flex:1;" placeholder="ex. kebab, part de pizza…" autocomplete="off" enterkeyhint="done">' +
+        '<button type="submit" class="btn-primary" style="border-radius:10px;padding:0 16px;font-family:inherit;font-weight:700;cursor:pointer;">Ajouter</button>' +
+      '</form>' +
+      (pendingMemos.length ? '<div style="margin-top:8px;">' + pendingMemos.map(m =>
+        '<div class="log-row"><div style="flex:1;"><div class="log-name">' + escapeHtml(m.name) + '</div><div class="log-meta">' + (m.date === todayStr() ? 'aujourd\'hui' : m.date) + ' · en attente</div></div>' +
+        '<button type="button" class="log-del" data-memo-del="' + m.id + '" aria-label="Supprimer">×</button></div>'
+      ).join('') + '</div>' : '') +
       '</div>';
 
     html += '<div class="gm-card">' +
@@ -2156,6 +2211,36 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
         if (idx !== -1) deleteWithUndo(entries[idx], todayStr(), idx);
         renderMain();
       });
+    });
+    document.getElementById('memoForm').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const name = document.getElementById('memoInput').value.trim();
+      if (!name) return;
+      const date = todayStr();
+      const entryId = uid();
+      addLogEntry({
+        id: entryId, memo: true, foodId: null, foodName: name, grams: 0,
+        kcal: 0, protein: 0, carbs: 0, fat: 0, salt: 0, potassium: 0, sugar: 0, fiber: 0
+      }, date);
+      saveJSON(FOOD_MEMO_KEY, loadJSON(FOOD_MEMO_KEY, []).concat([{ id: uid(), name, date, entryId, done: false }]));
+      renderMain();
+    });
+    app.querySelectorAll('[data-memo-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const memos = loadJSON(FOOD_MEMO_KEY, []);
+        const m = memos.find(x => x.id === btn.dataset.memoDel);
+        if (!m) return;
+        if (m.entryId) removeLogEntry(m.entryId, m.date);
+        saveJSON(FOOD_MEMO_KEY, memos.filter(x => x.id !== m.id));
+        renderMain();
+      });
+    });
+    const copyMemoBtn = document.getElementById('copyMemoBtn');
+    if (copyMemoBtn) copyMemoBtn.addEventListener('click', () => {
+      const text = loadJSON(FOOD_MEMO_KEY, []).filter(m => !m.done).map(m => '- ' + m.name + ' (' + m.date + ')').join('\n');
+      const done = () => { copyMemoBtn.textContent = 'Copié ✓'; setTimeout(() => { copyMemoBtn.textContent = 'Copier la liste'; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => prompt('Copie cette liste :', text));
+      else prompt('Copie cette liste :', text);
     });
     document.getElementById('foodCalPrev').addEventListener('click', () => { foodCalMonthOffset--; renderMain(); });
     document.getElementById('foodCalNext').addEventListener('click', () => { foodCalMonthOffset++; renderMain(); });
