@@ -838,10 +838,11 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
   }
 
   // Sixth one-time import batch. Pain au chocolat: French average values
-  // (Ciqual "pain au chocolat, préemballé ou artisanal"), ~60g per piece.
+  // (Ciqual "pain au chocolat, préemballé ou artisanal"), ~70g per piece
+  // (standard boulangerie size; supermarket ones are ~45g).
   const STARTER_FOODS_6_SEEDED_KEY = 'po_food_seeded_batch6_v1';
   const STARTER_FOODS_6 = [
-    { name: 'Pain au chocolat (croissant au chocolat)', kcalPer100g: 423, proteinPer100g: 7.8, carbsPer100g: 45.4, sugarPer100g: 14.5, fatPer100g: 22.6, saltPer100g: 0.83, potassiumPer100g: 140, fiberPer100g: 2.7, servingGrams: 60, servingLabel: 'pièce' }
+    { name: 'Pain au chocolat (croissant au chocolat)', kcalPer100g: 423, proteinPer100g: 7.8, carbsPer100g: 45.4, sugarPer100g: 14.5, fatPer100g: 22.6, saltPer100g: 0.83, potassiumPer100g: 140, fiberPer100g: 2.7, servingGrams: 70, servingLabel: 'pièce' }
   ];
   if (!loadJSON(STARTER_FOODS_6_SEEDED_KEY, false)) {
     const db = loadJSON(FOOD_DB_KEY, []);
@@ -851,7 +852,7 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     saveJSON(STARTER_FOODS_6_SEEDED_KEY, true);
   }
 
-  // One-time log entry: 1 pain au chocolat (60g) eaten on 2026-09-26.
+  // One-time log entry: 1 pain au chocolat (70g) eaten on 2026-09-26.
   // Hardcoded date (not todayStr()) so re-opening the app on a later day
   // doesn't log it against the wrong day.
   const PAIN_CHOC_LOG_2026_09_26_SEEDED_KEY = 'po_food_log_pain_choc_2026_09_26_v1';
@@ -860,12 +861,33 @@ details.info p { margin: 8px 0; } details.info strong { color: var(--text-primar
     const food = db.find(f => f.name === 'Pain au chocolat (croissant au chocolat)');
     if (food) {
       addLogEntry({
-        foodId: food.id, foodName: food.name, grams: 60,
-        kcal: 253.8, protein: 4.68, carbs: 27.24, fat: 13.56,
-        salt: 0.5, potassium: 84, sugar: 8.7, fiber: 1.62
+        foodId: food.id, foodName: food.name, grams: 70,
+        kcal: 296.1, protein: 5.46, carbs: 31.78, fat: 15.82,
+        salt: 0.58, potassium: 98, sugar: 10.15, fiber: 1.89
       }, '2026-09-26');
     }
     saveJSON(PAIN_CHOC_LOG_2026_09_26_SEEDED_KEY, true);
+  }
+
+  // One-time patch: the pain au chocolat was first seeded at 60g/pièce —
+  // a standard boulangerie one is closer to 70g. Fix the food's serving
+  // and the portion already logged on 2026-09-26 (it snapshots macros).
+  const PAIN_CHOC_70G_PATCHED_KEY = 'po_food_pain_choc_70g_patched_v1';
+  if (!loadJSON(PAIN_CHOC_70G_PATCHED_KEY, false)) {
+    const name = 'Pain au chocolat (croissant au chocolat)';
+    const db = loadJSON(FOOD_DB_KEY, []);
+    const food = db.find(f => f.name === name);
+    if (food && food.servingGrams === 60) { food.servingGrams = 70; saveJSON(FOOD_DB_KEY, db); }
+    const log = loadJSON(FOOD_LOG_KEY, {});
+    let logChanged = false;
+    (log['2026-09-26'] || []).forEach(e => {
+      if (e.foodName === name && e.grams === 60) {
+        Object.assign(e, { grams: 70, kcal: 296.1, protein: 5.46, carbs: 31.78, fat: 15.82, salt: 0.58, potassium: 98, sugar: 10.15, fiber: 1.89 });
+        logChanged = true;
+      }
+    });
+    if (logChanged) saveJSON(FOOD_LOG_KEY, log);
+    saveJSON(PAIN_CHOC_70G_PATCHED_KEY, true);
   }
 
   // ================================================================
